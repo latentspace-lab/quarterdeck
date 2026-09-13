@@ -108,6 +108,7 @@ export class VoiceAudio {
       await Promise.all([
          this.preloadNation("GB"),
          this.preloadNation("FR"),
+         this.preloadNation("ES"),
       ]);
    }
 
