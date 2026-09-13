@@ -17,11 +17,21 @@ function ok(cond, name, extra = "") {
 
 // ---------------------------------------------------------------- Katalog
 console.log("== Schiffskatalog ==");
-ok(VESSELS.length === 4, "vier Schiffe im Katalog", String(VESSELS.length));
-ok(VESSELS.filter((v) => v.rig === "square").length === 3, "drei Rahsegler");
+ok(VESSELS.length === 5, "fuenf Schiffe im Katalog", String(VESSELS.length));
+ok(VESSELS.filter((v) => v.rig === "square").length === 4, "vier Rahsegler");
 ok(getVessel("lydia").name === "Lydia" && vesselLabel(getVessel("lydia")) === "HMS Lydia",
    "HMS Lydia gefunden");
 ok(getVessel("gibtsnicht").id === "yacht", "unbekannte ID faellt auf die Yacht zurueck");
+// getVessel() faellt still auf die Yacht zurueck. Fehlt einem Eintrag die id,
+// segelt die halbe Flotte unbemerkt als Jolle - darum jede id einzeln pruefen.
+ok(VESSELS.every((v) => v.id && getVessel(v.id).name === v.name),
+   "jedes Schiff im Katalog hat eine eigene id",
+   VESSELS.map((v) => v.id).join(", "));
+const indy = polarSpeedAt(140, 15, 1, 1, getVessel("indefatigable").sail.polar);
+const lyd = polarSpeedAt(140, 15, 1, 1, getVessel("lydia").sail.polar);
+ok(getVessel("indefatigable").name === "Indefatigable" && indy > lyd,
+   "die Indefatigable laeuft der Lydia davon",
+   indy.toFixed(2) + " kn vs " + lyd.toFixed(2) + " kn");
 ok(gunCount(getVessel("yacht")) === 0 && getVessel("yacht").guns === null,
    "die Yacht fuehrt keine Geschuetze");
 ok(gunCount(getVessel("hotspur")) === 20, "Hotspur: 20 Rohre", String(gunCount(getVessel("hotspur"))));
