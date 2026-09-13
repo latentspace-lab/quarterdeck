@@ -24,6 +24,13 @@ export const SECTIONS = ["BOW", "MID", "QUARTER"];
 export const MASTS = ["fore", "main", "mizzen"];
 
 // Munitionsarten: wie stark wirken sie auf welche Baugruppe?
+// Rumpfschaden einer einzelnen 18-Pfuender-Kugel auf Pistolenschussweite,
+// bezogen auf einen von sechs Rumpfabschnitten. Der Wert ist so gewaehlt,
+// dass eine volle Breitseite aus naechster Naehe rund ein Viertel der
+// Gefechtskraft kostet - drei bis vier Breitseiten machen ein Schiff fertig,
+// genau wie in den Gefechtsberichten der Zeit.
+export const HULL_PER_BALL = 0.115;
+
 export const AMMO = {
    ball: {
       id: "ball",
@@ -56,7 +63,7 @@ export const AMMO = {
       name: "Kartaetsche",
       short: "Kartätsche",
       desc: "Schwarm kleiner Kugeln - fegt das Deck, ohne den Rumpf zu oeffnen.",
-      hull: 0.12, rig: 0.40, gun: 1.7, crew: 0.35,  // je Schrotkugel!
+      hull: 0.035, rig: 0.12, gun: 0.10, crew: 0.16,  // je Schrotkugel!
       elevation: 1.1,
       spreadDeg: 5.5,
       pellets: 9,
@@ -178,25 +185,39 @@ export class DamageModel {
       // Nicht die Kugel toetet, sondern der Splitterhagel, den sie aus der
       // Bordwand reisst - und auf kurze Distanz die Kartaetsche.
       const isRigHit = (hit.y ?? 0) > FB * 1.25;
-      res.crew.n = Math.round(power * a.crew * (1.2 + Math.random() * 2.2));
+      res.crew.n = Math.round(power * a.crew * (2.0 + Math.random() * 4.0));
       res.crew.where = isRigHit ? "rigg" : (a.id === "grape" ? "deck" : "bord");
 
       // --- Rumpf ---------------------------------------------------------
       if (!isRigHit) {
-         const dmg = power * a.hull * 0.055 / this.scantling;
          const key = side + "_" + sec;
-         this.hull[key] = clamp(this.hull[key] - dmg, 0, 1);
-         res.splinters = Math.round(clamp(dmg * 190 * a.hull, 2, 26));
+         // Eine schon aufgerissene Bordwand haelt die naechste Kugel viel
+         // schlechter: Spanten sind gebrochen, Plankengaenge lose. Deshalb
+         // waechst der Schaden mit dem Zerstoerungsgrad des Abschnitts.
+         const worn = 1 + 1.25 * (1 - this.hull[key]);
+         const dmg = power * a.hull * HULL_PER_BALL * worn / this.scantling;
+         const before = this.hull[key];
+         this.hull[key] = clamp(before - dmg, 0, 1);
+         res.hullDmg = before - this.hull[key];
+         res.splinters = Math.round(clamp(dmg * 190 * a.hull, 2, 34));
 
-         if (a.hull > 0.5 && dmg > 0.012) {
+         // Abschnitt komplett durchgeschossen: die Bordwand ist offen, das
+         // Wasser steht in der Batterie.
+         if (before > 0 && this.hull[key] <= 0.001) {
+            this.holes.push({ side, sec, below: true, size: 0.55 });
+            this._event("shattered", { side, sec });
+            res.shattered = true;
+         }
+
+         if (a.hull > 0.5 && dmg > 0.010) {
             res.holed = true;
             // "zwischen Wind und Wasser": Treffer knapp ueber der Wasserlinie
             // reissen beim Ueberholen des Schiffs unter Wasser - das sind die
             // gefaehrlichen. Tiefe Treffer sind seltener, aber schlimm.
-            const low = (hit.y ?? FB) < FB * 0.42;
-            if (low && Math.random() < 0.55) {
+            const low = (hit.y ?? FB) < FB * 0.50;
+            if (low && Math.random() < 0.72) {
                res.below = true;
-               const size = dmg * (0.6 + Math.random() * 0.8);
+               const size = dmg * (0.9 + Math.random() * 1.1);
                this.holes.push({ side, sec, below: true, size });
                this._event("holed", { side, sec, size });
             } else {
@@ -204,9 +225,10 @@ export class DamageModel {
             }
          }
 
-         // Rohre ausgeschlagen
+         // Rohre ausgeschlagen. Eine Kugel, die in der Batterie einschlaegt,
+         // wirft die Lafette um und toetet die halbe Bedienung.
          if (a.gun > 0 && sec !== "QUARTER") {
-            const loss = power * a.gun * 0.045 * (0.5 + Math.random());
+            const loss = power * a.gun * 0.055 * (0.5 + Math.random());
             const before = this.guns[side];
             this.guns[side] = clamp(this.guns[side] - loss, 0, 1);
             res.gunsLost = before - this.guns[side];
@@ -283,7 +305,7 @@ export class DamageModel {
       const e = 0.5 * v * v * clamp(otherTons / Math.max(ownTons, 1), 0.15, 4) / 120;
       const sec = sectionAt(clamp(s ?? 0.5, 0, 1));
       const key = (side === "PORT" ? "PORT" : "STBD") + "_" + sec;
-      const dmg = clamp(e / this.scantling, 0, 0.9);
+      const dmg = clamp(e * 1.6 / this.scantling, 0, 0.95);
       this.hull[key] = clamp(this.hull[key] - dmg, 0, 1);
       const res = { section: sec, side, splinters: Math.round(clamp(dmg * 120, 3, 40)), mastBroken: null, below: false };
       if (dmg > 0.10 && Math.random() < 0.7) {
@@ -356,7 +378,14 @@ export class DamageModel {
       const heelExtra = clamp((ctx.heel ?? 0) / 40, 0, 1) * 0.4;
       // Die Pumpen laufen nur, solange Leute daran stehen
       const pumps = (this.isPlayer ? 0.010 : 0.008) * clamp(ctx.pump ?? 1, 0, 1.3);
-      const rate = (inflow * 0.032 * (1 + heelExtra)) / Math.max(this.reserve, 0.2);
+      // Ein offenes Leck unter Wasser laesst pro Sekunde mehr Wasser ein, als
+      // die Pumpen schaffen. Nur ein paar Splittertreffer haelt die Wache in
+      // Schach - eine aufgerissene Bordwand nicht mehr.
+      // Der Zufluss waechst mit der Wurzel der Leckflaeche: Wasser stroemt
+      // nach Torricelli ein, die Zimmerleute pfropfen die kleinen Loecher zu.
+      // Eine Breitseite allein haelt die Wache gerade noch in Schach, drei
+      // nicht mehr.
+      const rate = (0.013 * Math.sqrt(inflow) * (1 + heelExtra)) / Math.max(this.reserve, 0.2);
       this.flooding = clamp(this.flooding + (rate - pumps) * dt, 0, 1);
       if (this.flooding >= 1 && !this.sunk) {
          this.sunk = true;

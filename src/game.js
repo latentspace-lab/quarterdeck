@@ -7,7 +7,7 @@ import { getFaction, enemyFactionFor } from "./factions.js";
 import { Ship } from "./ship.js";
 import { Fleet, SCENARIOS, scenarioFor, forcesFor } from "./fleet.js";
 import { DebrisField } from "./debris.js";
-import { createTerrain } from "./terrain.js";
+import { createTerrain, findOpenWater, makeRng, worldInfo } from "./terrain.js";
 import * as collide from "./collide.js";
 import { AMMO, AMMO_ORDER } from "./damage.js";
 import { BoatDynamics, pointOfSail, vmgUp, vmgDown, polarSpeedAt } from "./physics.js";
@@ -74,6 +74,7 @@ export class Simulator {
       // Land und Untiefen
       this.terrain = createTerrain(scene.scene);
       this.terrain.setVisible(false);
+      this.worldSeed = null;   // null = bei jedem Start neu auswuerfeln
 
       // Wind
       this.wind = new Wind({ dir: 0, speed: 12, gust: 0.5, veer: 0.4, variability: 1 });
@@ -325,13 +326,19 @@ export class Simulator {
       this.ui.closeMenu();
       this.menuOpen = false;
       this.paused = false;
+      // Erst die Welt, dann die Schiffe: der Startplatz haengt von den Inseln ab.
+      if (mode === "Regatta" || mode === "Training") {
+         this.terrain.setVisible(false);
+      } else {
+         this._newWorld();
+         this.terrain.setVisible(true);
+      }
       this._placeAtStart(mode);
       this.battery.clear();
       this.debris.clear();
       this.course.setVisible(mode === "Regatta");
       if (mode !== "Gefecht") {
          this.fleet.clear();
-         this.terrain.setVisible(false);
       }
       this.ui.showMessage(
          vesselLabel(this.vessel) + " klar zum Auslaufen — " + this.vessel.rate);
@@ -370,6 +377,20 @@ export class Simulator {
       }
    }
 
+   // Neue Seekarte auswuerfeln (oder den gesetzten Seed wiederholen).
+   _newWorld(seed) {
+      const s = seed ?? this.worldSeed ?? ((Math.random() * 1e9) | 0);
+      const w = this.terrain.regenerate(s);
+      this.worldSeed = w.seed;
+      if (this.ui && this.ui.setSeed) this.ui.setSeed(w.seed);
+      return w;
+   }
+
+   // Feste Seekarte vorgeben; null = jedes Mal neu wuerfeln.
+   setSeed(seed) {
+      this.worldSeed = seed == null ? null : (seed >>> 0);
+   }
+
    _placeAtStart(mode) {
       const V = this.vessel;
       // Kein Start mitten im Wind: ein Rahsegler kaeme dort nie heraus.
@@ -383,6 +404,17 @@ export class Simulator {
       this.boat.heel = 0;
       this.boat.pos.x = 0;
       this.boat.pos.z = mode === "Regatta" ? -30 - V.hull.loa * 1.2 : 0;
+      // Im Archipel nicht blind auf dem Nullpunkt starten, sondern auf einem
+      // Platz mit genug Wasser unterm Kiel und Raum zum Manoevrieren.
+      if (this.terrain.visible) {
+         const rng = makeRng((worldInfo().seed ^ 0x5f3a) >>> 0);
+         const p = findOpenWater({
+            rng, maxDist: 700, minDepth: 22,
+            clearance: Math.max(240, V.hull.loa * 4),
+         });
+         this.boat.pos.x = p.x;
+         this.boat.pos.z = p.z;
+      }
       this.boat.sailSet = 1;
       this.boat.tack = "STBD";
       this.boat.leeway = 0;
@@ -708,7 +740,6 @@ export class Simulator {
       this.debris.clear();
       const foeFaction = enemyFactionFor(this.factionId);
       const list = forcesFor(this.scenarioId, this.vessel, foeFaction);
-      this.terrain.setVisible(true);
       // Der Seegang folgt dem Wind nur traege: eine See baut sich auf und
       // laeuft langsamer wieder ab. Sonst wuerde jede Boe die Wellen pumpen.
       this.seaWind = 12;
@@ -725,8 +756,18 @@ export class Simulator {
       list.forEach((id, i) => {
          const spread = (i - (list.length - 1) / 2) * 420;
          const across = dirVec(windDir + 90);
-         const x = this.player.pos.x + up.x * 900 + across.x * spread;
-         const z = this.player.pos.z + up.z * 900 + across.z * spread;
+         let x = this.player.pos.x + up.x * 900 + across.x * spread;
+         let z = this.player.pos.z + up.z * 900 + across.z * spread;
+         // Auch der Gegner braucht Wasser unterm Kiel: den Idealplatz nur als
+         // Ausgangspunkt nehmen und den naechsten freien Fleck dazu suchen.
+         if (this.terrain.visible) {
+            const rng = makeRng((worldInfo().seed + 977 * (i + 1)) >>> 0);
+            const p = findOpenWater({
+               rng, near: { x, z }, maxDist: 420, minDepth: 20, clearance: 260,
+               avoid: [{ x: this.player.pos.x, z: this.player.pos.z, r: 400 }],
+            });
+            x = p.x; z = p.z;
+         }
          const heading = normDeg(Math.atan2(this.player.pos.x - x, this.player.pos.z - z) * 180 / Math.PI);
          this.fleet.spawn(id.id, {
             x, z, heading, speed: 4,
@@ -799,6 +840,17 @@ export class Simulator {
             break;
          case "holed":
             if (isUs && Math.random() < 0.4) this.ui.showMessage("Leck unter Wasser — die Pumpen!");
+            break;
+         case "shattered": {
+            const SEC = { BOW: "Bug", MID: "Mittschiffs", QUARTER: "Achterschiff" };
+            const SD = { PORT: "backbord", STBD: "steuerbord" };
+            this.ui.showMessage((isUs ? "Die Bordwand " : ev.ship.name + ": Bordwand ")
+               + SD[ev.side] + " " + (SEC[ev.sec] || "") + " ist aufgerissen!");
+            if (isUs) this.cam.shake(1.4);
+            break;
+         }
+         case "swamped":
+            if (isUs) this.ui.showMessage("See kommt über die Reling — Wasser in der Batterie!");
             break;
          case "rudder":
             if (isUs) this.ui.showMessage("Das Ruder ist getroffen!");

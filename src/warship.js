@@ -512,6 +512,15 @@ function waveFlag(mesh, time, strength) {
    pos.needsUpdate = true;
 }
 
+// Freibord bis Oberkante Schanzkleid, mittschiffs gemessen.
+// Ein Rahsegler dieser Zeit trug sein Batteriedeck gut zwei Meter ueber Wasser
+// und das Schanzkleid noch einmal so hoch darueber - sonst stuende die See bei
+// jedem Seegang in der Batterie. Genau danach ist der Wert bemessen.
+export function freeboardOf(vessel) {
+   const { draft, beam } = vessel.hull;
+   return draft * 0.80 + beam * 0.11;
+}
+
 // =========================================================================
 // Hauptbaukasten
 // =========================================================================
@@ -523,7 +532,7 @@ export function buildWarship(vessel) {
    const LOA = vessel.hull.loa;
    const BEAM = vessel.hull.beam;
    const DRAFT = vessel.hull.draft;
-   const FB = DRAFT * 0.70 + BEAM * 0.10; // Freibord bis Schanzkleidoberkante
+   const FB = freeboardOf(vessel);
    const dim = { LOA, BEAM, DRAFT, FB };
    const { point } = makeHullGeom(dim);
 

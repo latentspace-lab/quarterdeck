@@ -8,7 +8,7 @@
 
 import * as THREE from "three";
 import { buildSailboat } from "./boat.js";
-import { buildWarship } from "./warship.js";
+import { buildWarship, freeboardOf } from "./warship.js";
 import { BoatDynamics } from "./physics.js";
 import { DamageModel } from "./damage.js";
 import { Crew } from "./crew.js";
@@ -49,6 +49,14 @@ export class Ship {
          isPlayer: this.isPlayer,
          neverStrikes: !!(this.faction && this.faction.neverStrikes),
       });
+
+      // Freibord bis Oberkante Schanzkleid - Grenze, ab der die See ueber Deck
+      // laeuft. Die Yacht hat kein Schanzkleid, dort reicht ein flacher Wert.
+      this.freeboard = this.model.userData.FB
+         ?? (this.vessel.rig === "square" ? freeboardOf(this.vessel)
+            : this.vessel.hull.draft * 0.55);
+      this.railClear = this.freeboard;
+      this._swampT = 0;
 
       // --- Mannschaft ---
       this.crew = new Crew(this.vessel, { isPlayer: this.isPlayer });
@@ -456,12 +464,6 @@ export class Ship {
       const wt = ctx.waveT ?? ctx.t;
       const lam = ctx.lambda ?? 1;
       const sea = (x, z) => seaHeight(x, z, wt, ctx.waveRad, ctx.amp, lam);
-      const hy = sea(p.x, p.z) * 0.9;
-      // Wasser im Schiff druckt sie tiefer
-      const sinkIn = this.dmg.flooding * V.hull.draft * 0.55;
-      this.model.position.set(p.x, hy - sinkIn, p.z);
-      this.model.rotation.y = this.dyn.heading * DEG;
-
       const heelSide = this.dyn.twaSigned > 0 ? 1 : -1;
       const halfBeam = V.hull.beam / 2;
       const probe = V.hull.loa * 0.36;
@@ -469,15 +471,36 @@ export class Ship {
 
       const port = dirVec(this.dyn.heading - 90);
       const stbd = dirVec(this.dyn.heading + 90);
+      const ahead0 = dirVec(this.dyn.heading);
       const hP = sea(p.x + port.x * halfBeam, p.z + port.z * halfBeam);
       const hS = sea(p.x + stbd.x * halfBeam, p.z + stbd.z * halfBeam);
       const waveRoll = (hS - hP) * 0.18 * massDamp;
+
+      // Ein Schiff schwimmt auf der Flaeche, die sein Rumpf verdraengt, nicht
+      // auf dem Wert unter dem Grossmast: darum wird ueber Bug, Heck und beide
+      // Seiten gemittelt. Vorher lag der Rumpf auf jedem Wellenkamm unter
+      // Wasser - die See stand dann auf dem Batteriedeck.
+      const hF = sea(p.x + ahead0.x * probe, p.z + ahead0.z * probe);
+      const hR = sea(p.x - ahead0.x * probe, p.z - ahead0.z * probe);
+      const hy = (sea(p.x, p.z) * 2 + hP + hS + hF + hR) / 6;
+      // Wasser im Schiff druckt sie tiefer
+      const sinkIn = this.dmg.flooding * V.hull.draft * 0.55;
+      this.model.position.set(p.x, hy - sinkIn, p.z);
+      this.model.rotation.y = this.dyn.heading * DEG;
 
       const kick = this.battery.rollKick * this.battery.rollKickSide;
       this.recoilRoll = lerp(this.recoilRoll, kick, clamp(dt * 9, 0, 1));
 
       const heeler = this.model.userData.heeler;
       heeler.rotation.z = heelSide * this.dyn.heel * DEG + waveRoll + this.recoilRoll * DEG;
+
+      // --- Wasser ueber die Reling --------------------------------------
+      // Die Lee-Reling ist der tiefste Punkt des Decks. Taucht sie unter die
+      // oertliche Wasserflaeche, stuerzt See in die Batterie: das Schiff nimmt
+      // Wasser, die Leute an Deck gehen ueber Bord. Genau deshalb liess man
+      // bei steifer Brise reffen und schloss die unteren Pforten.
+      this._swampCheck(dt, heeler.rotation.z, halfBeam, sinkIn,
+         hy, Math.min(hP, hS));
 
       const ahead = dirVec(this.dyn.heading);
       const astern = dirVec(this.dyn.heading + 180);
@@ -489,6 +512,37 @@ export class Ship {
       // rechnet in Schiffskoordinaten und darf sich nicht darauf verlassen,
       // dass der Renderer sie schon aktualisiert hat.
       this.model.updateMatrixWorld(true);
+   }
+
+   // Freibord der Lee-Reling ueber der oertlichen Wasserflaeche.
+   // Negativ = die See laeuft ueber Deck.
+   railClearance(rollRad, halfBeam, sinkIn, hy, hLee) {
+      const fb = this.freeboard;
+      const roll = Math.abs(rollRad);
+      // Reling kippt zur Lee: Hoehe sinkt um sin(krengung)*halbe Breite
+      const rail = fb * Math.cos(roll) - halfBeam * Math.sin(roll) - sinkIn;
+      return rail - (hLee - hy);
+   }
+
+   _swampCheck(dt, rollRad, halfBeam, sinkIn, hy, hLee) {
+      const clear = this.railClearance(rollRad, halfBeam, sinkIn, hy, hLee);
+      this.railClear = clear;
+      if (clear >= 0 || this.dmg.sunk) { this._swampT = 0; return; }
+      const depth = Math.min(-clear, 2.5);
+      this._swampT = (this._swampT || 0) + dt;
+      // Wassereinbruch ueber Deck: als offenes Leck buchen, damit die Pumpen
+      // und die Sinkmechanik davon wissen.
+      this.dmg.flooding = clamp(
+         this.dmg.flooding + depth * 0.022 * dt, 0, 1);
+      // Leute, die an Deck arbeiten, gehen ueber Bord
+      if (this.crew && Math.random() < depth * 0.18 * dt) {
+         this.crew.hit(1 + ((Math.random() * 2) | 0), "deck");
+         if (this.crew.shock) this.crew.shock(0.04);
+      }
+      if (this._swampT > 1.2) {
+         this._swampT = 0;
+         this.dmg._event("swamped", { depth });
+      }
    }
 
    animate(dt, ctx) {

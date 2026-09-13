@@ -9,7 +9,7 @@ import { buildWarship } from "../src/warship.js";
 import { Battery, segmentBox, rangeForElevation, elevationForRange } from "../src/guns.js";
 import { Ship } from "../src/ship.js";
 import { Captain, sailableHeading, SCENARIOS, forcesFor } from "../src/fleet.js";
-import { waterDepth, groundHeight } from "../src/terrain.js";
+import { waterDepth, groundHeight, generateWorld, worldInfo, isOpenWater, findOpenWater } from "../src/terrain.js";
 import { whitecapsForWind } from "../src/ocean.js";
 import { testPair, groundStep } from "../src/collide.js";
 import { seaHeight, ampForWind } from "../src/ocean.js";
@@ -38,9 +38,13 @@ function pound(vessel, ammo, n, o = {}) {
    }
    return d;
 }
+const hull8 = pound(LY, "ball", 8);
+ok(hull8.integrity() < 0.85 && hull8.integrity() > 0.45,
+   "eine volle Breitseite kostet die Fregatte ein Viertel ihrer Gefechtskraft",
+   hull8.integrity().toFixed(2));
 const hull20 = pound(LY, "ball", 20);
-ok(hull20.integrity() < 0.85 && hull20.integrity() > 0.4,
-   "20 Vollkugeln setzen der Fregatte zu, erledigen sie aber nicht",
+ok(hull20.integrity() < 0.40,
+   "zweieinhalb Breitseiten machen sie gefechtsunfaehig",
    hull20.integrity().toFixed(2));
 ok(hull20.guns.STBD < 0.9, "Vollkugeln schlagen Rohre aus", hull20.guns.STBD.toFixed(2));
 const rig20 = pound(LY, "chain", 20, { y: 14 });
@@ -233,11 +237,24 @@ console.log("\n== Schiff zerlegen ==");
 
 // ------------------------------------------------------------ Gelaende
 console.log("\n== Untiefen ==");
+// Die Seekarte wird jetzt gewuerfelt - der Test erzeugt eine feste Welt und
+// sucht sich Riff und Insel darin selbst.
+const WORLD = generateWorld(20250913);
+ok(WORLD.islands.length >= 2, "der Generator legt ein Archipel an",
+   WORLD.islands.length + " Inseln, " + WORLD.reefs.length + " Riffe");
 ok(waterDepth(0, 0) > 20, "offenes Wasser ist tief", waterDepth(0, 0).toFixed(0) + " m");
-ok(waterDepth(420, 780) < LY.hull.draft * 1.12, "auf dem Riff laeuft die Fregatte auf",
-   waterDepth(420, 780).toFixed(1) + " m");
-ok(groundHeight(1500, 700) > 40, "die Insel ragt aus dem Wasser",
-   groundHeight(1500, 700).toFixed(0) + " m");
+// flachste Stelle aller Untiefen suchen
+let SHOAL = null, PEAK = null;
+for (const f of [...WORLD.islands, ...WORLD.reefs]) {
+   const d = waterDepth(f.x, f.z);
+   if (!SHOAL || d < SHOAL.d) SHOAL = { x: f.x, z: f.z, d };
+   const h = groundHeight(f.x, f.z);
+   if (!PEAK || h > PEAK.h) PEAK = { x: f.x, z: f.z, h };
+}
+ok(SHOAL && SHOAL.d < LY.hull.draft * 1.12, "auf dem Riff laeuft die Fregatte auf",
+   SHOAL ? SHOAL.d.toFixed(1) + " m" : "kein Riff");
+ok(PEAK && PEAK.h > 40, "die Insel ragt aus dem Wasser",
+   PEAK.h.toFixed(0) + " m");
 
 // ------------------------------------------------------------ Gefecht
 console.log("\n== Kapitaene und Gefecht ==");
@@ -332,7 +349,7 @@ ok(shipOfTier("es", 3).name === "San Juan Nepomuceno", "Groessenklasse 3 der Arm
    }
    shots = A.battery.status().shots + B.battery.status().shots;
    ok(t < 1200, "das Gefecht wird entschieden", t.toFixed(0) + " s");
-   ok(shots > 100, "es wird ordentlich geschossen", shots + " Schuss");
+   ok(shots > 50, "es wird ordentlich geschossen", shots + " Schuss");
    ok(peakDebris > 20, "Splitter und Wrackteile fliegen", peakDebris + " Teile");
    const loser = A.dmg.struck || A.dmg.sunk ? A : B;
    ok(loser.dmg.integrity() < 0.99 || loser.dmg.flooding > 0.1 || loser.dmg.mastsStanding() < 3,
@@ -345,13 +362,17 @@ ok(shipOfTier("es", 3).name === "San Juan Nepomuceno", "Groessenklasse 3 der Arm
    B.place(A.pos.x + 400, A.pos.z, A.dyn.heading, 3);
    ok(testPair(A, B) === null, "auf Distanz nicht");
    // Grundberuehrung
-   A.place(420, 780, 0, 8);
+   A.place(SHOAL.x, SHOAL.z, 0, 8);
    const g = groundStep(A, waterDepth, 0.1);
    ok(g !== null, "Grundberuehrung auf dem Riff wird erkannt",
       g ? "Tiefe " + g.depth.toFixed(1) + " m bei " + A.vessel.hull.draft + " m Tiefgang" : "nicht erkannt");
    ok(g && g.hard && A.dyn.stopped, "hart aufgelaufen: das Schiff sitzt fest");
    A.place(0, 0, 0, 8);
    ok(groundStep(A, waterDepth, 0.1) === null, "im tiefen Wasser passiert nichts");
+   const free = findOpenWater({ maxDist: 900, minDepth: 20 });
+   ok(isOpenWater(free.x, free.z, 20, 220),
+      "der Generator findet einen freien Startplatz",
+      "(" + free.x.toFixed(0) + ", " + free.z.toFixed(0) + ")");
 }
 
 
