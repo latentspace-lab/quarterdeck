@@ -18,6 +18,7 @@ import {
 } from "@segel/shared";
 import { Simulation } from "../sim/Simulation.ts";
 import { GameState, ShipSchema } from "../state/GameState.ts";
+import { takeNext } from "./inputQueue.ts";
 
 /** Steps one interval callback may run before we drop time instead of catching up. */
 const MAX_STEPS_PER_INTERVAL = 3;
@@ -90,23 +91,15 @@ export class BattleRoom extends Room<{ state: GameState }> {
       for (let i = 0; i < steps; i++) this.tickOnce();
    }
 
-   /** Inputs a ship may have waiting before the oldest are dropped to catch up. */
-   static readonly MAX_INPUT_BACKLOG = 4;
-
    /**
     * Exactly one simulation step plus its bookkeeping. Exposed for tests.
-    *
-    * One input per ship per tick: the client applied each command to exactly
-    * one step, and its prediction is only right if the server does the same.
-    * A backlog (packets arriving in a bunch) is worked off one per tick; a
-    * backlog beyond MAX_INPUT_BACKLOG is trimmed from the front - better a
-    * correction than a ship lagging its player by seconds.
+    * One input per ship per tick - see inputQueue.ts for why and for what
+    * happens to a backlog.
     */
    tickOnce(): void {
       for (const [id, q] of this.inputQueues) {
-         if (!q.length) continue;
-         if (q.length > BattleRoom.MAX_INPUT_BACKLOG) q.splice(0, q.length - BattleRoom.MAX_INPUT_BACKLOG);
-         this.sim.applyInputs(id, [q.shift() as InputCommand]);
+         const cmd = takeNext(q);
+         if (cmd) this.sim.applyInputs(id, [cmd]);
       }
       this.sim.step();
       this.syncState();
