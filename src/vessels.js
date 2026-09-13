@@ -80,6 +80,9 @@ export const VESSELS = [
          leewayMax: 7,
       },
       guns: null,
+      // scantling = Staerke der Bordwand, mastStrength = Rundhoelzer,
+      // reserve = Reserveauftrieb (wie lange sie Wasser wegsteckt)
+      structure: { scantling: 0.30, mastStrength: 0.45, reserve: 0.5 },
       cam: { dist: 15, height: 6.5, cockpitZ: -1.2, cockpitY: 2.4, lead: 8, targetY: 2.0 },
    },
    {
@@ -113,6 +116,7 @@ export const VESSELS = [
          rollKick: 1.7,        // Grad Krengungsstoss
          range: 420,           // m effektive Reichweite (fuer die Anzeige)
       },
+      structure: { scantling: 0.58, mastStrength: 0.70, reserve: 0.65 },
       cam: { dist: 58, height: 21, cockpitZ: -10.5, cockpitY: 7.0, lead: 12, targetY: 9 },
    },
    {
@@ -146,6 +150,7 @@ export const VESSELS = [
          rollKick: 2.4,
          range: 550,
       },
+      structure: { scantling: 1.00, mastStrength: 1.00, reserve: 1.00 },
       cam: { dist: 88, height: 31, cockpitZ: -16.5, cockpitY: 9.6, lead: 17, targetY: 13 },
    },
    {
@@ -182,14 +187,108 @@ export const VESSELS = [
          rollKick: 3.4,
          range: 600,
       },
+      // Ein Zweidecker hat Spanten wie ein Haus: Vollkugeln der leichteren
+      // Kaliber prallen auf Distanz schlicht ab.
+      structure: { scantling: 1.85, mastStrength: 1.55, reserve: 1.70 },
       cam: { dist: 106, height: 38, cockpitZ: -20.5, cockpitY: 11.8, lead: 21, targetY: 16 },
    },
 ];
 
+// Franzoesisches Anstrichschema: roter Streifen statt Ocker. Historisch gab es
+// beides; hier sorgt es dafuer, dass man Freund und Feind im Pulverdampf auf
+// einen Blick auseinanderhaelt.
+const FRENCH = {
+   copper: [0.44, 0.25, 0.15],
+   boot: [0.08, 0.08, 0.09],
+   band: [0.62, 0.16, 0.14],
+   dark: [0.12, 0.11, 0.13],
+   deck: 0xd2c39c,
+   trim: 0x9a7a3a,
+};
+
+// ---------------------------------------------------------------------------
+// Gegner (nicht im Schiffsmenue waehlbar, nur als Feind im Gefecht)
+// ---------------------------------------------------------------------------
+export const ENEMIES = [
+   {
+      id: "hirondelle",
+      name: "Hirondelle",
+      prefix: "",
+      nation: "FR",
+      paint: FRENCH,
+      klass: "Corvette",
+      rate: "20-Kanonen-Korvette",
+      rig: "square",
+      era: "1805",
+      desc: "Schnelle franzoesische Korvette - beisst kaum, laeuft aber davon.",
+      crew: 110,
+      hull: { loa: 29.0, beam: 8.4, draft: 3.7, displacement: 440 },
+      sail: { noGo: 61, polar: POLAR_SLOOP_OF_WAR, tackAssist: 0.55 },
+      dyn: { turnRate: 13.5, rudderRef: 3.2, accelUp: 0.075, accelDown: 0.13,
+             accelLuff: 0.34, maxHeel: 15, capsizeHeel: 46, heelScale: 0.72, leewayMax: 11 },
+      guns: {
+         decks: [{ y: 0.60, count: 10, from: 0.20, to: 0.80, calibre: "8-Pfünder" }],
+         reload: 11.5, spread: 0.32, recoil: 0.5, rollKick: 1.6, range: 400,
+      },
+      structure: { scantling: 0.54, mastStrength: 0.68, reserve: 0.62 },
+      cam: { dist: 58, height: 21, cockpitZ: -10.5, cockpitY: 7.0, lead: 12, targetY: 9 },
+   },
+   {
+      id: "amelie",
+      name: "Amélie",
+      prefix: "",
+      nation: "FR",
+      paint: FRENCH,
+      klass: "Fregatte",
+      rate: "40-Kanonen-Fregatte",
+      rig: "square",
+      era: "1806",
+      desc: "Franzoesische Fregatten waren groesser und schneller gebaut als die britischen.",
+      crew: 320,
+      hull: { loa: 46.0, beam: 12.0, draft: 4.8, displacement: 1100 },
+      sail: { noGo: 64, polar: POLAR_FRIGATE, tackAssist: 0.5 },
+      dyn: { turnRate: 9.2, rudderRef: 3.6, accelUp: 0.050, accelDown: 0.090,
+             accelLuff: 0.26, maxHeel: 14, capsizeHeel: 50, heelScale: 0.62, leewayMax: 10 },
+      guns: {
+         decks: [{ y: 0.58, count: 14, from: 0.16, to: 0.84, calibre: "18-Pfünder" }],
+         reload: 12.5, spread: 0.38, recoil: 0.8, rollKick: 2.4, range: 540,
+      },
+      structure: { scantling: 1.05, mastStrength: 1.00, reserve: 1.05 },
+      cam: { dist: 88, height: 31, cockpitZ: -16.5, cockpitY: 9.6, lead: 17, targetY: 13 },
+   },
+   {
+      id: "vengeur",
+      name: "Vengeur",
+      prefix: "",
+      nation: "FR",
+      paint: FRENCH,
+      klass: "Linienschiff 3. Ranges",
+      rate: "74-Kanonen-Zweidecker",
+      rig: "square",
+      era: "1808",
+      desc: "Ein franzoesischer Vierundsiebziger. Wer den anfaellt, braucht Rueckendeckung.",
+      crew: 640,
+      hull: { loa: 53.0, beam: 14.8, draft: 6.3, displacement: 1800 },
+      sail: { noGo: 68, polar: POLAR_THIRD_RATE, tackAssist: 0.42 },
+      dyn: { turnRate: 6.2, rudderRef: 4.2, accelUp: 0.030, accelDown: 0.060,
+             accelLuff: 0.20, maxHeel: 12, capsizeHeel: 55, heelScale: 0.52, leewayMax: 9 },
+      guns: {
+         decks: [
+            { y: 0.44, count: 14, from: 0.14, to: 0.86, calibre: "36-Pfünder" },
+            { y: 0.70, count: 14, from: 0.16, to: 0.84, calibre: "18-Pfünder" },
+         ],
+         reload: 14.5, spread: 0.48, recoil: 1.0, rollKick: 3.4, range: 600,
+      },
+      structure: { scantling: 1.90, mastStrength: 1.55, reserve: 1.75 },
+      cam: { dist: 106, height: 38, cockpitZ: -20.5, cockpitY: 11.8, lead: 21, targetY: 16 },
+   },
+];
+
+export const ALL_VESSELS = VESSELS.concat(ENEMIES);
 export const VESSEL_COLORS = NELSON;
 
 export function getVessel(id) {
-   return VESSELS.find((v) => v.id === id) || VESSELS[0];
+   return ALL_VESSELS.find((v) => v.id === id) || VESSELS[0];
 }
 
 export function vesselLabel(v) {
@@ -203,10 +302,10 @@ export function gunCount(v) {
 }
 
 // Broadside-Gewicht in englischen Pfund (nur zur Anzeige)
-const BALL_LB = { "9-Pfünder": 9, "18-Pfünder": 18, "32-Pfünder": 32 };
+const BALL_LB = { "8-Pfünder": 8, "9-Pfünder": 9, "18-Pfünder": 18, "32-Pfünder": 32, "36-Pfünder": 36 };
 export function broadsideWeight(v) {
    if (!v.guns) return 0;
    return v.guns.decks.reduce((w, d) => w + d.count * (BALL_LB[d.calibre] || 12), 0);
 }
 
-export default { VESSELS, getVessel, vesselLabel, gunCount, broadsideWeight };
+export default { VESSELS, ENEMIES, ALL_VESSELS, getVessel, vesselLabel, gunCount, broadsideWeight };

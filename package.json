@@ -8,7 +8,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "node tests/physics.test.js && node tests/sim.smoke.js && node tests/visual.test.js && node tests/vessels.test.js"
+    "test": "node tests/physics.test.js && node tests/sim.smoke.js && node tests/visual.test.js && node tests/vessels.test.js && node tests/damage.test.js"
   },
   "dependencies": {
     "three": "^0.186.0",

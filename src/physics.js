@@ -185,6 +185,18 @@ export class BoatDynamics {
       // Segelflaeche 0.25..1 (Reffen). Nur bei Rahseglern wirksam - eine Yacht
       // trimmt statt zu reffen.
       this.sailSet = 1;
+      // Von aussen gesetzte Faktoren aus dem Schadensmodell (1 = unbeschaedigt):
+      //   driveMul  - verbliebene Segelkraft (Masten, Tuch, Tauwerk)
+      //   rudderMul - Ruderwirkung
+      //   dragMul   - zusaetzlicher Widerstand (Wasser im Schiff, Wrack im Schlepp)
+      //   turnBias  - staendiges Gieren, z. B. durch ein Wrack an einer Seite
+      //   heelBias  - Schlagseite durch Wassereinbruch (Grad)
+      this.driveMul = 1;
+      this.rudderMul = 1;
+      this.dragMul = 1;
+      this.turnBias = 0;
+      this.heelBias = 0;
+      this.stopped = false;   // aufgelaufen / manoevrierunfaehig
       this.config = {
          maxHeel: opts.maxHeel ?? this.profile.maxHeel,
          capsizeHeel: opts.capsizeHeel ?? this.profile.capsizeHeel,
@@ -232,7 +244,7 @@ export class BoatDynamics {
       const targetHeel = heelTarget(this.twa, wind.speedKts, this.config.maxHeel, P.heelScale)
          * (0.45 + 0.55 * setF);
       this.heelLerp = lerp(this.heelLerp, targetHeel, clamp(dt * 1.5, 0, 1));
-      this.heel = this.heelLerp;
+      this.heel = this.heelLerp + this.heelBias;
       this.heelMaxSeen = Math.max(this.heelMaxSeen, this.heel);
       if (this.heel > this.config.capsizeHeel) {
          this.capsizeTimer += dt;
@@ -252,6 +264,9 @@ export class BoatDynamics {
       let targetSpeed = this.luffing
          ? 0
          : polarSpeedAt(this.twa, wind.speedKts, trimEff, hp, P.polar) * (0.30 + 0.70 * setF);
+      // Schaden: weniger Segelkraft, mehr Widerstand
+      targetSpeed *= clamp(this.driveMul, 0, 1) / Math.max(this.dragMul, 0.2);
+      if (this.stopped) targetSpeed = 0;
       // Ein Rahsegler behaelt beim Durchgehen durch den Wind Schwung ("Fahrt im
       // Schiff") - sonst kaeme er nie durch eine Wende.
       if (this.luffing && P.tackAssist > 0) {
@@ -263,7 +278,8 @@ export class BoatDynamics {
 
       // 6. Ruder -> Gier
       const rauth = rudderAuthority(this.speed, P.rudderRef);
-      const turnRate = this.rudder * P.turnRate * rauth; // deg/s
+      const turnRate = this.rudder * P.turnRate * rauth * clamp(this.rudderMul, 0, 1)
+         + this.turnBias * rauth; // deg/s
       this.heading = normDeg(this.heading + turnRate * dt);
 
       // 7. Leeway + Bodengang

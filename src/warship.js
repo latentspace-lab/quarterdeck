@@ -18,6 +18,7 @@
 import * as THREE from "three";
 import { clamp, DEG } from "./utils.js";
 import { VESSEL_COLORS } from "./vessels.js";
+import { holeTexture, fireTexture } from "./fx.js";
 
 const UP = new THREE.Vector3(0, 1, 0);
 
@@ -94,17 +95,18 @@ function makeHullGeom(dim) {
 // Die Wasserlinie ist waagerecht, die Baender folgen dem Deckssprung: genau so
 // laufen Barkholz und Stueckpfortenstrake an einem echten Rumpf.
 // bands sind Bruchteile des mittschiffs gemessenen Freibords.
-function hullColorAt(y, s, FB, bands) {
-   if (y < -0.015) return C.copper;              // Kupferbeschlag
-   if (y < FB * 0.12) return C.boot;             // Barkholz an der Wasserlinie
+function hullColorAt(y, s, FB, bands, paint) {
+   const P = paint || C;
+   if (y < -0.015) return P.copper || C.copper;  // Kupferbeschlag
+   if (y < FB * 0.12) return P.boot || C.boot;   // Barkholz an der Wasserlinie
    const u = y / (FB * sheerStation(s));         // Hoehe relativ zur eigenen Station
    for (let i = 0; i < bands.length; i++) {
-      if (Math.abs(u - bands[i]) < 0.078) return C.band;
+      if (Math.abs(u - bands[i]) < 0.078) return P.band || C.band;
    }
-   return C.dark;
+   return P.dark || C.dark;
 }
 
-function buildHull(dim, bands) {
+function buildHull(dim, bands, paint) {
    const { LOA, FB } = dim;
    const { point } = makeHullGeom(dim);
    const S = 34, M = 36;
@@ -112,7 +114,7 @@ function buildHull(dim, bands) {
 
    function push(p, s) {
       positions.push(p.x, p.y, p.z);
-      const c = hullColorAt(p.y, s, FB, bands);
+      const c = hullColorAt(p.y, s, FB, bands, paint);
       colors.push(c[0], c[1], c[2]);
       return positions.length / 3 - 1;
    }
@@ -144,7 +146,7 @@ function buildHull(dim, bands) {
    for (const vi of rim) { cx += positions[vi * 3]; cy += positions[vi * 3 + 1]; cz += positions[vi * 3 + 2]; }
    const rn = rim.length;
    positions.push(cx / rn, cy / rn, cz / rn);
-   const cc = hullColorAt(cy / rn, 1, FB, bands);
+   const cc = hullColorAt(cy / rn, 1, FB, bands, paint);
    colors.push(cc[0], cc[1], cc[2]);
    const centroid = positions.length / 3 - 1;
    for (let k = 0; k < rim.length; k++) indices.push(centroid, rim[k], rim[(k + 1) % rim.length]);
@@ -274,6 +276,25 @@ function makeSquareSail(U = 14, V = 9, color = 0xf2ecdb) {
    return mesh;
 }
 
+// Risse im Tuch.
+//
+// Ein Segeltuch reisst nicht als Ganzes, sondern bekommt Loecher, die sich
+// laengs der genaehten Bahnen aufziehen - darum sind die Risse in v-Richtung
+// (von oben nach unten) deutlich laenger als in der Breite. Rund um ein Loch
+// haengt das Tuch aus und schlaegt; im Kern ist es ganz weg. Sind genug Bahnen
+// ausgerissen, fliegt das ganze Segel aus den Lieken.
+function tearAt(tears, u, v) {
+   let worst = 0;
+   for (let k = 0; k < tears.length; k++) {
+      const t = tears[k];
+      const du = (u - t.u) / t.r;             // quer: schmal
+      const dv = (v - t.v) / (t.r * t.len);   // laengs: zieht sich auf
+      const d = Math.sqrt(du * du + dv * dv);
+      if (d < 1) { const f = 1 - d; if (f > worst) worst = f; }
+   }
+   return worst;
+}
+
 function updateSquareSail(mesh, o) {
    const { U, V } = mesh.userData;
    const pos = mesh.geometry.attributes.position;
@@ -282,6 +303,7 @@ function updateSquareSail(mesh, o) {
    const drop = o.drop;
    const belly = o.belly * o.sgn;
    const set = clamp(o.set, 0.06, 1); // 1 = voll gesetzt, klein = gegeit/gerefft
+   const tears = o.tears || EMPTY_TEARS;
    let i = 0;
    for (let iu = 0; iu <= U; iu++) {
       const u = iu / U;
@@ -292,12 +314,32 @@ function updateSquareSail(mesh, o) {
          // Gillung: das Achterliek haengt in der Mitte etwas durch
          const sag = 0.06 * drop * Math.sin(Math.PI * Math.abs(xs)) * v;
          let bulge = belly * Math.sin(Math.PI * (u * 0.96 + 0.02)) * Math.sin(Math.PI * (0.18 + v * 0.72));
-         if (o.flutter > 0.01) {
-            bulge *= 1 - 0.78 * o.flutter;
-            bulge += o.flutter * headHalf * (0.10 * Math.sin(v * 7.0 + o.time * 15.0 + u * 8.5)
-                                          + 0.05 * Math.sin(u * 11.0 - o.time * 21.0));
+         let flut = o.flutter;
+
+         // --- Risse ------------------------------------------------------
+         const tear = tears.length ? tearAt(tears, u, v) : 0;
+         if (tear > 0.55) {
+            // Loch: die Dreiecke werden auf einen Punkt gezogen und
+            // verschwinden damit aus dem Bild.
+            const cu = (Math.round(u * U) / U - 0.5) * 2;
+            pos.setXYZ(i, cu * half, -v * drop * set, 0);
+            i++;
+            continue;
          }
-         pos.setXYZ(i, xs * half, -v * drop * set - sag * set, bulge * set);
+         if (tear > 0) {
+            // Ausgefranster Rand: das Tuch traegt nicht mehr, sackt weg und
+            // schlaegt in hoher Frequenz.
+            bulge *= 1 - 0.85 * tear;
+            flut = Math.min(1, flut + tear * 0.9);
+         }
+
+         if (flut > 0.01) {
+            bulge *= 1 - 0.78 * flut;
+            bulge += flut * headHalf * (0.10 * Math.sin(v * 7.0 + o.time * 15.0 + u * 8.5)
+                                     + 0.05 * Math.sin(u * 11.0 - o.time * 21.0));
+         }
+         const hang = tear * drop * 0.16 * set;
+         pos.setXYZ(i, xs * half, -v * drop * set - sag * set - hang, bulge * set);
          i++;
       }
    }
@@ -305,6 +347,8 @@ function updateSquareSail(mesh, o) {
    mesh.geometry.computeVertexNormals();
    mesh.geometry.attributes.normal.needsUpdate = true;
 }
+
+const EMPTY_TEARS = [];
 
 // Schratsegel (Stagsegel / Klueber / Besan) als Dreieck:
 // lokal: Hals bei (0,0,0), Kopf oben am Stag, Schothorn nach achtern ausgestellt.
@@ -353,6 +397,20 @@ function updateTriSail(mesh, o) {
 // =========================================================================
 // Flaggen (White Ensign + Kommandowimpel) als Canvas-Textur
 // =========================================================================
+// Tricolore (franzoesische Marineflagge ab 1794)
+function tricolorTexture() {
+   if (typeof document === "undefined") return null;
+   const c = document.createElement("canvas");
+   c.width = 128; c.height = 64;
+   const g = c.getContext("2d");
+   g.fillStyle = "#00209f"; g.fillRect(0, 0, 43, 64);
+   g.fillStyle = "#f1f2f1"; g.fillRect(43, 0, 42, 64);
+   g.fillStyle = "#c8102e"; g.fillRect(85, 0, 43, 64);
+   const t = new THREE.CanvasTexture(c);
+   t.needsUpdate = true;
+   return t;
+}
+
 function ensignTexture() {
    if (typeof document === "undefined") return null;
    const c = document.createElement("canvas");
@@ -422,7 +480,8 @@ export function buildWarship(vessel) {
    const gunDecks = (vessel.guns && vessel.guns.decks) || [];
    const bands = gunDecks.map((d) => d.y);
 
-   heeler.add(buildHull(dim, bands), buildDeck(dim));
+   const paint = vessel.paint || null;
+   heeler.add(buildHull(dim, bands, paint), buildDeck(dim));
 
    // ---- Ruder ----
    const rudderPivot = new THREE.Group();
@@ -561,11 +620,13 @@ export function buildWarship(vessel) {
       heeler.add(g);
 
       const rLow = BEAM * 0.036, rMid = BEAM * 0.026, rTop = BEAM * 0.017;
+      let sparVol = 0; // m3 Holz in diesem Mast - ergibt spaeter die Wrackmasse
       const seg = (r0, r1, y0, y1, mat) => {
          const m = new THREE.Mesh(new THREE.CylinderGeometry(r1, r0, y1 - y0, 9), mat);
          m.position.y = (y0 + y1) / 2;
          m.castShadow = true;
          g.add(m);
+         sparVol += Math.PI * ((r0 + r1) / 2) ** 2 * (y1 - y0);
          return m;
       };
       seg(rLow, rMid, 0, H * 0.46, matSpar);            // Untermast
@@ -604,7 +665,7 @@ export function buildWarship(vessel) {
          }
       }
 
-      masts[md.key] = { group: g, H, deckY, z: md.z, rake: md.rake, def: md };
+      masts[md.key] = { group: g, H, deckY, z: md.z, rake: md.rake, def: md, sparVol: 0, levels: [] };
 
       // ---- Rahen ----
       const levels = [];
@@ -619,6 +680,7 @@ export function buildWarship(vessel) {
          const yardGroup = new THREE.Group();
          yardGroup.position.y = lv.y;
          g.add(yardGroup);
+         sparVol += Math.PI * (BEAM * 0.010) ** 2 * lv.len * 1.25;
          const yardGeo = new THREE.CylinderGeometry(BEAM * 0.010, BEAM * 0.010, lv.len, 7);
          yardGeo.rotateZ(Math.PI / 2);
          const yard = new THREE.Mesh(yardGeo, matSpar);
@@ -639,14 +701,18 @@ export function buildWarship(vessel) {
             squareSails.push({
                mesh: sail, yardGroup, headHalf: lv.len * 0.46, drop: lv.drop,
                mastKey: md.key, level: lv.name,
+               health: 1, tears: [], blown: false, rnd: Math.random(),
             });
          } else {
             squareSails.push({ mesh: null, yardGroup, headHalf: lv.len * 0.46, drop: 0, mastKey: md.key, level: lv.name });
          }
+         masts[md.key].levels.push(lv);
       }
+      masts[md.key].sparVol = sparVol;
    }
 
-   // Stage von Mast zu Mast / zum Bug
+   // Stage von Mast zu Mast / zum Bug. Jedes Stag merkt sich, an welchen
+   // Masten es haengt - faellt einer, verschwindet es mit ihm.
    const mastTop = (k, f) => {
       const m = masts[k];
       const r = m.rake * DEG;
@@ -655,13 +721,20 @@ export function buildWarship(vessel) {
          m.deckY + Math.cos(r) * m.H * f,
          m.z - Math.sin(r) * m.H * f);
    };
+   const stays = [];
+   const addStay = (a, b, r, onMasts) => {
+      const m = rope(a, b, r);
+      heeler.add(m);
+      stays.push({ mesh: m, masts: onMasts });
+      return m;
+   };
    const bowTip = new THREE.Vector3(0, FB * 0.86, LOA / 2 - LOA * 0.01);
-   heeler.add(rope(mastTop("fore", 0.46), bowTip, BEAM * 0.005));
-   heeler.add(rope(mastTop("main", 0.46), mastTop("fore", 0.30), BEAM * 0.005));
-   heeler.add(rope(mastTop("mizzen", 0.46), mastTop("main", 0.30), BEAM * 0.005));
+   addStay(mastTop("fore", 0.46), bowTip, BEAM * 0.005, ["fore"]);
+   addStay(mastTop("main", 0.46), mastTop("fore", 0.30), BEAM * 0.005, ["main", "fore"]);
+   addStay(mastTop("mizzen", 0.46), mastTop("main", 0.30), BEAM * 0.005, ["mizzen", "main"]);
    // Achterstage
    const sternTop = new THREE.Vector3(0, FB * sheerStation(1) * 0.95, -LOA / 2 + LOA * 0.02);
-   heeler.add(rope(mastTop("mizzen", 0.98), sternTop, BEAM * 0.004));
+   addStay(mastTop("mizzen", 0.98), sternTop, BEAM * 0.004, ["mizzen"]);
 
    // ---- Klueverbaum + Stagsegel ----
    const bsLen = LOA * 0.34;
@@ -678,7 +751,7 @@ export function buildWarship(vessel) {
       bowsprit.position.y + Math.sin(22 * DEG) * bsLen,
       bowsprit.position.z + Math.cos(22 * DEG) * bsLen
    );
-   heeler.add(rope(mastTop("fore", 0.76), bsTip, BEAM * 0.004));
+   addStay(mastTop("fore", 0.76), bsTip, BEAM * 0.004, ["fore"]);
 
    const jib = makeTriSail(10, 8, 0xf5efe1);
    const staysail = makeTriSail(9, 7, 0xf2ecde);
@@ -710,7 +783,7 @@ export function buildWarship(vessel) {
    heeler.add(spanker);
 
    // ---- Flaggen ----
-   const ensTex = ensignTexture();
+   const ensTex = vessel.nation === "FR" ? tricolorTexture() : ensignTexture();
    const ensignPivot = new THREE.Group();
    ensignPivot.position.set(0, mz.deckY + mz.H * 0.40, mz.z - gaffLen * 0.9);
    const ensign = makeFlag(LOA * 0.09, LOA * 0.055, ensTex);
@@ -722,6 +795,27 @@ export function buildWarship(vessel) {
    const pennant = makeFlag(LOA * 0.14, LOA * 0.014, null, 0xe8e8e6);
    pennantPivot.add(pennant);
    heeler.add(pennantPivot);
+
+   // Die Flaggen gehoeren an ihre Masten: der Ensign an die Besangaffel, der
+   // Kommandowimpel an den Grosstopp. Faellt der Mast, gehen sie mit ihm ueber
+   // Bord - sie duerfen nicht in der Luft haengen bleiben.
+   heeler.updateMatrixWorld(true);
+   masts.mizzen.group.attach(ensignPivot);
+   masts.main.group.attach(pennantPivot);
+
+   // Notgaffel am Heck: geht der Kreuzmast verloren, wird die Flagge dort
+   // wieder gesetzt - ein Schiff ohne Flagge gilt sonst als gestrichen.
+   const sternEnsignPivot = new THREE.Group();
+   sternEnsignPivot.position.set(0, FB * sheerStation(1) * 1.10, sternZ - LOA * 0.01);
+   const sternEnsign = makeFlag(LOA * 0.075, LOA * 0.046, ensTex);
+   sternEnsignPivot.add(sternEnsign);
+   sternEnsignPivot.visible = false;
+   heeler.add(sternEnsignPivot);
+   const sternStaff = new THREE.Mesh(
+      new THREE.CylinderGeometry(BEAM * 0.008, BEAM * 0.010, FB * 0.55, 6), matSpar);
+   sternStaff.position.set(0, FB * sheerStation(1) * 0.95, sternZ - LOA * 0.01);
+   sternStaff.visible = false;
+   heeler.add(sternStaff);
 
    // =====================================================================
    // Zustand + Animation
@@ -736,20 +830,252 @@ export function buildWarship(vessel) {
    const _clewS = new THREE.Vector3();
    const _clewSp = new THREE.Vector3();
 
+   const lostMasts = new Set();
+   const holeDecals = [];
+   const fires = [];
+   const MAX_HOLES = 46;
+
    ship.userData = {
       heeler, masts, batteries, muzzles, LOA, BEAM, FB, DRAFT,
       yards: squareSails,
-      spankerPivot, bowsprit,
+      spankerPivot, bowsprit, stays,
       rudder: rudderPivot, rudderPivot,
       sails: squareSails.filter((s) => s.mesh).map((s) => s.mesh).concat([jib, staysail, spanker]),
       vesselId: vessel.id,
+      nation: vessel.nation || "GB",
       kind: "warship",
+      lostMasts,
+      // Decksgeometrie - damit die Mannschaft auf dem Deck steht und nicht darin
+      deckAt: (s0) => FB * sheerStation(clamp(s0, 0, 1)) * 0.86,
+      halfBeamAt: (s0, y) => skinAt(s0, y, 1).hb,
+      zAt: (s0) => THREE.MathUtils.lerp(LOA / 2, -LOA / 2, clamp(s0, 0, 1)),
+      gunDecks: gunDecks.map((d) => ({ ...d })),
+      // Hoechster Punkt des Riggs und groesste Rahbreite - fuer die Trefferpruefung
+      rigTop: Math.max(...mastDefs.map((m) => m.h)) * 1.02,
+      rigHalfWidth: LOA * 0.34,
    };
 
    // Rueckstoss von aussen ausloesen
    ship.kickRecoil = function (side, amount) {
       recoil[side] = Math.max(recoil[side], amount);
    };
+
+   // =====================================================================
+   // Schadensbild
+   // =====================================================================
+
+   // Punkt auf der Bordwand fuer (Laengsposition s, Hoehe y, Seite)
+   function skinAt(sIn, yIn, sx) {
+      const s0 = clamp(sIn, 0.02, 0.98);
+      let hb = BEAM * 0.4, z = THREE.MathUtils.lerp(LOA / 2, -LOA / 2, s0);
+      for (let t = 0; t <= 1.0001; t += 0.02) {
+         const q = point(s0, t, sx);
+         if (q.y >= yIn) { hb = Math.abs(q.hb); z = q.z; break; }
+         hb = Math.abs(q.hb); z = q.z;
+      }
+      return { hb, z };
+   }
+   ship.skinAt = skinAt;
+
+   const texHole = holeTexture();
+   const matHole = texHole
+      ? new THREE.MeshBasicMaterial({ map: texHole, transparent: true, depthWrite: false, side: THREE.DoubleSide })
+      : null;
+
+   // Einschlagloch setzen. size 0..1 (Anteil des angerichteten Schadens)
+   ship.addHole = function (side, sPos, y, size = 0.3) {
+      if (!matHole) return null;
+      const sx = side === "STBD" ? 1 : -1;
+      const yy = clamp(y, -DRAFT * 0.5, FB * 1.15);
+      const { hb, z } = skinAt(sPos, yy, sx);
+      const d = clamp(0.55 + size * 5.5, 0.5, Math.min(LOA * 0.075, 3.2));
+      const m = new THREE.Mesh(new THREE.PlaneGeometry(d, d), matHole);
+      m.rotation.y = sx * Math.PI / 2;
+      m.rotation.z = Math.random() * Math.PI;
+      m.position.set(sx * (hb + 0.05), yy, z);
+      m.renderOrder = 2;
+      heeler.add(m);
+      holeDecals.push(m);
+      if (holeDecals.length > MAX_HOLES) {
+         const old = holeDecals.shift();
+         heeler.remove(old);
+         old.geometry.dispose();
+      }
+      return m;
+   };
+
+   // Mast geht ueber Bord: Baugruppe loesen und dem Aufrufer uebergeben.
+   // Segel, Stage und Schratsegel dieses Masts fallen mit.
+   ship.detachMast = function (key) {
+      const m = masts[key];
+      if (!m || lostMasts.has(key)) return null;
+      lostMasts.add(key);
+
+      // Schratsegel mitnehmen
+      if (key === "mizzen") {
+         m.group.attach(spankerPivot);
+         m.group.attach(spanker);
+      }
+      if (key === "fore") {
+         m.group.attach(jib);
+         m.group.attach(staysail);
+      }
+      // Stage dieses Masts verschwinden
+      for (const st of stays) {
+         if (st.masts.includes(key) && st.mesh.parent) {
+            st.mesh.parent.remove(st.mesh);
+            st.mesh.geometry.dispose();
+         }
+      }
+
+      // Ensign geht mit dem Kreuzmast ueber Bord -> am Heck neu setzen
+      if (key === "mizzen" && !struck) {
+         sternEnsignPivot.visible = true;
+         sternStaff.visible = true;
+      }
+
+      // Masse: Rundholz + stehendes Gut + nasses Tuch, grob Faktor 1.6
+      const volume = m.sparVol * 1.6;
+      const mass = volume * 520;            // Kiefer
+      const topWorld = new THREE.Vector3(0, m.H * 0.62, 0);
+      m.group.localToWorld(topWorld);
+
+      return {
+         key, group: m.group, mass, volume,
+         radius: m.H * 0.22,
+         height: m.H,
+         topWorld,
+         // Ansatzpunkt am Schiff, an dem das Wrack im Tauwerk haengt
+         anchorLocal: new THREE.Vector3(0, m.deckY + m.H * 0.08, m.z),
+      };
+   };
+
+   ship.mastLost = (key) => lostMasts.has(key);
+
+   // Flagge streichen
+   let struck = false;
+   ship.setStruck = function (v) {
+      struck = !!v;
+      ensign.visible = !struck;
+      pennant.visible = !struck;
+      sternEnsignPivot.visible = !struck && lostMasts.has("mizzen");
+      sternStaff.visible = sternEnsignPivot.visible;
+   };
+   ship.isStruck = () => struck;
+
+   // Ausgeschlagene Rohre verschwinden aus der Pforte
+   ship.setGunFraction = function (side, f) {
+      const arr = batteries[side] && batteries[side].children;
+      if (!arr) return;
+      const keep = Math.round(clamp(f, 0, 1) * arr.length);
+      for (let i = 0; i < arr.length; i++) arr[i].visible = i < keep;
+   };
+
+   // Brandherde
+   const texFire = fireTexture();
+   ship.setFire = function (level) {
+      const want = Math.min(6, Math.floor(clamp(level, 0, 1) * 7));
+      while (fires.length > want) {
+         const f = fires.pop();
+         heeler.remove(f);
+         f.material.dispose();
+      }
+      if (!texFire) return;
+      while (fires.length < want) {
+         const sp = new THREE.Sprite(new THREE.SpriteMaterial({
+            map: texFire, transparent: true, depthWrite: false,
+            blending: THREE.AdditiveBlending, fog: true, opacity: 0.9,
+         }));
+         const fs = 0.25 + Math.random() * 0.55;
+         sp.position.set(
+            (Math.random() - 0.5) * BEAM * 0.7,
+            FB * (0.9 + Math.random() * 0.3),
+            (Math.random() - 0.5) * LOA * 0.7);
+         sp.userData.base = fs;
+         heeler.add(sp);
+         fires.push(sp);
+      }
+   };
+
+   // ---------------------------------------------------------------------
+   // Zerschossenes Tuch
+   //
+   // Jedes Segel hat seinen eigenen Zustand. Der Schaden trifft zuerst die
+   // oberen Segel - dort steht der meiste Wind und dorthin geht die
+   // Kettenkugel. Mit sinkendem Zustand reissen einzelne Bahnen auf; ist
+   // genug weg, fliegt das Segel aus den Lieken und treibt nach Lee davon.
+   // ---------------------------------------------------------------------
+   let sailHealth = 1;
+   const blownQueue = [];
+   // Wie stark ein Segel dem Schaden ausgesetzt ist
+   const EXPOSURE = { topgallant: 1.55, topsail: 1.15, course: 0.75, crossjack: 1.0 };
+
+   function wearSail(s, h) {
+      h = clamp(h, 0, 1);
+      if (h >= s.health) return;        // Tuch flickt sich nicht von selbst
+      s.health = h;
+      // Zahl der aufgerissenen Bahnen waechst mit dem Schaden
+      const want = Math.min(9, Math.floor((1 - h) * 10));
+      while (s.tears.length < want) {
+         s.tears.push({
+            u: 0.06 + Math.random() * 0.88,
+            v: 0.10 + Math.random() * 0.85,
+            r0: 0.07 + Math.random() * 0.09,
+            len: 1.8 + Math.random() * 2.2,   // Risse laufen laengs
+            r: 0,
+         });
+      }
+      const grow = 1 + (1 - h) * 1.9;
+      for (const t of s.tears) t.r = t.r0 * grow;
+      if (h <= 0.08 && !s.blown) {
+         s.blown = true;
+         s.mesh.visible = false;
+         blownQueue.push(s);
+      }
+   }
+
+   ship.setSailDamage = function (health) {
+      sailHealth = clamp(health, 0, 1);
+      const loss = 1 - sailHealth;
+      for (const s of squareSails) {
+         if (!s.mesh || s.blown) continue;
+         const e = (EXPOSURE[s.level] ?? 1) * (0.82 + s.rnd * 0.36);
+         wearSail(s, clamp(1 - loss * e * 1.15, 0, 1));
+      }
+   };
+
+   // Ein einzelnes Segel gezielt beschaedigen (Treffer in genau dieses Tuch)
+   ship.damageSail = function (mastKey, level, amount) {
+      const s = squareSails.find((x) => x.mesh && !x.blown
+         && x.mastKey === mastKey && (!level || x.level === level));
+      if (s) wearSail(s, s.health - amount);
+      return !!s;
+   };
+
+   // Segel, die seit dem letzten Aufruf aus den Lieken geflogen sind.
+   // Der Aufrufer macht daraus treibende Tuchfetzen.
+   const _sailPos = new THREE.Vector3();
+   ship.drainBlownSails = function () {
+      if (!blownQueue.length) return [];
+      const out = blownQueue.splice(0, blownQueue.length).map((s) => {
+         // Mitte des Segels in Weltkoordinaten
+         _sailPos.set(0, -s.drop * 0.5, 0);
+         s.yardGroup.updateMatrixWorld();
+         s.yardGroup.localToWorld(_sailPos);
+         return {
+            pos: _sailPos.clone(),
+            w: s.headHalf * 2,
+            h: s.drop,
+            level: s.level,
+            mastKey: s.mastKey,
+         };
+      });
+      return out;
+   };
+
+   ship.sailStates = () => squareSails.filter((s) => s.mesh)
+      .map((s) => ({ mast: s.mastKey, level: s.level, health: s.health,
+                     tears: s.tears.length, blown: s.blown }));
 
    ship.animate = function (dt, o = {}) {
       const time = o.time || 0;
@@ -777,20 +1103,28 @@ export function buildWarship(vessel) {
       const windF = clamp(0.40 + (o.windKts || 10) * 0.045, 0.40, 1.20);
       const setAll = clamp(o.sailSet === undefined ? 1 : o.sailSet, 0.05, 1);
 
+      // Zerschossenes Tuch schlaegt und steht nicht mehr voll. Es wird aber
+      // NICHT kleiner: ein durchloechertes Segel bleibt ein Segel, bis es aus
+      // den Lieken fliegt. Und genau das passiert der Reihe nach - zuerst
+      // oben, wo der Druck am groessten ist.
       for (const s of squareSails) {
+         if (lostMasts.has(s.mastKey)) continue; // Mast ist ueber Bord
          s.yardGroup.rotation.y = braceCur;
-         if (!s.mesh) continue;
-         const bellyBase = s.headHalf * 0.33 * windF;
+         if (!s.mesh || s.blown) continue;
+         // Zerschossenes Tuch steht nicht mehr voll und schlaegt staendig
+         const bellyBase = s.headHalf * 0.33 * windF * lerpN(0.45, 1, s.health);
          updateSquareSail(s.mesh, {
             headHalf: s.headHalf,
             drop: s.drop,
             belly: bellyBase,
             sgn,
             set: setAll,
-            flutter: flutterCur,
+            flutter: clamp(flutterCur + (1 - s.health) * 0.34, 0, 1),
+            tears: s.tears,
             time: time + (s.level === "topsail" ? 1.3 : s.level === "topgallant" ? 2.6 : 0),
          });
       }
+      const tornFlutter = clamp(flutterCur + (1 - sailHealth) * 0.30, 0, 1);
 
       // --- Schratsegel ------------------------------------------------------
       const fsMag = clamp((Math.abs(A) - 20) * 0.45, 5, 70);
@@ -798,6 +1132,14 @@ export function buildWarship(vessel) {
       spankerCur += (fsTarget - spankerCur) * Math.min(1, dt * 1.6);
       const camJ = (0.14 + 0.26 * Math.min(Math.abs(braceCur) / (Math.PI / 4), 1)) * windF * BEAM * 0.16;
 
+      const foreUp = !lostMasts.has("fore");
+      const mizzenUp = !lostMasts.has("mizzen");
+      // Klueber stehen weit vorn im Wind und fliegen als erste
+      jib.visible = foreUp && sailHealth > 0.42;
+      staysail.visible = foreUp && sailHealth > 0.30;
+      spanker.visible = mizzenUp && sailHealth > 0.20;
+
+      if (foreUp && (jib.visible || staysail.visible)) {
       _clew.set(
          jibTack.x - LOA * 0.16 * Math.sin(-spankerCur),
          jibTack.y - LOA * 0.055,
@@ -805,7 +1147,7 @@ export function buildWarship(vessel) {
       );
       updateTriSail(jib, {
          tack: jibTack, head: jibHead, clew: _clew,
-         camber: camJ, flutter: flutterCur, time, leeX,
+         camber: camJ, flutter: tornFlutter, time, leeX,
       });
       _clewS.set(
          stayTack.x - LOA * 0.14 * Math.sin(-spankerCur),
@@ -814,9 +1156,13 @@ export function buildWarship(vessel) {
       );
       updateTriSail(staysail, {
          tack: stayTack, head: stayHead, clew: _clewS,
-         camber: camJ * 0.85, flutter: flutterCur, time: time + 0.8, leeX,
+         camber: camJ * 0.85, flutter: tornFlutter, time: time + 0.8, leeX,
       });
+      }
 
+      if (!mizzenUp) {
+         // Besan mit dem Kreuzmast ueber Bord - nichts mehr zu animieren
+      } else {
       spankerPivot.rotation.y = -spankerCur;
       const spTack = spankerPivot.position;
       const spHead = new THREE.Vector3(0, spTack.y + mz.H * 0.38, spTack.z);
@@ -827,8 +1173,9 @@ export function buildWarship(vessel) {
       );
       updateTriSail(spanker, {
          tack: spTack, head: spHead, clew: _clewSp,
-         camber: camJ * 1.1, flutter: flutterCur * 0.85, time: time + 2.1, leeX,
+         camber: camJ * 1.1, flutter: tornFlutter * 0.85, time: time + 2.1, leeX,
       });
+      }
 
       // --- Rueckstoss -------------------------------------------------------
       for (const side of ["PORT", "STBD"]) {
@@ -842,12 +1189,31 @@ export function buildWarship(vessel) {
       }
 
       // --- Flaggen ----------------------------------------------------------
-      const flagYaw = normHalf(A + 180) * DEG;
-      ensignPivot.rotation.y = flagYaw;
-      pennantPivot.rotation.y = flagYaw;
-      const fs = clamp((o.windKts || 10) / 18, 0.3, 1.4);
-      waveFlag(ensign, time, fs);
-      waveFlag(pennant, time * 1.3, fs);
+      if (!struck) {
+         const flagYaw = normHalf(A + 180) * DEG;
+         const fs = clamp((o.windKts || 10) / 18, 0.3, 1.4);
+         if (!lostMasts.has("mizzen")) {
+            ensignPivot.rotation.y = flagYaw;
+            waveFlag(ensign, time, fs);
+         } else if (sternEnsignPivot.visible) {
+            sternEnsignPivot.rotation.y = flagYaw;
+            waveFlag(sternEnsign, time, fs);
+         }
+         if (!lostMasts.has("main")) {
+            pennantPivot.rotation.y = flagYaw;
+            waveFlag(pennant, time * 1.3, fs);
+         }
+      }
+
+      // --- Brandherde --------------------------------------------------------
+      for (let i = 0; i < fires.length; i++) {
+         const f = fires[i];
+         const b = f.userData.base;
+         const puls = 1 + 0.34 * Math.sin(time * (7 + i * 1.7) + i);
+         const sc = BEAM * b * puls;
+         f.scale.set(sc, sc * 1.7, 1);
+         f.material.opacity = 0.55 + 0.35 * Math.abs(Math.sin(time * (5 + i) + i * 2));
+      }
    };
 
    // Startpose
@@ -858,5 +1224,7 @@ export function buildWarship(vessel) {
 function normHalf(d) {
    return ((d % 360) + 540) % 360 - 180;
 }
+
+function lerpN(a, b, t) { return a + (b - a) * clamp(t, 0, 1); }
 
 export default { buildWarship };

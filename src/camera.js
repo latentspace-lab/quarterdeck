@@ -14,6 +14,7 @@ export class CameraRig {
       this.elevation = 0.18;
       this.zoom = 1.0;
       this.dragging = false;
+      this.shakeAmt = 0;   // Erschuetterung bei Treffern und Stoessen
       this._tmp = new THREE.Vector3();
       this._look = new THREE.Vector3();
       this._pos = new THREE.Vector3();
@@ -52,6 +53,9 @@ export class CameraRig {
       if (MODES.includes(m)) this.mode = m;
     }
     // Kameraabstaende an die Schiffsgroesse anpassen
+    // Kurzer Stoss auf die Kamera (Treffer, Mastbruch, Kollision)
+    shake(a) { this.shakeAmt = Math.min(2.5, this.shakeAmt + a); }
+
     setVessel(camSpec) {
       if (camSpec) this.rig = { ...this.rig, ...camSpec };
       return this;
@@ -123,6 +127,13 @@ export class CameraRig {
        // sanftes Nachfuerhren
       const k = Math.min(1, dt * (this.mode === "CHASE" ? 7 : 4));
       this.camera.position.lerp(camPos, k);
+      if (this.shakeAmt > 0.001) {
+         const a = this.shakeAmt * sz * 0.9;
+         this.camera.position.x += (Math.random() - 0.5) * a;
+         this.camera.position.y += (Math.random() - 0.5) * a;
+         this.camera.position.z += (Math.random() - 0.5) * a;
+         this.shakeAmt = Math.max(0, this.shakeAmt - dt * 3.2);
+      }
       this.camera.lookAt(target);
       this.camera.up.set(0, 1, 0);
     }

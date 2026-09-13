@@ -32,6 +32,7 @@ export class UI {
               <div class="wind-dir"><span id="windDir">0</span>° · <span id="windName">Windstille</span></div>
               <div class="wind-speed"><span id="windSpeed">0.0</span> kn · <span id="beaufort">Bft 0</span></div>
               <div class="awa">AwA <span id="awaFrom">--</span>° · <span id="awaSpeed">--</span> kn</div>
+              <div class="small" id="seaState">See: --</div>
               <div class="small" id="hudGust">Gusts: an</div>
            </div>
            <div class="panel bl">
@@ -54,8 +55,61 @@ export class UI {
               <div><b>Segeltrimm:</b> W in · S aus &nbsp;|&nbsp; C / 1-4 Kamera · H HUD · T Top</div>
               <div><b>Menü:</b> M / Esc &nbsp;·&nbsp; R Neustart (Kurs) &nbsp;·&nbsp; G Gusts</div>
            </div>
+           <div class="panel crew" id="crewPanel" style="display:none">
+              <div class="crew-title">BESATZUNG <span id="crewHead"></span></div>
+              <div id="crewList"></div>
+              <div class="crew-foot"><span>Moral</span>
+                 <div class="dmg-track"><div class="dmg-fill" id="crewMoral"></div></div>
+                 <span class="dv" id="crewMoralV">100%</span></div>
+           </div>
+           <div class="panel dmg" id="dmgPanel" style="display:none">
+              <div class="dmg-title">SCHIFFSZUSTAND</div>
+              <div class="dmg-body">
+                 <svg class="plan" id="dPlan" viewBox="0 0 92 132" aria-hidden="true">
+                    <polygon id="pl_PORT_BOW"      points="46,4 46,44 14,44 20,22"/>
+                    <polygon id="pl_STBD_BOW"      points="46,4 46,44 78,44 72,22"/>
+                    <polygon id="pl_PORT_MID"      points="46,44 46,88 11,88 14,44"/>
+                    <polygon id="pl_STBD_MID"      points="46,44 46,88 81,88 78,44"/>
+                    <polygon id="pl_PORT_QUARTER"  points="46,88 46,120 18,117 11,88"/>
+                    <polygon id="pl_STBD_QUARTER"  points="46,88 46,120 74,117 81,88"/>
+                    <path class="plan-line" d="M46,4 L20,22 L14,44 L11,88 L18,117 L46,120
+                       L74,117 L81,88 L78,44 L72,22 Z"/>
+                    <line class="plan-line thin" x1="46" y1="6" x2="46" y2="119"/>
+                    <line class="plan-line thin" x1="14" y1="44" x2="78" y2="44"/>
+                    <line class="plan-line thin" x1="11" y1="88" x2="81" y2="88"/>
+                    <circle id="pl_mast_fore"   cx="46" cy="30" r="5.5"/>
+                    <circle id="pl_mast_main"   cx="46" cy="66" r="6"/>
+                    <circle id="pl_mast_mizzen" cx="46" cy="100" r="5"/>
+                    <text id="pl_x_fore"   class="plan-x" x="46" y="33.5">✕</text>
+                    <text id="pl_x_main"   class="plan-x" x="46" y="69.5">✕</text>
+                    <text id="pl_x_mizzen" class="plan-x" x="46" y="103.5">✕</text>
+                    <polygon id="pl_rudder" points="42,121 50,121 48,130 44,130"/>
+                 </svg>
+                 <div class="dmg-bars">
+                    <div class="dmg-row"><span class="dl">Rumpf</span>
+                       <div class="dmg-track"><div class="dmg-fill" id="dHull"></div></div>
+                       <span class="dv" id="dHullV">100%</span></div>
+                    <div class="dmg-row"><span class="dl">Takelage</span>
+                       <div class="dmg-track"><div class="dmg-fill" id="dRig"></div></div>
+                       <span class="dv" id="dRigV">100%</span></div>
+                    <div class="dmg-row"><span class="dl">Ruder</span>
+                       <div class="dmg-track"><div class="dmg-fill" id="dRud"></div></div>
+                       <span class="dv" id="dRudV">100%</span></div>
+                    <div class="dmg-row"><span class="dl">Leck</span>
+                       <div class="dmg-track"><div class="dmg-fill flood" id="dFlood"></div></div>
+                       <span class="dv" id="dFloodV">0%</span></div>
+                    <div class="masts" id="dMasts"></div>
+                 </div>
+              </div>
+              <div class="small warn" id="dWarn"></div>
+           </div>
+           <div class="panel foes" id="foePanel" style="display:none">
+              <div class="foe-title">GEGNER</div>
+              <div id="foeList"></div>
+           </div>
            <div class="panel gun" id="gunPanel" style="display:none">
               <div class="gun-title">BATTERIE · <span id="gunCal">—</span></div>
+              <div class="ammo-row" id="ammoRow"></div>
               <div class="gun-row">
                  <span class="gun-side">Q ◄ BB</span>
                  <div class="gun-track"><div class="gun-fill" id="gunFillP"></div></div>
@@ -87,6 +141,27 @@ export class UI {
          gunStateP: this.root.querySelector("#gunStateP"),
          gunStateS: this.root.querySelector("#gunStateS"),
          gunInfo: this.root.querySelector("#gunInfo"),
+         ammoRow: this.root.querySelector("#ammoRow"),
+         crewPanel: this.root.querySelector("#crewPanel"),
+         crewHead: this.root.querySelector("#crewHead"),
+         crewList: this.root.querySelector("#crewList"),
+         crewMoral: this.root.querySelector("#crewMoral"),
+         crewMoralV: this.root.querySelector("#crewMoralV"),
+         dmgPanel: this.root.querySelector("#dmgPanel"),
+         dHull: this.root.querySelector("#dHull"), dHullV: this.root.querySelector("#dHullV"),
+         dRig: this.root.querySelector("#dRig"), dRigV: this.root.querySelector("#dRigV"),
+         dRud: this.root.querySelector("#dRud"), dRudV: this.root.querySelector("#dRudV"),
+         dFlood: this.root.querySelector("#dFlood"), dFloodV: this.root.querySelector("#dFloodV"),
+         dMasts: this.root.querySelector("#dMasts"),
+         plan: {
+            sections: {},
+            masts: {},
+            xs: {},
+            rudder: this.root.querySelector("#pl_rudder"),
+         },
+         dWarn: this.root.querySelector("#dWarn"),
+         foePanel: this.root.querySelector("#foePanel"),
+         foeList: this.root.querySelector("#foeList"),
          lap: this.root.querySelector("#hudLap"),
          time: this.root.querySelector("#hudTime"),
          course: this.root.querySelector("#hudCourse"),
@@ -98,6 +173,7 @@ export class UI {
          awaFrom: this.root.querySelector("#awaFrom"),
          awaSpeed: this.root.querySelector("#awaSpeed"),
          gust: this.root.querySelector("#hudGust"),
+         seaState: this.root.querySelector("#seaState"),
          hSpeed: this.root.querySelector("#hSpeed"),
          vmg: this.root.querySelector("#vmg"),
          twa: this.root.querySelector("#twa"),
@@ -113,6 +189,16 @@ export class UI {
          trainHint: this.root.querySelector("#trainHint"),
          trainFill: this.root.querySelector("#trainFill"),
       };
+      for (const side of ["PORT", "STBD"]) {
+         for (const sec of ["BOW", "MID", "QUARTER"]) {
+            const k = side + "_" + sec;
+            this._refs.plan.sections[k] = this.root.querySelector("#pl_" + k);
+         }
+      }
+      for (const m of ["fore", "main", "mizzen"]) {
+         this._refs.plan.masts[m] = this.root.querySelector("#pl_mast_" + m);
+         this._refs.plan.xs[m] = this.root.querySelector("#pl_x_" + m);
+      }
    }
 
    update(s) {
@@ -131,6 +217,9 @@ export class UI {
          R.shipRate.textContent = s.vessel.rate;
       }
       this._updateGuns(s);
+      this._updateDamage(s);
+      this._updateCrew(s);
+      this._updateFoes(s);
 
       if (s.mode === "Regatta" && s.course) {
          R.lap.textContent = "Runde " + s.course.lap;
@@ -163,6 +252,7 @@ export class UI {
       R.awaFrom.textContent = s.awa.from ? Math.round(s.awa.from) : "--";
       R.awaSpeed.textContent = s.awa.speed ? s.awa.speed.toFixed(1) : "--";
       R.gust.textContent = "Gusts: " + (s.gusts ? "an" : "aus");
+      if (s.sea) R.seaState.textContent = "See: " + s.sea.name + " · " + s.sea.hs.toFixed(1) + " m";
 
       const sp = s.boat.speed.toFixed(1);
       R.hSpeed.textContent = sp;
@@ -212,8 +302,17 @@ export class UI {
       const cal = (s.vessel && s.vessel.guns && s.vessel.guns.decks
          .map((d) => d.calibre).join(" / ")) || "";
       R.gunCal.textContent = cal;
-      const set = (fill, state, g) => {
+      const ready = s.guns.gunsReady || { PORT: s.guns.guns, STBD: s.guns.guns };
+      const set = (fill, state, g, nReady) => {
          const pct = Math.round(g.progress * 100);
+         // Eine Seite ohne bediente Rohre ist nicht "klar", sondern erledigt
+         if (nReady <= 0) {
+            fill.style.width = "100%";
+            fill.style.background = "linear-gradient(90deg,#5a2320,#8a3a30)";
+            state.textContent = "AUSGEFALLEN";
+            state.style.color = "#ff7b7b";
+            return;
+         }
          fill.style.width = pct + "%";
          fill.style.background = g.ready
             ? "linear-gradient(90deg,#ffb03d,#ff5d5d)"
@@ -221,15 +320,137 @@ export class UI {
          state.textContent = g.ready ? "KLAR" : "LADEN " + pct + "%";
          state.style.color = g.ready ? "#ffcf5d" : "rgba(210,230,250,0.6)";
       };
-      set(R.gunFillP, R.gunStateP, s.guns.PORT);
-      set(R.gunFillS, R.gunStateS, s.guns.STBD);
+      set(R.gunFillP, R.gunStateP, s.guns.PORT, ready.PORT);
+      set(R.gunFillS, R.gunStateS, s.guns.STBD, ready.STBD);
       R.gunInfo.textContent =
-         s.guns.guns + " Rohre je Seite · " + s.guns.broadsides + " Breitseiten · "
-         + s.guns.shots + " Schuss";
+         ready.PORT + "/" + ready.STBD + " von " + s.guns.guns + " Rohren · "
+         + s.guns.broadsides + " Breitseiten · " + s.guns.shots + " Schuss";
+      if (s.guns.ammo && R.ammoRow) {
+         const cur = s.guns.ammo.id;
+         const names = [["ball", "Kugel"], ["chain", "Kette"], ["grape", "Kartätsche"]];
+         R.ammoRow.innerHTML = names.map(([id, n]) =>
+            `<span class="ammo${id === cur ? " on" : ""}">${n}</span>`).join("")
+            + `<span class="ammo-key">Z</span>`;
+      }
    }
 
    showMessage(text) {
       this._showMessage(text);
+   }
+
+   _updateDamage(s) {
+      const R = this._refs;
+      const d = s.damage;
+      if (!d || (s.vessel && s.vessel.rig !== "square")) {
+         R.dmgPanel.style.display = "none";
+         return;
+      }
+      R.dmgPanel.style.display = "block";
+      const bar = (fill, val, v, invert = false) => {
+         const pct = Math.round(val * 100);
+         fill.style.width = pct + "%";
+         const good = invert ? 1 - val : val;
+         fill.style.background = good > 0.6
+            ? "linear-gradient(90deg,#3bd671,#8ee06a)"
+            : good > 0.3
+               ? "linear-gradient(90deg,#ffb03d,#ffe066)"
+               : "linear-gradient(90deg,#ff5d5d,#ff8f5d)";
+         v.textContent = pct + "%";
+      };
+      bar(R.dHull, d.hull, R.dHullV);
+      bar(R.dRig, (d.rigging + d.sails) / 2, R.dRigV);
+      bar(R.dRud, d.rudder, R.dRudV);
+      bar(R.dFlood, d.flooding, R.dFloodV, true);
+
+      // Rumpfplan: jeder der sechs Abschnitte einzeln. Ein Mittelwert ueber
+      // den ganzen Rumpf verschweigt genau das, was zaehlt - naemlich WO sie
+      // getroffen ist. Eine zerschossene Breitseite ist etwas anderes als
+      // gleichmaessiger Verschleiss.
+      if (d.sections) {
+         for (const k in R.plan.sections) {
+            const el = R.plan.sections[k];
+            if (el) el.setAttribute("fill", damageColor(d.sections[k]));
+         }
+      }
+      for (const m of ["fore", "main", "mizzen"]) {
+         const st = d.masts[m];
+         const el = R.plan.masts[m];
+         const x = R.plan.xs[m];
+         if (!el) continue;
+         if (st.state === "gone") {
+            el.setAttribute("fill", "#2a1a18");
+            el.setAttribute("stroke", "#ff5d5d");
+            if (x) x.style.display = "block";
+         } else {
+            el.setAttribute("fill", damageColor(st.integrity));
+            el.setAttribute("stroke", st.state === "wounded" ? "#ffb03d" : "rgba(180,215,240,0.55)");
+            if (x) x.style.display = "none";
+         }
+      }
+      if (R.plan.rudder) R.plan.rudder.setAttribute("fill", damageColor(d.rudder));
+
+      const M = [["fore", "Fock"], ["main", "Groß"], ["mizzen", "Kreuz"]];
+      R.dMasts.innerHTML = M.map(([k, n]) => {
+         const st = d.masts[k];
+         const cls = st.state === "gone" ? "gone" : st.state === "wounded" ? "hurt" : "ok";
+         const val = st.state === "gone" ? "weg" : Math.round(st.integrity * 100) + "%";
+         return `<span class="mast ${cls}" title="${n}mast">${n}<b>${val}</b></span>`;
+      }).join("");
+
+      const warn = [];
+      if (d.afire > 0.05) warn.push("FEUER AN BORD");
+      if (s.wreck) warn.push("Wrack im Schlepp — X kappen");
+      if (d.flooding > 0.25) warn.push("Wasser im Schiff");
+      if (s.depth !== null && s.depth !== undefined && s.depth < 12) {
+         warn.push("FLACHWASSER " + s.depth.toFixed(1) + " m");
+      }
+      R.dWarn.textContent = warn.join(" · ");
+      R.dWarn.style.display = warn.length ? "block" : "none";
+   }
+
+   _updateCrew(s) {
+      const R = this._refs;
+      const c = s.crew;
+      if (!c || c.total < 8) { R.crewPanel.style.display = "none"; return; }
+      R.crewPanel.style.display = "block";
+      R.crewHead.textContent = c.fit + " / " + c.total
+         + (c.wounded ? "  ✚" + c.wounded : "") + (c.dead ? "  †" + c.dead : "");
+      R.crewList.innerHTML = c.roles.map((r) => {
+         const pct = Math.round(r.frac * 100);
+         const col = r.frac > 0.7 ? "#8ee06a" : r.frac > 0.4 ? "#ffcf5d" : "#ff7b7b";
+         return `<div class="crew-row">
+            <span class="cl">${r.short}</span>
+            <div class="crew-track"><div class="crew-fill" style="width:${pct}%;background:${col}"></div></div>
+            <span class="cv">${r.fit}</span>
+         </div>`;
+      }).join("");
+      const m = c.morale;
+      R.crewMoral.style.width = Math.round(m * 100) + "%";
+      R.crewMoral.style.background = m > 0.6
+         ? "linear-gradient(90deg,#3bd671,#8ee06a)"
+         : m > 0.3 ? "linear-gradient(90deg,#ffb03d,#ffe066)"
+                   : "linear-gradient(90deg,#ff5d5d,#ff8f5d)";
+      R.crewMoralV.textContent = Math.round(m * 100) + "%";
+   }
+
+   _updateFoes(s) {
+      const R = this._refs;
+      if (!s.enemies || !s.enemies.length) {
+         R.foePanel.style.display = "none";
+         return;
+      }
+      R.foePanel.style.display = "block";
+      R.foeList.innerHTML = s.enemies.map((e) => {
+         const st = e.sunk ? "gesunken" : e.struck ? "gestrichen" : Math.round(e.dist) + " m";
+         const cls = e.sunk ? "out" : e.struck ? "struck" : "";
+         const bar = Math.max(0, Math.round(e.hull * 100));
+         return `<div class="foe ${cls}">
+            <div class="foe-name">${e.name}<span class="foe-dist">${st}</span></div>
+            <div class="foe-sub">${e.rate}</div>
+            <div class="foe-bar"><div class="foe-fill" style="width:${bar}%"></div></div>
+            <div class="foe-sub">Rgk ${Math.round(e.bearing)}° · Masten ${e.masts}/3</div>
+         </div>`;
+      }).join("");
    }
 
    _showMessage(text) {
@@ -356,6 +577,9 @@ export class UI {
          windDir: opts.windDir,
          windSpeed: opts.windSpeed,
          gusts: opts.gusts,
+         scenarioId: opts.scenarioId || "single",
+         scenarios: opts.scenarios || [],
+         onScenarioChange: opts.onScenarioChange || (() => {}),
          onWindChange: opts.onWindChange,
          onVesselChange: opts.onVesselChange || (() => {}),
          onStart: opts.onStart,
@@ -367,6 +591,7 @@ export class UI {
    renderMenu(m) {
       const modes = [
          ["Freeride", "Frei auf See, Windspielen"],
+         ["Gefecht", "Seegefecht gegen die Franzosen"],
          ["Regatta", "Runden-Kurs mit Wendebojen"],
          ["Training", "Segeltechnische Übungen"],
       ];
@@ -400,6 +625,26 @@ export class UI {
       }).join("");
       const selected = VESSELS.find((v) => v.id === m.vesselId) || VESSELS[0];
 
+      // Gefechtslage nur zeigen, wenn auch gekaempft wird
+      let scenarioHtml = "";
+      if (m.mode === "Gefecht" && m.scenarios.length) {
+         const unarmed = !selected.guns;
+         const cards = m.scenarios.map((sc) => {
+            const force = (sc.forces[m.vesselId] || []);
+            const label = unarmed || !force.length
+               ? "kein Gegner für dieses Schiff"
+               : force.length + (force.length === 1 ? " Gegner" : " Gegner");
+            return `<button class="sc-btn${m.scenarioId === sc.id ? " active" : ""}${unarmed ? " off" : ""}" data-sc="${sc.id}">
+                  <div class="sc-title">${sc.title}</div>
+                  <div class="sc-desc">${sc.desc}</div>
+                  <div class="sc-force">${label}</div>
+               </button>`;
+         }).join("");
+         scenarioHtml = `<div class="sec-label">Gefechtslage</div>
+            <div class="sc-grid">${cards}</div>`
+            + (unarmed ? `<div class="sc-hint">Die ${selected.name} führt keine Geschütze — wähle ein Kriegsschiff.</div>` : "");
+      }
+
       this.menuEl.innerHTML =
           `<div class="menu-card">
             <h1>Segel-Simulator 3D</h1>
@@ -407,7 +652,8 @@ export class UI {
             <div class="sec-label">Schiff</div>
             <div class="ship-grid">${shipHtml}</div>
             <div class="sec-label">Spielmodus</div>
-            <div class="mode-grid">${modeHtml}</div>
+            <div class="mode-grid m4">${modeHtml}</div>
+            ${scenarioHtml}
             <div class="menu-controls">
                <label class="ctrl">
                   <span>Windrichtung</span>
@@ -437,6 +683,13 @@ export class UI {
          b.onclick = () => {
              m.mode = b.dataset.mode;
              this.renderMenu(m);
+         };
+      });
+      this.menuEl.querySelectorAll(".sc-btn").forEach((b) => {
+         b.onclick = () => {
+            m.scenarioId = b.dataset.sc;
+            m.onScenarioChange(m.scenarioId);
+            this.renderMenu(m);
          };
       });
       this.menuEl.querySelectorAll(".ship-btn").forEach((b) => {
@@ -469,7 +722,7 @@ export class UI {
          m.onWindChange(m.windDir, m.windSpeed, m.gusts);
       };
       this.menuEl.querySelector("#menuStart").onclick = () =>
-         m.onStart(m.mode, m.windDir, m.windSpeed, m.gusts, m.vesselId);
+         m.onStart(m.mode, m.windDir, m.windSpeed, m.gusts, m.vesselId, m.scenarioId);
       this.menuEl.querySelector("#menuHelp").onclick = () => m.onHelp(m);
    }
 
@@ -505,6 +758,26 @@ export class UI {
       this.root.style.display = "block";
       this.compass.style.display = "block";
    }
+}
+
+// Zustandsfarbe: gruen -> gelb -> rot -> ausgeschossen
+function damageColor(v) {
+   const t = Math.max(0, Math.min(1, v === undefined ? 1 : v));
+   const stops = [
+      [0.00, [42, 20, 18]],
+      [0.30, [150, 52, 38]],
+      [0.60, [176, 130, 40]],
+      [1.00, [46, 122, 72]],
+   ];
+   for (let i = 0; i < stops.length - 1; i++) {
+      const [a, ca] = stops[i], [b, cb] = stops[i + 1];
+      if (t >= a && t <= b) {
+         const u = (t - a) / (b - a);
+         const c = [0, 1, 2].map((j) => Math.round(ca[j] + (cb[j] - ca[j]) * u));
+         return `rgb(${c[0]},${c[1]},${c[2]})`;
+      }
+   }
+   return "rgb(46,122,72)";
 }
 
 function pointColor(twa, luffing, noGo = 32) {
