@@ -21,7 +21,10 @@ async function waitFor(pred, ms = 5000, label = "condition") {
    }
    throw new Error("timed out waiting for " + label);
 }
-const shipOf = (room, id) => room.state.ships.get(id);
+// The state is empty until the first full patch arrives; guard every read.
+const shipsOf = (room) => (room.state && room.state.ships) || null;
+const shipOf = (room, id) => shipsOf(room)?.get(id);
+const shipCount = (room) => shipsOf(room)?.size ?? -1;
 
 async function run() {
    const srv = await startServer(0, "127.0.0.1", { greet: false });
@@ -41,7 +44,7 @@ async function run() {
       ok(Number.isInteger(welcome.params.terrainSeed), "and carries the world parameters", "seed " + welcome.params.terrainSeed);
       eq(welcome.params.tickRate, SIM_HZ, "at the shared tick rate");
 
-      await waitFor(() => room.state && room.state.tick > 5 && shipOf(room, room.sessionId), 5000, "first patches");
+      await waitFor(() => room.state && room.state.tick > 5 && !!shipOf(room, room.sessionId), 5000, "first patches");
       const me = shipOf(room, room.sessionId);
       eq(me.vesselId, "lydia", "our ship is the vessel we asked for");
       eq(me.name, "Hornblower", "with the name we gave");
@@ -87,8 +90,8 @@ async function run() {
          setTimeout(() => reject(new Error("no welcome for player two")), 3000);
       });
       eq(welcome2.params.terrainSeed, welcome.params.terrainSeed, "the newcomer gets the same world");
-      await waitFor(() => room.state.ships.size === 2 && room2.state && room2.state.ships.size === 2, 5000, "both see two ships");
-      eq(room.state.ships.size, 2, "the first player sees two ships");
+      await waitFor(() => shipCount(room) === 2 && shipCount(room2) === 2, 5000, "both see two ships");
+      eq(shipCount(room), 2, "the first player sees two ships");
       eq(shipOf(room, room2.sessionId).vesselId, "hotspur", "and knows what the newcomer sails");
       const p1 = shipOf(room, room.sessionId);
       const p2 = shipOf(room, room2.sessionId);
@@ -110,10 +113,43 @@ async function run() {
       eq(shipOf(room2, room.sessionId).mastsStanding, 2, "the state shows two masts standing");
       ok(shipOf(room2, room.sessionId).wreckDrag > 0, "and the wreck dragging alongside");
 
+      suite.section("A broadside over the wire");
+      // Player two turns to bring her starboard battery to bear on player one
+      // is too slow for a test; instead: fire into the empty sea and check the
+      // salvo and the shots arrive at both clients with exact ballistics.
+      const before = events.length;
+      room.send(MSG.input, { seq: ++seq, rudder: 0, fire: "PORT", ammo: "chain" });
+      await waitFor(() => events.some((e, i) => i >= before && e.kind === "salvo"), 3000, "salvo event");
+      const salvo = events.find((e, i) => i >= before && e.kind === "salvo");
+      eq(salvo.shipId, room.sessionId, "the salvo names the firing ship");
+      eq(salvo.side, "PORT", "and the side");
+      eq(salvo.ammo, "chain", "and the load that was ordered with it");
+      await waitFor(() => shipOf(room2, room.sessionId).ammo === "chain", 3000, "ammo in state");
+      ok(shipOf(room2, room.sessionId).reloadPort > 5, "the state shows the port side reloading",
+         shipOf(room2, room.sessionId).reloadPort.toFixed(1) + " s");
+      await waitFor(() => events.filter((e, i) => i >= before && e.kind === "shots")
+         .reduce((n, e) => n + e.shots.length, 0) >= salvo.count, 4000, "all shots reported");
+      const balls = events.filter((e, i) => i >= before && e.kind === "shots").flatMap((e) => e.shots);
+      ok(balls.every((b) => Number.isFinite(b.origin.x) && Number.isFinite(b.vel.y) && b.ammo === "chain"),
+         "every ball carries origin, velocity and load", balls.length + " balls");
+      ok(events1.some((e) => e.kind === "salvo" && e.shipId === room.sessionId), "the firing player hears it too");
+
+      suite.section("An AI enemy in the room");
+      const client3 = new Client(srv.url);
+      const room3 = await client3.create(ROOM_BATTLE, { vesselId: "hotspur", enemies: ["hirondelle", "bogus"] });
+      room3.onMessage(MSG.welcome, () => {});
+      room3.onMessage(MSG.event, () => {});
+      await waitFor(() => shipCount(room3) === 2, 5000, "player + one enemy");
+      const ai = [...shipsOf(room3).values()].find((s) => s.ai);
+      ok(ai, "an AI ship is in the state");
+      eq(ai && ai.vesselId, "hirondelle", "the known vessel was spawned, the bogus one dropped");
+      ok(ai && Math.hypot(ai.x, ai.z) > 600, "to windward, well off", ai && Math.hypot(ai.x, ai.z).toFixed(0) + " m");
+      await room3.leave(true);
+
       suite.section("Leaving");
       await room2.leave(true);
-      await waitFor(() => room.state.ships.size === 1, 5000, "the second ship is removed");
-      eq(room.state.ships.size, 1, "a consented leave removes the ship");
+      await waitFor(() => shipCount(room) === 1, 5000, "the second ship is removed");
+      eq(shipCount(room), 1, "a consented leave removes the ship");
       await room.leave(true);
    } finally {
       await srv.shutdown();

@@ -1,25 +1,33 @@
 // ServerShip.ts - a ship as the server sees it.
 //
-// Dynamics, damage, crew and pose - and not a single Three.js object. Where
-// the client's Ship class turns a damage result into splinters and a falling
-// mast mesh, this class only books the consequences that change the game:
-// casualties, wreck drag, flooding, events for the clients.
+// Dynamics, damage, crew, guns and pose - and not a single Three.js object.
+// Where the client's Ship class turns a damage result into splinters and a
+// falling mast mesh, this class only books the consequences that change the
+// game: casualties, wreck drag, flooding, events for the clients.
 
+import { Matrix4 } from "three/src/math/Matrix4.js";
 import {
    BoatDynamics,
    DamageModel,
    Crew,
    shipPose,
+   poseMatrix,
    swampStep,
    freeboardOf,
+   rigTopOf,
+   rigHalfWidthOf,
    deriveRng,
    getVessel,
    clamp,
+   lerp,
+   AMMO,
    type Vessel,
    type Rng,
+   type Side,
    type InputCommand,
    type ShipState,
-   type ShipEvent,
+   type ServerEvent,
+   type HitEvent,
    type Pose,
    type SeaHeightFn,
    type WindSample,
@@ -27,7 +35,10 @@ import {
    type CollidableShip,
    type RamInput,
    type SwampState,
+   type TargetBox,
+   type ProjectileHit,
 } from "@segel/shared";
+import { ServerBattery } from "./ServerBattery.ts";
 
 export interface ServerShipOptions {
    x?: number;
@@ -37,6 +48,8 @@ export interface ServerShipOptions {
    /** AI-controlled ships strike their colours when beaten; human ships do not. */
    ai?: boolean;
    name?: string;
+   /** Ships fire on ships of another team. Humans default to "blue", AI to "red". */
+   team?: string;
 }
 
 /**
@@ -62,32 +75,42 @@ export class ServerShip implements CollidableShip {
    readonly vessel: Vessel;
    readonly name: string;
    readonly ai: boolean;
+   readonly team: string;
    readonly rng: Rng;
    readonly dyn: BoatDynamics;
    readonly dmg: DamageModel;
    readonly crew: Crew;
+   readonly battery: ServerBattery;
    /** Bulwark height above the waterline (m) */
    readonly freeboard: number;
+   /** Human gunnery; captains pass their own skill */
+   gunnery = 1.0;
 
    alive = true;
    sinkTimer = 0;
    groundedFor = 0;
    _ramCooldown = 0;
+   lastHitAt = -99;
    /** Last InputCommand applied - the prediction ack for the owning client */
    lastSeq = 0;
    /** 0..1 - resistance from masts dragging alongside */
    wreckDrag = 0;
-   /** Recoil heel impulse (deg); the battery feeds this in PR B */
+   /** Recoil heel impulse (deg), fed by the battery */
    recoilRoll = 0;
    /** Fallen masts still hanging in the rigging alongside */
    readonly wreckage = new Set<MastKey>();
    /** Where the hull sits on the sea after the last step; null while sinking */
    pose: Pose | null = null;
+   /** World matrix of the heeler frame for this pose - what the hit test uses */
+   readonly heelerMatrix = new Matrix4();
    /** The controlling client is away; the ship holds rudder and sail */
    disconnected = false;
+   /** Broadsides ordered by the client, resolved by the simulation this tick */
+   fireRequests: Side[] = [];
 
    private readonly swamp: SwampState = { swampT: 0, railClear: 0 };
-   private events: ShipEvent[] = [];
+   /** Everything the clients need to hear about this ship, in order */
+   private events: ServerEvent[] = [];
 
    constructor(id: string, vesselId: string, seed: number, opts: ServerShipOptions = {}) {
       this.id = id;
@@ -95,6 +118,7 @@ export class ServerShip implements CollidableShip {
       this.vessel = getVessel(vesselId);
       this.name = opts.name ?? this.vessel.name;
       this.ai = !!opts.ai;
+      this.team = opts.team ?? (this.ai ? "red" : "blue");
       this.rng = deriveRng(seed, id);
       this.dyn = new BoatDynamics({
          vessel: this.vessel,
@@ -106,6 +130,7 @@ export class ServerShip implements CollidableShip {
       this.dyn.groundHeading = this.dyn.heading;
       this.dmg = new DamageModel(this.vessel, { isPlayer: !this.ai, rng: this.rng });
       this.crew = new Crew(this.vessel, { isPlayer: !this.ai, rng: this.rng });
+      this.battery = new ServerBattery(id, this.vessel, this.rng);
       // Same rule as the client's Ship: warships measure to the bulwark, the
       // yacht has none.
       this.freeboard =
@@ -122,6 +147,9 @@ export class ServerShip implements CollidableShip {
    get railClear(): number {
       return this.swamp.railClear;
    }
+   get armed(): boolean {
+      return this.battery.enabled;
+   }
 
    applyInput(cmd: InputCommand): void {
       this.dyn.setRudder(cmd.rudder);
@@ -129,6 +157,9 @@ export class ServerShip implements CollidableShip {
          this.dyn.sailSet = clamp(cmd.sailSet, 0.25, 1);
       }
       if (cmd.cutWreck) this.cutAwayWreckage();
+      if (cmd.ammo !== undefined && AMMO[cmd.ammo]) this.battery.setAmmo(cmd.ammo);
+      if (cmd.fire === "BOTH") this.fireRequests.push("PORT", "STBD");
+      else if (cmd.fire === "PORT" || cmd.fire === "STBD") this.fireRequests.push(cmd.fire);
       this.lastSeq = cmd.seq;
    }
 
@@ -150,7 +181,7 @@ export class ServerShip implements CollidableShip {
       }
       this.collectEvents();
 
-      // --- Consequences on the dynamics ------------------------------------
+      // --- Consequences on the dynamics and the guns ------------------------
       this.wreckDrag = 0;
       for (const m of this.wreckage) this.wreckDrag += wreckLoadFor(this.vessel, m);
       this.wreckDrag = clamp(this.wreckDrag, 0, 1);
@@ -160,9 +191,14 @@ export class ServerShip implements CollidableShip {
       // A wreck on one side pulls the ship that way all the time.
       dyn.turnBias = this.wreckDrag * 7 * (dyn.twaSigned > 0 ? -1 : 1);
       dyn.heelBias = D.floodHeel();
+      const gun = this.crew.gunnery();
+      this.battery.effectiveness.PORT = D.gunFraction("PORT") * gun.served;
+      this.battery.effectiveness.STBD = D.gunFraction("STBD") * gun.served;
+      if (this.vessel.guns) this.battery.reloadTime = this.vessel.guns.reload / Math.max(gun.rate, 0.2);
 
       // --- Sail --------------------------------------------------------------
       dyn.step(dt, wind, null);
+      this.lastHitAt += dt;
 
       // --- Sinking -----------------------------------------------------------
       if (D.sunk) {
@@ -172,8 +208,9 @@ export class ServerShip implements CollidableShip {
          return;
       }
 
-      // --- Pose and water over the rail --------------------------------------
-      this.recoilRoll += (0 - this.recoilRoll) * clamp(dt * 9, 0, 1);
+      // --- Pose, hit matrix, water over the rail ---------------------------
+      const kick = this.battery.rollKick * this.battery.rollKickSide;
+      this.recoilRoll = lerp(this.recoilRoll, kick, clamp(dt * 9, 0, 1));
       this.pose = shipPose(
          {
             pos: dyn.pos,
@@ -186,9 +223,76 @@ export class ServerShip implements CollidableShip {
          },
          sea,
       );
+      poseMatrix(dyn.pos, this.pose, this.heelerMatrix);
       swampStep(this.swamp, dt, this.pose, this.freeboard, this.vessel.hull.beam / 2,
          { dmg: D, crew: this.crew }, this.rng);
       this.collectEvents();
+   }
+
+   /** Hit box for the shared ballistics; null while the ship cannot be hit (sinking). */
+   targetBox(): TargetBox | null {
+      if (!this.alive || !this.pose) return null;
+      const square = this.vessel.rig === "square";
+      return {
+         id: this.id,
+         matrixWorld: this.heelerMatrix,
+         LOA: this.vessel.hull.loa,
+         BEAM: this.vessel.hull.beam,
+         DRAFT: this.vessel.hull.draft,
+         FB: this.freeboard,
+         rigTop: square && this.dmg.mastsStanding() > 0 ? rigTopOf(this.vessel) : 0,
+         rigHalfWidth: square ? rigHalfWidthOf(this.vessel) : this.vessel.hull.beam,
+      };
+   }
+
+   /** Give the order for a broadside. Queues the salvo event; true if the guns will fire. */
+   orderFire(side: Side, gunnery: number, ownMatrix: Matrix4, targets: Iterable<TargetBox>): boolean {
+      if (!this.alive || this.dmg.sunk || this.dyn.isCapsized) return false;
+      const salvo = this.battery.fire(side, gunnery, ownMatrix, targets);
+      if (!salvo) return false;
+      this.events.push({ kind: "salvo", shipId: this.id, side, ammo: this.battery.ammo, count: salvo.length });
+      return true;
+   }
+
+   /** A projectile struck this ship. Books the damage and returns the event for the clients. */
+   takeHit(hit: ProjectileHit, from: string): HitEvent | null {
+      if (!this.alive) return null;
+      const res = this.dmg.applyHit({
+         side: hit.side,
+         s: hit.s,
+         y: hit.y,
+         ammo: hit.ammo,
+         lb: hit.lb,
+         range01: hit.range01,
+         freeboard: this.freeboard,
+      });
+      if (!res) return null;
+      let casualties = 0;
+      if (res.crew && res.crew.n > 0) {
+         const c = this.crew.hit(res.crew.n, res.crew.where);
+         casualties = c.hurt + c.killed;
+      }
+      this.lastHitAt = 0;
+      this.collectEvents();
+      return {
+         kind: "hit",
+         shipId: this.id,
+         from,
+         side: hit.side,
+         s: hit.s,
+         y: hit.y,
+         inRig: hit.inRig,
+         world: { x: hit.world.x, y: hit.world.y, z: hit.world.z },
+         dir: { x: hit.dir.x, y: hit.dir.y, z: hit.dir.z },
+         ammo: hit.ammo.id,
+         lb: hit.lb,
+         range01: hit.range01,
+         splinters: res.splinters,
+         holed: res.holed,
+         below: res.below,
+         mastBroken: res.mastBroken ? res.mastBroken.mast : null,
+         casualties,
+      };
    }
 
    /**
@@ -199,7 +303,7 @@ export class ServerShip implements CollidableShip {
    private collectEvents(): void {
       for (const ev of this.dmg.drainEvents()) {
          if (ev.type === "mastLost") this.mastLost(ev.mast as MastKey);
-         this.events.push({ ...ev, shipId: this.id });
+         this.events.push({ kind: "ship", ...ev, shipId: this.id });
       }
    }
 
@@ -218,7 +322,7 @@ export class ServerShip implements CollidableShip {
       const n = this.wreckage.size;
       if (n === 0) return 0;
       this.wreckage.clear();
-      this.events.push({ type: "cutAway", shipId: this.id, n });
+      this.events.push({ kind: "ship", type: "cutAway", shipId: this.id, n });
       return n;
    }
 
@@ -242,7 +346,7 @@ export class ServerShip implements CollidableShip {
       return d;
    }
 
-   drainEvents(): ShipEvent[] {
+   drainEvents(): ServerEvent[] {
       const e = this.events;
       this.events = [];
       return e;
@@ -271,9 +375,9 @@ export class ServerShip implements CollidableShip {
          afire: this.dmg.afire,
          struck: this.dmg.struck,
          sunk: this.dmg.sunk,
-         reloadPort: 0,
-         reloadStbd: 0,
-         ammo: "ball",
+         reloadPort: this.battery.reload.PORT,
+         reloadStbd: this.battery.reload.STBD,
+         ammo: this.battery.ammo,
          driveMul: d.driveMul,
          rudderMul: d.rudderMul,
          dragMul: d.dragMul,

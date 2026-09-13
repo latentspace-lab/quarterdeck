@@ -19,7 +19,11 @@ import * as THREE from "three";
 import { clamp, DEG } from "./utils.js";
 import { VESSEL_COLORS } from "./vessels.js";
 import { holeTexture, fireTexture } from "./fx.js";
-import { freeboardOf as sharedFreeboardOf } from "@segel/shared";
+import {
+   freeboardOf as sharedFreeboardOf,
+   smooth, hbStation, kdStation, sheerStation, beamFactor, makeHullGeom,
+   gunLayout, barrelLengthOf, rigTopOf, rigHalfWidthOf,
+} from "@segel/shared";
 
 const UP = new THREE.Vector3(0, 1, 0);
 
@@ -37,61 +41,12 @@ const matGlass = new THREE.MeshStandardMaterial({ color: 0x9fd8e8, roughness: 0.
 const C = VESSEL_COLORS;
 
 // =========================================================================
-// Rumpfform
+// Hull form
 // =========================================================================
-// Halbbreite ueber die Laenge (0 = Bug, 1 = Spiegel)
-function hbStation(s) {
-   if (s < 0.44) return Math.pow(smooth(s, 0.0, 0.44), 0.72);
-   return 1 - 0.40 * Math.pow(smooth(s, 0.44, 1.0), 1.45);
-}
-// Kiellinie: vorn steigt der Vorsteven, achtern leichter Kielfall
-function kdStation(s) {
-   return 0.26 + 0.74 * smooth(s, 0.0, 0.24) + 0.06 * smooth(s, 0.40, 0.80)
-        - 0.16 * smooth(s, 0.88, 1.0);
-}
-// Deckssprung: hohe Back vorn, tiefste Stelle mittschiffs, Achterdeck/Poop hinten.
-// Beide Enden steigen erst im letzten Drittel - dazwischen laeuft die
-// Scheuerlinie glatt durch, wie bei einem echten Rumpf.
-function sheerStation(s) {
-   return 1.0
-      + 0.30 * Math.pow(smooth(0.34 - s, 0.0, 0.34), 1.5)   // Back steigt zum Bug
-      + 0.22 * Math.pow(smooth(s - 0.66, 0.0, 0.34), 1.4);  // Poop steigt zum Heck
-}
-// Querschnittsform: schmal am Kiel, voll an der Wasserlinie, eingezogen oben
-function beamFactor(t, tW) {
-   const tMax = Math.min(0.94, tW * 1.06 + 0.05);
-   if (t <= tMax) {
-      const u = t / Math.max(tMax, 1e-4);
-      return 0.12 + 0.88 * Math.pow(Math.sin(u * Math.PI / 2), 0.74);
-   }
-   const v = (t - tMax) / Math.max(1 - tMax, 1e-4);
-   return 1.0 - 0.21 * v * v; // Tumblehome
-}
-function smooth(x, a, b) {
-   return THREE.MathUtils.smoothstep(x, a, b);
-}
-
-// Geometrie-Helfer: liefert Punkt + Halbbreite fuer Station s, Hoehenparameter t
-function makeHullGeom(dim) {
-   const { LOA, BEAM, DRAFT, FB } = dim;
-   const tW = DRAFT / (DRAFT + FB); // Hoehenparameter der Wasserlinie
-
-   function point(s, t, side) {
-      let z = THREE.MathUtils.lerp(LOA / 2, -LOA / 2, s);
-      const yKeel = -DRAFT * kdStation(s);
-      const ySheer = FB * sheerStation(s);
-      const y = yKeel + (ySheer - yKeel) * t;
-      // lokaler Hoehenparameter relativ zur eigenen Station
-      const tLocal = (y - yKeel) / Math.max(ySheer - yKeel, 1e-4);
-      const tWLocal = (0 - yKeel) / Math.max(ySheer - yKeel, 1e-4);
-      const hb = hbStation(s) * (BEAM / 2) * beamFactor(tLocal, tWLocal);
-      // Steven- und Spiegelfall: oben nach vorn bzw. nach achtern ausladend
-      z += tLocal * LOA * 0.075 * smooth(1 - s, 0.84, 1.0);
-      z -= tLocal * LOA * 0.055 * smooth(s, 0.86, 1.0);
-      return { x: side * hb, y, z, hb, sheer: ySheer };
-   }
-   return { point, tW };
-}
+// The station profiles (hbStation, kdStation, sheerStation, beamFactor) and
+// the hull point function (makeHullGeom) live in @segel/shared/hull: the
+// server places gun ports and hit boxes on the same hull, so the maths has to
+// be one source. They are imported above.
 
 // Die Wasserlinie ist waagerecht, die Baender folgen dem Deckssprung: genau so
 // laufen Barkholz und Stueckpfortenstrake an einem echten Rumpf.
@@ -619,41 +574,26 @@ export function buildWarship(vessel) {
    const muzzles = { PORT: [], STBD: [] };
    heeler.add(batteries.PORT, batteries.STBD);
 
-   for (const deck of gunDecks) {
-      const barrelLen = BEAM * 0.16;
-      const barrelR = BEAM * 0.018;
-      const geoBarrel = new THREE.CylinderGeometry(barrelR * 0.72, barrelR, barrelLen, 8);
-      geoBarrel.rotateZ(Math.PI / 2); // Rohr zeigt in +X
-      geoBarrel.translate(barrelLen / 2, 0, 0);
-      for (let i = 0; i < deck.count; i++) {
-         const s = THREE.MathUtils.lerp(deck.from, deck.to, deck.count === 1 ? 0.5 : i / (deck.count - 1));
-         // Die Pforte sitzt auf dem Strake, also relativ zum Deckssprung
-         const y = deck.y * FB * sheerStation(s);
-         const p = point(s, 0.5, 1);
-         // exakte Halbbreite auf Batteriehoehe suchen
-         let hbHere = p.hb;
-         let zHere = p.z;
-         for (let t = 0; t <= 1.0001; t += 0.02) {
-            const q = point(s, t, 1);
-            if (q.y >= y) { hbHere = q.hb; zHere = q.z; break; }
-         }
-         const z = zHere;
-         for (const side of ["STBD", "PORT"]) {
-            const sx = side === "STBD" ? 1 : -1;
-            // Stueckpforte
-            const lid = new THREE.Mesh(new THREE.PlaneGeometry(LOA * 0.022, FB * 0.15), matPortLid);
-            lid.rotation.y = sx * Math.PI / 2;
-            lid.position.set(sx * (hbHere + 0.02), y, z);
-            heeler.add(lid);
-            // Rohr (sitzt in der Rueckstoss-Gruppe)
-            const barrel = new THREE.Mesh(geoBarrel, matIron);
-            barrel.scale.x = sx;
-            barrel.position.set(sx * (hbHere - barrelLen * 0.15), y, z);
-            batteries[side].add(barrel);
-            muzzles[side].push(new THREE.Vector3(
-               sx * (hbHere + barrelLen * 0.85), y, z));
-         }
-      }
+   // Port positions come from the shared hull maths (gunLayout): the server's
+   // muzzles are this client's muzzles to the last digit.
+   const barrelLen = barrelLengthOf(vessel);
+   const barrelR = BEAM * 0.018;
+   const geoBarrel = new THREE.CylinderGeometry(barrelR * 0.72, barrelR, barrelLen, 8);
+   geoBarrel.rotateZ(Math.PI / 2); // barrel points to +X
+   geoBarrel.translate(barrelLen / 2, 0, 0);
+   for (const port of gunLayout(vessel)) {
+      const sx = port.side === "STBD" ? 1 : -1;
+      // port lid
+      const lid = new THREE.Mesh(new THREE.PlaneGeometry(LOA * 0.022, FB * 0.15), matPortLid);
+      lid.rotation.y = sx * Math.PI / 2;
+      lid.position.set(sx * (port.hb + 0.02), port.y, port.z);
+      heeler.add(lid);
+      // barrel (in the recoil group)
+      const barrel = new THREE.Mesh(geoBarrel, matIron);
+      barrel.scale.x = sx;
+      barrel.position.set(sx * (port.hb - barrelLen * 0.15), port.y, port.z);
+      batteries[port.side].add(barrel);
+      muzzles[port.side].push(new THREE.Vector3(sx * (port.hb + barrelLen * 0.85), port.y, port.z));
    }
 
    // =====================================================================
@@ -917,8 +857,8 @@ export function buildWarship(vessel) {
       zAt: (s0) => THREE.MathUtils.lerp(LOA / 2, -LOA / 2, clamp(s0, 0, 1)),
       gunDecks: gunDecks.map((d) => ({ ...d })),
       // Hoechster Punkt des Riggs und groesste Rahbreite - fuer die Trefferpruefung
-      rigTop: Math.max(...mastDefs.map((m) => m.h)) * 1.02,
-      rigHalfWidth: LOA * 0.34,
+      rigTop: rigTopOf(vessel),
+      rigHalfWidth: rigHalfWidthOf(vessel),
    };
 
    // Rueckstoss von aussen ausloesen
