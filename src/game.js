@@ -686,7 +686,8 @@ export class Simulator {
       this.fleet.clear();
       this.debris.clear();
       const sc = scenarioFor(this.scenarioId);
-      const list = sc.forces[this.vesselId] || [];
+      const enemyFaction = enemyFactionFor(this.vessel?.faction || "gb");
+      const list = forcesFor(this.scenarioId, this.vessel, enemyFaction);
       this.terrain.setVisible(true);
       // Der Seegang folgt dem Wind nur traege: eine See baut sich auf und
       // laeuft langsamer wieder ab. Sonst wuerde jede Boe die Wellen pumpen.
