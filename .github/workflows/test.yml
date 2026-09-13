@@ -1,0 +1,43 @@
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          # 22.18+ liefert TypeScript-Stripping ohne Flag - die Tests
+          # importieren packages/server/src/headless.ts direkt.
+          node-version: 22
+          cache: npm
+      - run: npm ci
+
+      # Typen zuerst: ein Typfehler soll nicht als Testfehler auftauchen.
+      - name: Typen pruefen
+        run: npm run typecheck
+
+      # Schnelle Ebenen zuerst - sie zeigen die meisten Fehler in unter einer
+      # Sekunde und machen den Log lesbar.
+      - name: Unit-Tests
+        run: npm run test:unit
+
+      - name: Regressionstests
+        run: npm run test:regression
+
+      # Der Boot-Smoke-Test faehrt das GEBAUTE Spiel im Browser - er braucht
+      # also den Build und Chromium. Ohne beides ueberspringt er sich selbst.
+      - name: Build
+        run: npm run build
+
+      - name: Chromium installieren
+        run: npx playwright install --with-deps chromium
+
+      - name: Integrationstests
+        run: npm run test:integration
