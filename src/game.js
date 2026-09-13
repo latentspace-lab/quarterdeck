@@ -18,6 +18,7 @@ import { Course } from "./marks.js";
 import { makeTrainer } from "./trainer.js";
 import { UI } from "./ui.js";
 import { DEG, clamp, lerp, normDeg, dirVec, diffDeg } from "./utils.js";
+import { voiceAudio, voiceAnnounce, TRIGGER } from "./audio.js";
 
 const CAM_LABEL = {
    CHASE: "Verfolger",
@@ -127,6 +128,7 @@ export class Simulator {
       this.seaWind = 12;
       this._groundMsg = 0;
       this._battleOver = false;
+      this._battleStarted = false;
       this._lockMsg = false;
       this.mode = "Freeride";
       this.gusts = true;
@@ -145,6 +147,7 @@ export class Simulator {
 
       // Zuerst Menü anzeigen
       this.openMenu();
+      voiceAudio.preload();
    }
 
    // Schiff wechseln: 3D-Modell, Physik-Profil, Kamera, Batterie, Trainer.
@@ -221,6 +224,7 @@ export class Simulator {
    openMenu() {
       this.menuOpen = true;
       this.paused = true;
+      voiceAnnounce(TRIGGER.MENU_OPEN);
       this.ui.openMenu({
          mode: this.mode,
          vesselId: this.vesselId,
@@ -491,7 +495,10 @@ export class Simulator {
       this.boat.setRudder(inp.rudder);
       if (this.vessel.rig === "square") {
          // W / S setzen bzw. reffen die Segel (mehr Tuch = mehr Fahrt und Krengung)
-         if (inp.trimIn) this.boat.sailSet = clamp(this.boat.sailSet + dt * 0.45, 0.25, 1);
+         if (inp.trimIn) {
+            this.boat.sailSet = clamp(this.boat.sailSet + dt * 0.45, 0.25, 1);
+            voiceAnnounce(TRIGGER.MAKE_SAIL);
+         }
          if (inp.trimOut) this.boat.sailSet = clamp(this.boat.sailSet - dt * 0.45, 0.25, 1);
       } else if (!this.manualTrim) {
          if (inp.trimIn) this.boat.trim = clamp(this.boat.trim + dt * 0.4, 0, 1);
@@ -728,6 +735,9 @@ export class Simulator {
       if (ok) {
          this.ui.showMessage((side === "PORT" ? "Backbord" : "Steuerbord")
             + "-Breitseite — " + n + " Rohre " + this.battery.ammoSpec().short + "!");
+         // Die erste Breitseite eroeffnet das Gefecht, danach nur noch Zurufe.
+         voiceAnnounce(this._battleStarted ? TRIGGER.BATTLE_STATIONS : TRIGGER.FIRE_AT_WILL);
+         this._battleStarted = true;
       }
       return ok;
    }
@@ -745,6 +755,7 @@ export class Simulator {
       this.seaWind = 12;
       this._groundMsg = 0;
       this._battleOver = false;
+      this._battleStarted = false;
 
       if (!list.length) {
          this.ui.showMessage("Die " + this.vessel.name + " ist kein Kriegsschiff — kein Gegner in Sicht.");
@@ -799,6 +810,7 @@ export class Simulator {
          msg = "Gefecht gewonnen! " + (struck ? struck + " gestrichen" : "")
             + (struck && sunk ? ", " : "") + (sunk ? sunk + " gesunken" : "") + ".";
          this._battleOver = true;
+         voiceAnnounce(TRIGGER.VICTORY);
       }
       return msg;
    }
@@ -839,7 +851,10 @@ export class Simulator {
             if (isUs) this.ui.showMessage(M[ev.mast] + " angeschlagen — Tuch wegnehmen!");
             break;
          case "holed":
-            if (isUs && Math.random() < 0.4) this.ui.showMessage("Leck unter Wasser — die Pumpen!");
+            if (isUs && Math.random() < 0.4) {
+               this.ui.showMessage("Leck unter Wasser — die Pumpen!");
+               voiceAnnounce(TRIGGER.FLOODING);
+            }
             break;
          case "shattered": {
             const SEC = { BOW: "Bug", MID: "Mittschiffs", QUARTER: "Achterschiff" };
@@ -860,6 +875,7 @@ export class Simulator {
             break;
          case "sunk":
             this.ui.showMessage(isUs ? "Wir sinken." : ev.ship.name + " sinkt.");
+            voiceAnnounce(TRIGGER.SHIP_SUNK);
             break;
          case "exploded":
             this.ui.showMessage(ev.ship.name + " fliegt in die Luft!");
@@ -880,6 +896,7 @@ export class Simulator {
          if (us) {
             this.cam.shake(1.6);
             this.ui.showMessage("Zusammenstoß! " + ev.closing.toFixed(1) + " kn Annäherung.");
+            voiceAnnounce(TRIGGER.COLLISION);
          }
       } else if (ev.type === "locked") {
          const us = ev.a === this.player || ev.b === this.player;
