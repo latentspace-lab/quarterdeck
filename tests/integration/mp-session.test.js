@@ -137,8 +137,18 @@ async function run() {
       const me = session.net.state.ships.get(session.shipId);
       ok(me.lastSeq > 30, "our inputs are acknowledged", "seq " + me.lastSeq);
       ok(me.rudder < -0.5, "the server has our rudder", me.rudder.toFixed(2));
-      ok(Math.hypot(sim.boat.pos.x - me.x, sim.boat.pos.z - me.z) < 15,
-         "the local ship stays near the server's copy", Math.hypot(sim.boat.pos.x - me.x, sim.boat.pos.z - me.z).toFixed(1) + " m");
+      // Prediction: the local ship is the server's acknowledged state plus the
+      // replay of a round trip's worth of inputs - in a hard turn it must still
+      // be within a boat's width, and the reconciliation itself near zero.
+      const gap = Math.hypot(sim.boat.pos.x - me.x, sim.boat.pos.z - me.z);
+      ok(gap < 6, "the local ship is within a round trip of the server's copy in a hard turn", gap.toFixed(2) + " m");
+      const corr = session.correction;
+      ok(corr, "reconciliation has run", corr && corr.replayed + " inputs replayed");
+      ok(corr && corr.dist < 0.5, "and the last correction was tiny: same physics, same inputs, one input per tick",
+         corr && corr.dist.toFixed(3) + " m");
+      ok(corr && !corr.snapped, "no snap");
+      ok(session.predictor.pending <= 8, "only a round trip's worth of inputs is unacknowledged", session.predictor.pending + " pending");
+      near(sim.player.serverDriven.driveMul, me.driveMul, 1e-6, "the local ship steps with the server's multipliers");
       near(sim.sea.seaWind, session.net.state.seaWind, 0.5, "sea state follows the server");
       near(sim.wind.dir, session.net.state.windDir, 1e-6, "wind direction is the server's");
 

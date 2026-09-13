@@ -10,11 +10,9 @@
 
 import { NetClient } from "./NetClient.js";
 import { RemoteShip } from "./RemoteShip.js";
+import { Predictor, ViewOffset } from "./Predictor.js";
 import { lerp, clamp } from "@segel/shared";
-import { lerpAngleDeg } from "./Interpolator.js";
 
-/** Seconds over which the local ship is blended onto the server's copy. */
-const CORRECTION_TAU = 0.35;
 /** Seconds over which sea state is blended onto the server's. */
 const SEA_TAU = 0.5;
 
@@ -37,6 +35,9 @@ export class MultiplayerSession {
       this._pending = { fire: null, ammo: null, cutWreck: false };
       this._lastSailSet = null;
       this._serverMe = null;
+      /** prediction + reconciliation of our own ship; created in start() */
+      this.predictor = null;
+      this.viewOffset = new ViewOffset(0.15);
       this._events = [];
       this.closed = false;
       this.closeCode = null;
@@ -79,6 +80,10 @@ export class MultiplayerSession {
       if (st && Number.isFinite(st.seaWind) && Number.isFinite(st.phaseT)) {
          sim.sea.fromSync({ seaWind: st.seaWind, phaseT: st.phaseT });
       }
+      // Our ship: the server owns damage, we predict the helm.
+      this.predictor = new Predictor(sim.vessel);
+      sim.player.serverDriven = { driveMul: 1, rudderMul: 1, dragMul: 1, turnBias: 0, heelBias: 0, stopped: false };
+      sim.player.viewOffset = this.viewOffset;
       return this.welcome;
    }
 
@@ -156,6 +161,8 @@ export class MultiplayerSession {
       if (this._pending.cutWreck) cmd.cutWreck = true;
       this._pending = { fire: null, ammo: null, cutWreck: false };
       this.net.send(cmd);
+      if (this.predictor) this.predictor.record(cmd);
+      this.viewOffset.step(dt);
       if (cmd.ammo) sim.player.battery.setAmmo(cmd.ammo);
 
       const st = this.net.state;
@@ -188,20 +195,32 @@ export class MultiplayerSession {
       this._routeEvents();
    }
 
-   /** Blend the local ship toward the authoritative copy. */
+   /**
+    * Reconcile the local ship with the authoritative copy: ghost <- server
+    * state, replay unacknowledged inputs, local <- ghost; the view keeps the
+    * old picture and eases onto the new one.
+    */
    _correctLocal(dt) {
       const s = this._serverMe;
       if (!s || !Number.isFinite(s.x) || !Number.isFinite(s.heading)) return;
-      const b = this.sim.boat;
-      const k = clamp(dt / CORRECTION_TAU, 0, 1);
-      b.pos.x = lerp(b.pos.x, s.x, k);
-      b.pos.z = lerp(b.pos.z, s.z, k);
-      b.heading = lerpAngleDeg(b.heading, s.heading, k);
-      b.speed = lerp(b.speed, s.speed, k);
-      // Damage is the server's alone; the local battery only shows.
       const player = this.sim.player;
+      // The multipliers the server stepped with - ours for the next steps too.
+      player.serverDriven = {
+         driveMul: s.driveMul, rudderMul: s.rudderMul, dragMul: s.dragMul,
+         turnBias: s.turnBias, heelBias: s.heelBias, stopped: !!s.stopped,
+      };
+      if (this.predictor) {
+         const c = this.predictor.reconcile(s, this.sim.boat, this.sim._windObj ? this.sim._windObj() : { dir: this.sim.wind.dir, speedKts: this.sim.wind.speed });
+         if (c) this.viewOffset.absorb(c);
+      }
+      // Damage is the server's alone; the local battery only shows.
       player.applyDamageState(s);
       player.battery.reloadTime = s.reloadTime || player.battery.reloadTime;
+   }
+
+   /** Last reconciliation, for the HUD and the tests. */
+   get correction() {
+      return this.predictor ? this.predictor.last : null;
    }
 
    _routeEvents() {
@@ -301,6 +320,10 @@ export class MultiplayerSession {
    async stop() {
       for (const r of this.remotes.values()) r.dispose();
       this.remotes.clear();
+      if (this.sim.player) {
+         this.sim.player.serverDriven = null;
+         this.sim.player.viewOffset = null;
+      }
       if (this.net) await this.net.leave();
       this.net = null;
    }

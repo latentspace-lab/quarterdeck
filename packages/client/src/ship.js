@@ -102,6 +102,15 @@ export class Ship {
       this.lastHitAt = -99;
       this._tmp = new THREE.Vector3();
       this._events = [];
+
+      // Multiplayer: when set, the server owns damage and its effect on the
+      // dynamics. update() then takes these multipliers instead of computing
+      // them from the local damage model, and skips what the server does
+      // (rig stress, water over the rail, striking).
+      this.serverDriven = null;
+      // Multiplayer: a correction the picture still has to absorb - added to
+      // the drawn position and heading, decays to zero (see Predictor).
+      this.viewOffset = null;
    }
 
    _rawScene() { return this.scene && this.scene.scene ? this.scene.scene : this.scene; }
@@ -419,8 +428,8 @@ export class Ship {
       const u = this.model.userData;
 
       // --- Schaden fortschreiben -----------------------------------------
-      D.update(dt, { heel: dyn.heel });
-      if (this.vessel.rig === "square") {
+      if (!this.serverDriven) D.update(dt, { heel: dyn.heel });
+      if (this.vessel.rig === "square" && !this.serverDriven) {
          const broke = D.stressRig(dt, {
             windKts: ctx.wind.speedKts,
             sailSet: dyn.sailSet,
@@ -429,7 +438,7 @@ export class Ship {
          if (broke) this._dropMast(broke.mast, "overpress");
       }
       // Eine ausgeblutete Besatzung kaempft nicht weiter
-      if (!this.isPlayer && !D.struck && !D.neverStrikes
+      if (!this.isPlayer && !this.serverDriven && !D.struck && !D.neverStrikes
             && this.crew.morale() < 0.12 && this.crew.losses > 8) {
          D.struck = true;
          D._event("struck", {});
@@ -469,22 +478,34 @@ export class Ship {
       }
 
       // --- Schadensfolgen auf die Fahrdynamik ----------------------------
-      this.wreckDrag = this.debris ? this.debris.tetherLoad(this.id) : 0;
-      dyn.driveMul = D.driveFactor();
-      dyn.rudderMul = D.rudderFactor() * (1 - 0.35 * this.wreckDrag);
-      dyn.dragMul = 1 + 1.8 * this.wreckDrag + 0.7 * D.flooding;
-      // Ein Wrack an einer Seite zieht das Schiff staendig in diese Richtung
-      dyn.turnBias = this.wreckDrag * 7 * (this.dyn.twaSigned > 0 ? -1 : 1);
-      dyn.heelBias = D.floodHeel();
-      // Mannschaft: bediente Rohre, Ladegeschwindigkeit, Segelmanoever, Ruder
-      const gun = this.crew.gunnery();
-      this.battery.effectiveness.PORT = D.gunFraction("PORT") * gun.served;
-      this.battery.effectiveness.STBD = D.gunFraction("STBD") * gun.served;
-      if (this.vessel.guns) {
-         this.battery.reloadTime = this.vessel.guns.reload / Math.max(gun.rate, 0.2);
+      if (this.serverDriven) {
+         // The server computed these from its damage and crew; the local
+         // prediction must step with exactly the same numbers.
+         const o = this.serverDriven;
+         dyn.driveMul = o.driveMul;
+         dyn.rudderMul = o.rudderMul;
+         dyn.dragMul = o.dragMul;
+         dyn.turnBias = o.turnBias;
+         dyn.heelBias = o.heelBias;
+         dyn.stopped = !!o.stopped;
+      } else {
+         this.wreckDrag = this.debris ? this.debris.tetherLoad(this.id) : 0;
+         dyn.driveMul = D.driveFactor();
+         dyn.rudderMul = D.rudderFactor() * (1 - 0.35 * this.wreckDrag);
+         dyn.dragMul = 1 + 1.8 * this.wreckDrag + 0.7 * D.flooding;
+         // Ein Wrack an einer Seite zieht das Schiff staendig in diese Richtung
+         dyn.turnBias = this.wreckDrag * 7 * (this.dyn.twaSigned > 0 ? -1 : 1);
+         dyn.heelBias = D.floodHeel();
+         // Mannschaft: bediente Rohre, Ladegeschwindigkeit, Segelmanoever, Ruder
+         const gun = this.crew.gunnery();
+         this.battery.effectiveness.PORT = D.gunFraction("PORT") * gun.served;
+         this.battery.effectiveness.STBD = D.gunFraction("STBD") * gun.served;
+         if (this.vessel.guns) {
+            this.battery.reloadTime = this.vessel.guns.reload / Math.max(gun.rate, 0.2);
+         }
+         dyn.driveMul *= 0.55 + 0.45 * this.crew.sailHandling();
+         dyn.rudderMul *= this.crew.command();
       }
-      dyn.driveMul *= 0.55 + 0.45 * this.crew.sailHandling();
-      dyn.rudderMul *= this.crew.command();
 
       // Wird gerade Segel bedient? Dann sind die Toppsgasten in den Wanten.
       const dSet = Math.abs(dyn.sailSet - this._lastSailSet);
@@ -572,13 +593,19 @@ export class Ship {
       this._applyPoseExact(pose, this._posCurr);
 
       // --- Wasser ueber die Reling --------------------------------------
-      this._swampCheck(dt, pose);
+      if (!this.serverDriven) this._swampCheck(dt, pose);
    }
 
    /** Eine fertige Lage auf das Modell schreiben. */
    _applyPoseExact(pose, pos) {
-      this.model.position.set(pos.x, pose.y, pos.z);
-      this.model.rotation.y = pose.yawY;
+      const vo = this.viewOffset;
+      if (vo && vo.active) {
+         this.model.position.set(pos.x + vo.x, pose.y, pos.z + vo.z);
+         this.model.rotation.y = pose.yawY + vo.yaw * DEG;
+      } else {
+         this.model.position.set(pos.x, pose.y, pos.z);
+         this.model.rotation.y = pose.yawY;
+      }
       const heeler = this.model.userData.heeler;
       heeler.rotation.z = pose.rollZ;
       heeler.rotation.x = pose.pitchX;

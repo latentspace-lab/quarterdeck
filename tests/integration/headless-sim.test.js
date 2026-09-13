@@ -62,7 +62,7 @@ suite.section("The snapshot is complete");
    const s = sim.snapshot().ships[0];
    for (const key of [
       "id", "vesselId", "x", "z", "heading", "speed", "heel", "sailSet", "rudder",
-      "twa", "tack", "luffing", "isCapsized", "alive",
+      "twa", "tack", "luffing", "leeway", "isCapsized", "alive",
       "hullIntegrity", "mastsStanding", "flooding", "afire", "struck", "sunk",
       "hullPortBow", "hullPortMid", "hullPortQuarter", "hullStbdBow", "hullStbdMid", "hullStbdQuarter",
       "rigging", "sails", "rudderState", "gunsPort", "gunsStbd",

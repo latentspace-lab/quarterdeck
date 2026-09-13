@@ -369,6 +369,7 @@ export class ServerShip implements CollidableShip {
          twa: d.twaSigned,
          tack: d.tack,
          luffing: d.luffing,
+         leeway: d.leeway,
          isCapsized: d.isCapsized,
          alive: this.alive,
          hullIntegrity: this.dmg.integrity(),
