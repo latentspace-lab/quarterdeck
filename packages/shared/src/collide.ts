@@ -174,14 +174,14 @@ export function resolve(
          closingKts: closing,
          otherTons: mB,
          ownTons: mA,
-         side: relA > 0 ? "STBD" : "PORT",
+         side: relA > 0 ? "PORT" : "STBD", // a positive bearing is to port (+x)
          s: sA,
       });
       res.bRes = B.takeRam({
          closingKts: closing,
          otherTons: mA,
          ownTons: mB,
-         side: relB > 0 ? "STBD" : "PORT",
+         side: relB > 0 ? "PORT" : "STBD",
          s: sB,
       });
       res.damaged = true;

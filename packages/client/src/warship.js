@@ -582,7 +582,7 @@ export function buildWarship(vessel) {
    geoBarrel.rotateZ(Math.PI / 2); // barrel points to +X
    geoBarrel.translate(barrelLen / 2, 0, 0);
    for (const port of gunLayout(vessel)) {
-      const sx = port.side === "STBD" ? 1 : -1;
+      const sx = port.side === "STBD" ? -1 : 1; // starboard is -x
       // port lid
       const lid = new THREE.Mesh(new THREE.PlaneGeometry(LOA * 0.022, FB * 0.15), matPortLid);
       lid.rotation.y = sx * Math.PI / 2;
@@ -891,7 +891,7 @@ export function buildWarship(vessel) {
    // Einschlagloch setzen. size 0..1 (Anteil des angerichteten Schadens)
    ship.addHole = function (side, sPos, y, size = 0.3) {
       if (!matHole) return null;
-      const sx = side === "STBD" ? 1 : -1;
+      const sx = side === "STBD" ? -1 : 1; // starboard is -x
       const yy = clamp(y, -DRAFT * 0.5, FB * 1.15);
       const { hb, z } = skinAt(sPos, yy, sx);
       const d = clamp(0.55 + size * 5.5, 0.5, Math.min(LOA * 0.075, 3.2));
@@ -1187,7 +1187,7 @@ export function buildWarship(vessel) {
       for (const side of ["PORT", "STBD"]) {
          if (recoil[side] > 0.0005) {
             recoil[side] = Math.max(0, recoil[side] - dt * 1.6);
-            const sx = side === "STBD" ? -1 : 1; // Rohre fahren nach innen
+            const sx = side === "STBD" ? 1 : -1; // guns run inboard (starboard is -x)
             batteries[side].position.x = sx * recoil[side];
          } else if (batteries[side].position.x !== 0) {
             batteries[side].position.x = 0;

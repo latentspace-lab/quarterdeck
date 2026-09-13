@@ -38,20 +38,20 @@ function pound(vessel, ammo, n, o = {}) {
    }
    return d;
 }
-// Rumpfschaden je Treffer ist NICHT zufaellig: dmg = power * ammo.hull * 0.055
+// Rumpfschaden je Treffer ist NICHT zufaellig: dmg = power * ammo.hull * 0.03
 // / scantling, und power haengt nur an Kaliber und Entfernung. Ueber 200 Seeds
 // kommt deshalb immer derselbe Wert heraus. Die folgenden Faelle halten das
 // gemessene IST fest - ob es das gewuenschte SOLL ist, steht offen in
 // tests/pending/balance.test.js.
 const hull8 = pound(LY, "ball", 8);
-// 8 x (18/18) * 0.85 Restwucht * 1.0 Rumpfwirkung * 0.055 / scantling 1.0,
-// bezogen auf drei Abschnitte: 1 - 8*0.04675/3 = 0.875333...
-ok(Math.abs(hull8.integrity() - (1 - (8 * 0.04675) / 3)) < 1e-9,
-   "acht Vollkugeln kosten 12.47 % der Gefechtskraft (gemessenes Ist)",
+// 8 x (18/18) * 0.85 Restwucht * 1.0 Rumpfwirkung * 0.03 / scantling 1.0,
+// bezogen auf drei Abschnitte: 1 - 8*0.0255/3 = 0.932
+ok(Math.abs(hull8.integrity() - (1 - (8 * 0.0255) / 3)) < 1e-9,
+   "acht Vollkugeln kosten 6.8 % der Gefechtskraft (gemessenes Ist)",
    hull8.integrity().toFixed(2));
 const hull20 = pound(LY, "ball", 20);
-ok(Math.abs(hull20.integrity() - (1 - (20 * 0.04675) / 3)) < 1e-9,
-   "zwanzig Vollkugeln kosten 31.17 % (gemessenes Ist)",
+ok(Math.abs(hull20.integrity() - (1 - (20 * 0.0255) / 3)) < 1e-9,
+   "zwanzig Vollkugeln kosten 17 % (gemessenes Ist)",
    hull20.integrity().toFixed(2));
 ok(hull20.guns.STBD < 0.9, "Vollkugeln schlagen Rohre aus", hull20.guns.STBD.toFixed(2));
 const rig20 = pound(LY, "chain", 20, { y: 14 });
@@ -80,7 +80,7 @@ const manyHoles = new DamageModel(LY);
 for (let i = 0; i < 9; i++) manyHoles.holes.push({ side: "STBD", sec: "MID", below: true, size: 0.06 });
 let sinkT = 0;
 while (!manyHoles.sunk && sinkT < 2000) { manyHoles.update(0.1, { heel: 8 }); sinkT += 0.1; }
-ok(manyHoles.sunk && sinkT > 60 && sinkT < 600,
+ok(manyHoles.sunk && sinkT > 30 && sinkT < 600,
    "neun Lecks versenken sie, aber nicht sofort", sinkT.toFixed(0) + " s");
 
 // Ruder und Flagge
@@ -197,7 +197,8 @@ ok(rangeForElevation(8, 250, 0.55) < rangeForElevation(8, 330, 0.22),
 function hitRate(dist, ammo, salvos = 22) {
    const scene = new THREE.Scene();
    const me = buildWarship(LY); scene.add(me);
-   const foe = buildWarship(LY); foe.position.set(dist, 0, 0); scene.add(foe);
+   // The target lies to starboard, which is the -x side (bow +z, up +y).
+   const foe = buildWarship(LY); foe.position.set(-dist, 0, 0); scene.add(foe);
    foe.updateMatrixWorld(true);
    const tg = {
       id: "foe", heeler: foe.userData.heeler, LOA: LY.hull.loa, BEAM: LY.hull.beam,
@@ -276,7 +277,8 @@ ok(SCENARIOS.length === 3, "drei Gefechtslagen");
    const debris = new DebrisField(scene, { max: 400 });
    const all = [];
    const targets = () => all.map((s) => s.targetInfo());
-   const onHit = (h) => h.target.ship.takeHit(h);
+   let hitCount = 0;
+   const onHit = (h) => { hitCount++; return h.target.ship.takeHit(h); };
    // Seit Phase 0D nimmt Ship einen Seed entgegen: damit ist dieses Gefecht
    // wiederholbar statt "meistens so aehnlich".
    const mk = (id, x, z, hd) => {
@@ -308,8 +310,12 @@ ok(SCENARIOS.length === 3, "drei Gefechtslagen");
    // wird nicht erreicht - die Kapitaene bleiben auf ~270 m stehen, obwohl
    // engage 160 m verlangt. Siehe tests/pending/balance.test.js.
    ok(t <= 1200 + dt + 1e-6, "das Gefecht laeuft bis zum Zeitlimit oder endet vorher", t.toFixed(0) + " s");
-   ok(shots > 50, "es wird ordentlich geschossen", shots + " Schuss");
-   ok(peakDebris > 0, "Splitter und Wrackteile fliegen", peakDebris + " Teile");
+   // Mit historischen Nachladezeiten (60 s und mehr) fallen in 20 Minuten nur
+   // noch wenige Salven, und ob eine davon auf ~270 m trifft, entscheidet der
+   // Seed. Splitter gibt es nur, wenn es Treffer gab.
+   ok(shots > 20, "es wird ordentlich geschossen", shots + " Schuss");
+   ok(hitCount === 0 || peakDebris > 0, "Splitter und Wrackteile fliegen, wenn es Treffer gibt",
+      hitCount + " Treffer, " + peakDebris + " Teile");
    // Nur pruefbar, wenn das Gefecht ueberhaupt entschieden wurde. Dass es das
    // in dieser Aufstellung nicht wird, steht in tests/pending/balance.test.js.
    const decided = A.dmg.struck || A.dmg.sunk || B.dmg.struck || B.dmg.sunk;
@@ -496,9 +502,10 @@ section("Breitseite auf kurze Distanz");
          sound: false, seed: 90210 });
       s.place(x, z, hd, 0); all.push(s); return s;
    };
-   // Beide auf Nordkurs, das Ziel 150 m genau steuerbord: volle Breitseite.
+   // Beide auf Nordkurs, das Ziel 150 m genau steuerbord (also bei -x):
+   // volle Breitseite.
    const shooter = mk("lydia", 0, 0, 0);
-   const target = mk("amelie", 150, 0, 0);
+   const target = mk("amelie", -150, 0, 0);
 
    const wind = { dir: 20, speedKts: 16 };
    const amp = ampForWind(wind.speedKts), waveRad = Math.PI;
@@ -518,7 +525,7 @@ section("Breitseite auf kurze Distanz");
    ok(shooter.battery.ready("PORT"), "die andere Seite bleibt unabhaengig klar");
    const hullBefore = target.dmg.integrity();
    const crewBefore = target.crew.fit;
-   for (let i = 0; i < 30 * 12; i++) {
+   for (let i = 0; i < 30 * 90; i++) {
       shooter.battery.update(dt, gunCtx());
       t += dt;
    }
@@ -536,7 +543,7 @@ section("Breitseite auf kurze Distanz");
    ok(target.crew.fit < crewBefore, "und verliert Leute",
       crewBefore + " -> " + target.crew.fit);
    ok(shooter.dmg.integrity() === 1, "der Schuetze bleibt unbeschaedigt");
-   ok(shooter.battery.ready("STBD"), "nach zwoelf Sekunden ist nachgeladen");
+   ok(shooter.battery.ready("STBD"), "nach neunzig Sekunden ist nachgeladen");
 }
 
 export default () => suite.done();

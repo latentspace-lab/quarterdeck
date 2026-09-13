@@ -237,7 +237,7 @@ export const VESSELS: Vessel[] = [
       },
       guns: {
          decks: [{ y: 0.60, count: 10, from: 0.20, to: 0.80, calibre: "9-pounder" }],
-         reload: 9.0,          // Sekunden fuer eine gut gedrillte Bedienung
+         reload: 60.0,         // seconds per side for a well-drilled crew
          spread: 0.28,         // Streuung der Einzelschuesse (s)
          recoil: 0.55,         // m Rohrrueckstoss
          rollKick: 1.7,        // Grad Krengungsstoss
@@ -271,7 +271,7 @@ export const VESSELS: Vessel[] = [
       },
       guns: {
          decks: [{ y: 0.58, count: 13, from: 0.16, to: 0.84, calibre: "18-pounder" }],
-         reload: 10.5,
+         reload: 60.0,
          spread: 0.34,
          recoil: 0.8,
          rollKick: 2.4,
@@ -308,7 +308,7 @@ export const VESSELS: Vessel[] = [
             { y: 0.52, count: 12, from: 0.16, to: 0.84, calibre: "18-pounder" },
             { y: 0.72, count: 10, from: 0.18, to: 0.82, calibre: "9-pounder" },
          ],
-         reload: 11.0,
+         reload: 65.0,
          spread: 0.32,
          recoil: 0.72,
          rollKick: 2.0,
@@ -347,7 +347,7 @@ export const VESSELS: Vessel[] = [
             { y: 0.44, count: 14, from: 0.14, to: 0.86, calibre: "32-pounder" },
             { y: 0.70, count: 14, from: 0.16, to: 0.84, calibre: "18-pounder" },
          ],
-         reload: 13.0,
+         reload: 75.0,
          spread: 0.45,
          recoil: 1.0,
          rollKick: 3.4,
@@ -394,7 +394,7 @@ export const ENEMIES: Vessel[] = [
              accelLuff: 0.34, maxHeel: 15, capsizeHeel: 46, heelScale: 0.72, leewayMax: 11 },
       guns: {
          decks: [{ y: 0.60, count: 10, from: 0.20, to: 0.80, calibre: "8-pounder" }],
-         reload: 11.5, spread: 0.32, recoil: 0.5, rollKick: 1.6, range: 400,
+         reload: 80.0, spread: 0.32, recoil: 0.5, rollKick: 1.6, range: 400,
       },
       structure: { scantling: 0.54, mastStrength: 0.68, reserve: 0.62 },
       cam: { dist: 58, height: 21, cockpitZ: -10.5, cockpitY: 7.0, lead: 12, targetY: 9 },
@@ -417,7 +417,7 @@ export const ENEMIES: Vessel[] = [
              accelLuff: 0.26, maxHeel: 14, capsizeHeel: 50, heelScale: 0.62, leewayMax: 10 },
       guns: {
          decks: [{ y: 0.58, count: 14, from: 0.16, to: 0.84, calibre: "18-pounder" }],
-         reload: 12.5, spread: 0.38, recoil: 0.8, rollKick: 2.4, range: 540,
+         reload: 85.0, spread: 0.38, recoil: 0.8, rollKick: 2.4, range: 540,
       },
       structure: { scantling: 1.05, mastStrength: 1.00, reserve: 1.05 },
       cam: { dist: 88, height: 31, cockpitZ: -16.5, cockpitY: 9.6, lead: 17, targetY: 13 },
@@ -443,7 +443,7 @@ export const ENEMIES: Vessel[] = [
             { y: 0.44, count: 14, from: 0.14, to: 0.86, calibre: "36-pounder" },
             { y: 0.70, count: 14, from: 0.16, to: 0.84, calibre: "18-pounder" },
          ],
-         reload: 14.5, spread: 0.48, recoil: 1.0, rollKick: 3.4, range: 600,
+         reload: 100.0, spread: 0.48, recoil: 1.0, rollKick: 3.4, range: 600,
       },
       structure: { scantling: 1.90, mastStrength: 1.55, reserve: 1.75 },
       cam: { dist: 106, height: 38, cockpitZ: -20.5, cockpitY: 11.8, lead: 21, targetY: 16 },

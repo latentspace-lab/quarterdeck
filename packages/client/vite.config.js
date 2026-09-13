@@ -20,7 +20,14 @@ export default defineConfig({
       host: true,
       port: 5173,
       open: false,
+      // Friends over Tailscale reach the dev server by its MagicDNS name;
+      // Vite refuses unknown Host headers unless they are listed here.
+      allowedHosts: [".ts.net"],
       fs: { allow: [fileURLToPath(new URL("../..", import.meta.url))] },
+   },
+   preview: {
+      host: true,
+      allowedHosts: [".ts.net"],
    },
    build: {
       target: "es2022",

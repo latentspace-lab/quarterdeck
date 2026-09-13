@@ -37,7 +37,7 @@ export class Captain {
       // Zufallsquelle (Phase 0D): ohne Angabe erbt der Kapitaen den Strom
       // seines Schiffs. Damit ist ein KI-Gefecht bei gleichem Seed wiederholbar.
       this.rng = opts.rng || (ship && ship.rng) || Math.random;
-      this._side = 1;         // bevorzugte Gefechtsseite (+1 Stb, -1 Bb)
+      this._side = 1;         // preferred side to engage on (+1 = the +x/port side, -1 = starboard)
       this._sideTimer = 0;
       this._lastFire = 0;
    }
@@ -119,7 +119,7 @@ export class Captain {
 
       // --- Feuer ------------------------------------------------------------
       if (this.state === "struck") return;
-      const side = rel >= 0 ? "STBD" : "PORT";
+      const side = rel >= 0 ? "PORT" : "STBD"; // a positive bearing is to port
       const absRel = Math.abs(rel);
       const inArc = absRel > 32 && absRel < 148;
       if (!inArc || !ship.battery.ready(side)) return;

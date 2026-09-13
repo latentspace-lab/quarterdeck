@@ -133,7 +133,7 @@ export class Captain {
       dyn.sailSet = set;
 
       // Fire.
-      const side: Side = rel >= 0 ? "STBD" : "PORT";
+      const side: Side = rel >= 0 ? "PORT" : "STBD"; // a positive bearing is to port
       const absRel = Math.abs(rel);
       const inArc = absRel > 32 && absRel < 148;
       if (!inArc || !ship.battery.ready(side)) return;
