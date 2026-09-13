@@ -11,7 +11,7 @@ import { serveDist, launchChromium, watchErrors } from "../lib/browser.js";
 import { createSuite } from "../lib/harness.js";
 
 const suite = createSuite("Multiplayer smoke (browser)");
-const { ok, eq } = suite;
+const { ok, eq, near } = suite;
 
 async function run() {
    const site = await serveDist();
@@ -104,9 +104,13 @@ async function run() {
       await page.waitForFunction(() => document.querySelectorAll("#roomList .room-row").length >= 1, null, { timeout: 5000 });
       const lobby = await page.evaluate(() => {
          const rows = [...document.querySelectorAll("#roomList .room-row")];
-         return rows.map((r) => ({ name: r.querySelector(".room-name").textContent, info: r.querySelector(".room-info").textContent }));
+         return rows.map((r) => ({
+            name: r.querySelector(".room-title").textContent,
+            kind: r.querySelector(".room-kind").textContent,
+            info: r.querySelector(".room-info").textContent,
+         }));
       });
-      ok(lobby.some((r) => r.name === "Smoke Test"), "the menu lists the room we are in, by name", JSON.stringify(lobby));
+      ok(lobby.some((r) => r.name === "Smoke Test" && r.kind === "Battle"), "the menu lists the room we are in, by name and kind", JSON.stringify(lobby));
       ok(lobby.some((r) => /2\/8 players/.test(r.info) && /1 AI/.test(r.info)), "with players and AI count", lobby[0] && lobby[0].info);
       const resumed = await page.evaluate(() => {
          const b = document.querySelector("#menuResume");
@@ -122,6 +126,30 @@ async function run() {
       other = null;
       await page.waitForFunction(() => window.__sim.session.remotes.size === 1, null, { timeout: 5000 });
       ok(true, "the page drops the remote ship");
+
+      suite.section("A regatta on the page");
+      const page2 = await browser.newPage({ viewport: { width: 1280, height: 760 } });
+      const errors2 = watchErrors(page2);
+      try {
+         await page2.goto(`${site.url}?mp=1&server=${encodeURIComponent(srv.url)}&vessel=yacht&name=Racer&mode=regatta&roomName=Cowes`,
+            { waitUntil: "load", timeout: 30000 });
+         await page2.waitForFunction(() => window.__sim && window.__sim.session && window.__sim.session.mode === "regatta"
+            && window.__sim.mode === "Multiplayer", null, { timeout: 15000 });
+         await page2.waitForFunction(() => document.querySelector("#hudCourse") && /Leg 1/.test(document.querySelector("#hudCourse").textContent), null, { timeout: 5000 });
+         const race = await page2.evaluate(() => ({
+            buoys: window.__sim.course.root.visible,
+            windward: window.__sim.course.windward.z,
+            hud: document.querySelector("#hudCourse").textContent,
+            lap: document.querySelector("#hudLap").textContent,
+         }));
+         eq(race.buoys, true, "the course buoys are shown");
+         near(race.windward, 850, 0, "at the server's course");
+         ok(/Leg 1 · Start line/.test(race.hud), "the HUD shows the first leg from the server's state", race.hud);
+         ok(/Runde 0|Lap 0/.test(race.lap), "and lap 0", race.lap);
+         eq(errors2.length, 0, "no errors on the regatta page", errors2.slice(0, 3).join(" | "));
+      } finally {
+         await page2.close().catch(() => {});
+      }
    } finally {
       if (other) await other.leave().catch(() => {});
       await browser.close().catch(() => {});

@@ -18,6 +18,7 @@ import {
    type WelcomeMessage,
 } from "@segel/shared";
 import { Simulation } from "../sim/Simulation.ts";
+import type { ServerShip } from "../sim/ServerShip.ts";
 import { GameState, ShipSchema } from "../state/GameState.ts";
 import { takeNext } from "./inputQueue.ts";
 
@@ -116,9 +117,13 @@ export class BattleRoom extends Room<{ state: GameState }> {
          if (cmd) this.sim.applyInputs(id, [cmd]);
       }
       this.sim.step();
+      this.afterStep();
       this.syncState();
       for (const ev of this.sim.drainEvents()) this.broadcast(MSG.event, ev);
    }
+
+   /** Hook after the simulation stepped, before the state is published. */
+   protected afterStep(): void {}
 
    private syncState(): void {
       const st = this.state;
@@ -135,13 +140,27 @@ export class BattleRoom extends Room<{ state: GameState }> {
       }
    }
 
+   /** Where the n-th player starts; regatta rooms override this. */
+   protected spawnFor(index: number) {
+      return this.sim.spawnPoint(index);
+   }
+
+   /** Extra welcome fields; regatta rooms add the course. */
+   protected welcomeExtras(): Partial<WelcomeMessage> {
+      return {};
+   }
+
+   /** Hook after a player's ship exists (regatta rooms start its race). */
+   protected onShipAdded(_ship: ServerShip): void {}
+
    onJoin(client: Client, options: JoinOptions = {}) {
       const vesselId = validVessel(options.vesselId);
-      const spawn = this.sim.spawnPoint(this.sim.ships.size);
+      const spawn = this.spawnFor(this.sim.ships.size);
       const ship = this.sim.add(client.sessionId, vesselId, {
          ...spawn,
          name: typeof options.name === "string" ? options.name.slice(0, 32) : undefined,
       });
+      this.onShipAdded(ship);
       this.state.ships.set(ship.id, new ShipSchema({ id: ship.id, vesselId, name: ship.name, ai: false }));
       this.inputQueues.set(ship.id, []);
       this.syncState();
@@ -150,6 +169,8 @@ export class BattleRoom extends Room<{ state: GameState }> {
          shipId: ship.id,
          params: this.sim.params,
          tick: this.sim.tick,
+         mode: this.mode,
+         ...this.welcomeExtras(),
       };
       client.send(MSG.welcome, welcome);
    }
@@ -173,7 +194,7 @@ export class BattleRoom extends Room<{ state: GameState }> {
       }
    }
 
-   private removeShip(id: string): void {
+   protected removeShip(id: string): void {
       this.sim.remove(id);
       this.inputQueues.delete(id);
       this.state.ships.delete(id);

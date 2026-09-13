@@ -112,6 +112,20 @@ export class Simulation {
    }
 
    /**
+    * Where the n-th boat starts a regatta: below the start line, staggered,
+    * close-hauled on starboard so the first beat is to the windward mark.
+    */
+   spawnPointRegatta(index: number, origin = { x: 0, z: 0 }): SpawnPoint {
+      const windDir = this.wind.baseDir;
+      return {
+         x: origin.x + (index - 1.5) * 32,
+         z: origin.z - 110 - index * 34,
+         heading: normDeg(windDir - 70),
+         speed: 3,
+      };
+   }
+
+   /**
     * Enemies line up to windward, a good 900 m off and staggered across the
     * wind, heading for the players' spawn line. Mirrors the client's
     * _startBattle; skill and range vary per captain from the room seed.

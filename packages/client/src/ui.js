@@ -221,7 +221,7 @@ export class UI {
       this._updateCrew(s);
       this._updateFoes(s);
 
-      if (s.mode === "Regatta" && s.course) {
+      if (s.course) {
          R.lap.textContent = "Runde " + s.course.lap;
          R.time.textContent =
             s.course.time.toFixed(1) + "s · Beste: " +
@@ -584,7 +584,7 @@ export class UI {
          onVesselChange: opts.onVesselChange || (() => {}),
          onStart: opts.onStart,
          onHelp: opts.onHelp,
-         mp: { url: "", name: "", roomId: "", roomName: "", practice: false, connected: false, ...(opts.multiplayer || {}) },
+         mp: { url: "", name: "", roomId: "", roomName: "", mode: "battle", connected: false, ...(opts.multiplayer || {}) },
          onJoin: opts.onJoin || (() => {}),
          onListRooms: opts.onListRooms || null,
          onResume: opts.onResume || null,
@@ -620,12 +620,13 @@ export class UI {
       }
       box.innerHTML = rooms.map((r) => {
          const md = r.metadata || {};
-         const enemies = md.enemies && md.enemies.length ? md.enemies.length + " AI" : "no AI";
+         const kind = md.mode === "regatta" ? "Regatta" : "Battle";
+         const enemies = md.mode === "regatta" ? "" : (md.enemies && md.enemies.length ? md.enemies.length + " AI" : "no AI") + " · ";
          const wind = Number.isFinite(md.windBaseSpeed) ? Math.round(md.windBaseSpeed) + " kn" : "";
          const full = r.clients >= r.maxClients;
          return `<div class="room-row${full ? " full" : ""}" data-room="${escapeAttr(r.roomId)}">
-               <span class="room-name">${escapeAttr(md.name || r.roomId)}</span>
-               <span class="room-info">${r.clients}/${r.maxClients} players · ${enemies} · ${wind}</span>
+               <span class="room-name"><span class="room-title">${escapeAttr(md.name || r.roomId)}</span> <span class="room-kind">${kind}</span></span>
+               <span class="room-info">${r.clients}/${r.maxClients} players · ${enemies}${wind}</span>
                <button class="room-join" ${full ? "disabled" : ""}>Join</button>
             </div>`;
       }).join("");
@@ -642,7 +643,7 @@ export class UI {
          url: m.mp.url,
          name: m.mp.name,
          roomId: roomId || m.mp.roomId || undefined,
-         mode: m.mp.practice ? "practice" : "battle",
+         mode: m.mp.mode || "battle",
          vesselId: m.vesselId,
          create: {
             enemies,
@@ -695,7 +696,7 @@ export class UI {
 
       // Battle nur zeigen, wenn auch gekaempft wird
       let scenarioHtml = "";
-      if ((m.mode === "Gefecht" || isMp) && m.scenarios.length) {
+      if ((m.mode === "Gefecht" || (isMp && (m.mp.mode || "battle") !== "regatta")) && m.scenarios.length) {
          const unarmed = !selected.guns;
          const cards = m.scenarios.map((sc) => {
             const force = (sc.forces[m.vesselId] || []);
@@ -732,17 +733,23 @@ export class UI {
                   <span>Room id (paste to join a specific room)</span>
                   <input type="text" id="mpRoom" value="${escapeAttr(m.mp.roomId)}" spellcheck="false" />
                </label>
-               <label class="ctrl toggle">
-                  <input type="checkbox" id="mpPractice" ${m.mp.practice ? "checked" : ""} />
-                  <span>Practice: alone against the AI on the server (private room)</span>
-               </label>
+            </div>
+            <div class="sec-label">Room type</div>
+            <div class="mode-grid m3">
+               ${[["battle", "Battle", "2–8 players, AI enemies optional"],
+                  ["regatta", "Regatta", "race the windward-leeward course"],
+                  ["practice", "Practice", "alone against the AI, private room"]]
+                  .map(([id, title, desc]) => `<button class="mode-btn${(m.mp.mode || "battle") === id ? " active" : ""}" data-mpmode="${id}">
+                     <div class="mb-title">${title}</div><div class="mb-desc">${desc}</div></button>`).join("")}
             </div>
             <div class="sec-label">Open rooms <button class="room-refresh" id="roomRefresh">Refresh</button></div>
             <div class="room-list" id="roomList"></div>
             <div class="sc-hint">Wind and enemies below apply to a room you create.</div>`;
 
+      const mpMode = m.mp.mode || "battle";
       const startLabel = isMp
-         ? (m.mp.practice ? "Practice · " : m.mp.roomId ? "Join room · " : "Join or create · ") + vesselLabel(selected)
+         ? (mpMode === "practice" ? "Practice · " : m.mp.roomId ? "Join room · "
+            : mpMode === "regatta" ? "Join or create regatta · " : "Join or create battle · ") + vesselLabel(selected)
          : `${m.mode} · ${vesselLabel(selected)}`;
       const resumeHtml = m.mp.connected && m.onResume
          ? `<button id="menuResume">Back to the battle</button>`
@@ -832,8 +839,9 @@ export class UI {
       }
       const urlEl = this.menuEl.querySelector("#mpUrl");
       if (urlEl) urlEl.onchange = () => this.refreshRooms(m);
-      const practice = this.menuEl.querySelector("#mpPractice");
-      if (practice) practice.onchange = () => { m.mp.practice = practice.checked; this.renderMenu(m); };
+      this.menuEl.querySelectorAll(".mode-btn[data-mpmode]").forEach((b) => {
+         b.onclick = () => { m.mp.mode = b.dataset.mpmode; this.renderMenu(m); };
+      });
       const refresh = this.menuEl.querySelector("#roomRefresh");
       if (refresh) refresh.onclick = () => this.refreshRooms(m);
       if (isMp) this.refreshRooms(m);

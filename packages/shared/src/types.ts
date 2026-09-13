@@ -85,6 +85,18 @@ export interface ShipState {
 
    /** Letztes vom Server angewandtes InputCommand (Bestaetigung der Vorhersage) */
    lastSeq: number;
+
+   // --- Race (regatta rooms; zero elsewhere) ---
+   /** current leg index into the course's legs */
+   raceLeg: number;
+   /** laps completed */
+   raceLap: number;
+   /** 0..1 along the lap */
+   raceProgress: number;
+   /** seconds into the current lap */
+   raceTime: number;
+   /** best lap in seconds, -1 = none yet */
+   raceBest: number;
 }
 
 /**
@@ -164,12 +176,14 @@ export const ROOMS = {
    battle: "battle",
    /** one player against AI, private */
    practice: "practice",
+   /** 2..8 players racing the windward-leeward course, listed in the lobby */
+   regatta: "regatta",
 } as const;
 
 /** What a room publishes for the lobby list (Colyseus metadata). */
 export interface RoomMeta {
    name: string;
-   mode: "battle" | "practice";
+   mode: "battle" | "practice" | "regatta";
    enemies: string[];
    windBaseDir: number;
    windBaseSpeed: number;
@@ -187,6 +201,10 @@ export interface WelcomeMessage {
    shipId: string;
    params: WorldParams;
    tick: number;
+   /** the room's kind */
+   mode: "battle" | "practice" | "regatta";
+   /** the course, in a regatta room */
+   course?: { origin: { x: number; z: number } };
 }
 
 /** Something that happened to one ship (mast lost, holed, sunk, struck, aground, swamped, cutAway ...). */

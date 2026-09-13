@@ -172,7 +172,7 @@ export class Simulator {
             vesselId: q.get("vessel") || "lydia",
             name: q.get("name") || "",
             roomId: q.get("room") || undefined,
-            mode: q.get("mode") === "practice" ? "practice" : "battle",
+            mode: ["practice", "regatta"].includes(q.get("mode")) ? q.get("mode") : "battle",
             create: {
                enemies: q.get("enemies") ? q.get("enemies").split(",") : undefined,
                roomName: q.get("roomName") || undefined,
@@ -209,11 +209,17 @@ export class Simulator {
       }
       this.mode = "Multiplayer";
       this.gusts = this.wind.variability > 0;
+      // A regatta room: show its course where the server has it.
+      const race = this.session.mode === "regatta";
+      if (race && this.session.course) this.course.moveTo(this.session.course.origin);
+      this.course.setVisible(race);
+      this._courseUI = null;
       this.ui.closeMenu();
       this.menuOpen = false;
       this.paused = false;
       this.yacht.visible = true;
-      this.ui.showMessage(vesselLabel(this.vessel) + " has joined room " + this.session.net.roomId);
+      this.ui.showMessage(vesselLabel(this.vessel) + " has joined "
+         + (race ? "the regatta " : "room ") + this.session.net.roomId);
    }
 
    async leaveMultiplayer() {
@@ -311,7 +317,7 @@ export class Simulator {
             name: this._mpName || "",
             roomId: "",
             roomName: "",
-            practice: false,
+            mode: (this.session && this.session.mode) || "battle",
             connected: !!(this.session && this.session.connected),
          },
          onListRooms: (url) => listRooms(url),
@@ -414,7 +420,7 @@ export class Simulator {
       this.ui.showMessage(
          vesselLabel(this.vessel) + " ready to get under way — " + this.vessel.rate);
       if (mode === "Regatta") {
-         this.course.reset();
+         this.course.reset(this.t);
          this.ui.setTraining(null);
          this.trainState = null;
          this.yacht.visible = true;
@@ -625,7 +631,7 @@ export class Simulator {
       if (this.mode === "Gefecht") {
          msg = this._updateBattle(dt);
       } else if (this.mode === "Regatta") {
-         const res = this.course.update(this.boat.pos);
+         const res = this.course.update(this.boat.pos, this.t);
          this._courseUI = res;
          if (res.message) msg = res.message;
       } else if (this.mode === "Training") {
@@ -660,7 +666,13 @@ export class Simulator {
       for (const ev of this.player.drainEvents()) this._onShipEvent(ev);
       // What the server reports about everyone
       for (const ev of S.drainEvents()) {
-         if (ev.kind === "ship") {
+         if (ev.kind === "ship" && (ev.type === "mark" || ev.type === "lap")) {
+            if (ev.shipId === S.shipId) this.ui.showMessage(ev.message);
+            else if (ev.type === "lap") {
+               const who = S.findShip(ev.shipId);
+               this.ui.showMessage((who ? who.name : "A rival") + " completes lap " + ev.lap + " in " + ev.lapTime.toFixed(1) + " s");
+            }
+         } else if (ev.kind === "ship") {
             const ship = ev.shipId === S.shipId ? this.player : S.findShip(ev.shipId);
             if (ship) this._onShipEvent({ ...ev, ship });
          } else if (ev.kind === "hit") {
@@ -680,6 +692,7 @@ export class Simulator {
             if (a && b) this._onWorldEvent({ ...ev, a, b });
          }
       }
+      if (S.mode === "regatta") this._courseUI = S.raceStatus(this.boat.pos);
       if (S.closed && !this._mpClosedMsg) {
          this._mpClosedMsg = true;
          this._uiMsg = "Connection to the server lost.";
@@ -1022,9 +1035,9 @@ export class Simulator {
          return;
       }
       if (this.mode === "Regatta") {
-         this.course.reset();
+         this.course.reset(this.t);
          this._placeAtStart("Regatta");
-         this.ui.showMessage("Neuer Kurs!");
+         this.ui.showMessage("New course!");
       } else if (this.mode === "Training") {
          this.trainer.reset();
          const c = this.trainer.current;
@@ -1136,7 +1149,7 @@ export class Simulator {
          camera: CAM_LABEL[this.cam.mode],
          gusts: this.gusts,
          message: msg || (this._courseUI && this._courseUI.message) || "",
-         course: this.mode === "Regatta" ? this._courseUI : null,
+         course: this.mode === "Regatta" || (this.session && this.session.mode === "regatta") ? this._courseUI : null,
       };
       this.ui.update(state);
       this.ui.hudVisible = this.hudVisible;
