@@ -635,6 +635,7 @@ export class Simulator {
       const S = this.session;
       if (!S) return;
       S.stepFixed(dt, inp);
+      S.stepBatteries(dt, worldCtx.gunCtx);
 
       const wv = dirVec(this.wind.dir + 180);
       this.debris.update(dt, {
@@ -654,6 +655,17 @@ export class Simulator {
          if (ev.kind === "ship") {
             const ship = ev.shipId === S.shipId ? this.player : S.findShip(ev.shipId);
             if (ship) this._onShipEvent({ ...ev, ship });
+         } else if (ev.kind === "hit") {
+            if (ev.shipId === S.shipId) {
+               this.cam.shake(ev.inRig ? 0.25 : 0.6);
+            } else if (ev.from === S.shipId) {
+               const target = S.findShip(ev.shipId);
+               const where = ev.inRig ? "in the rigging" : ev.below ? "below the waterline" : "in the hull";
+               this.ui.showMessage("Hit on " + (target ? target.name : "the enemy") + " " + where + "!");
+            }
+         } else if (ev.kind === "salvo" && ev.shipId === S.shipId) {
+            this.ui.showMessage((ev.side === "PORT" ? "Port" : "Starboard") + " broadside — "
+               + ev.count + " guns " + (AMMO[ev.ammo] ? AMMO[ev.ammo].short : ev.ammo) + "!");
          } else if (ev.kind === "world") {
             const a = ev.a === S.shipId ? this.player : S.findShip(ev.a);
             const b = ev.b === S.shipId ? this.player : S.findShip(ev.b);
@@ -833,6 +845,7 @@ export class Simulator {
       if (this.boat.isCapsized) return false;
       if (this.session) {
          // The server fires the guns; the order goes out with the next input.
+         // The message comes back with the salvo event.
          this.session.fire(side);
          return true;
       }
@@ -1091,7 +1104,7 @@ export class Simulator {
          pos: pointOfSail(b.twa, b.luffing, this.vessel.rig, this.vessel.sail.noGo),
          noGo: this.vessel.sail.noGo,
          vessel: this.vessel,
-         guns: this.battery.status(),
+         guns: this.session ? this.session.gunStatus() : this.battery.status(),
          sailSet: b.sailSet,
          damage: this.player.dmg.status(),
          crew: this.player.crew.status(),

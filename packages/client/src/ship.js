@@ -177,6 +177,55 @@ export class Ship {
       return res;
    }
 
+   /**
+    * Multiplayer: a hit the server resolved (HitEvent). Effects only - the
+    * damage values come with the state, the mast with its own event.
+    */
+   showHit(ev) {
+      if (!this.alive) return;
+      const hit = {
+         world: new THREE.Vector3(ev.world.x, ev.world.y, ev.world.z),
+         dir: new THREE.Vector3(ev.dir.x, ev.dir.y, ev.dir.z),
+         inRig: !!ev.inRig, s: ev.s, y: ev.y,
+      };
+      const res = {
+         splinters: ev.splinters || 0, holed: !!ev.holed, below: !!ev.below,
+         side: ev.side, s: ev.s, y: ev.y, mastBroken: null,
+      };
+      this.lastHitAt = 0;
+      this._spawnHitFx(hit, res);
+   }
+
+   /**
+    * Multiplayer: take the damage detail from a ShipState so the plan, the
+    * masts, the guns and the ensign show what the server knows.
+    */
+   applyDamageState(s) {
+      const D = this.dmg;
+      D.hull.PORT_BOW = s.hullPortBow; D.hull.PORT_MID = s.hullPortMid; D.hull.PORT_QUARTER = s.hullPortQuarter;
+      D.hull.STBD_BOW = s.hullStbdBow; D.hull.STBD_MID = s.hullStbdMid; D.hull.STBD_QUARTER = s.hullStbdQuarter;
+      D.rigging = s.rigging;
+      D.sails = s.sails;
+      D.rudder = s.rudderState;
+      D.guns.PORT = s.gunsPort;
+      D.guns.STBD = s.gunsStbd;
+      D.flooding = s.flooding;
+      D.afire = s.afire;
+      const ST = ["sound", "wounded", "gone"];
+      for (const [key, integ, st] of [["fore", s.mastFore, s.mastForeState], ["main", s.mastMain, s.mastMainState], ["mizzen", s.mastMizzen, s.mastMizzenState]]) {
+         const m = D.masts[key];
+         if (!m) continue;
+         m.integrity = integ;
+         m.state = ST[st] || "sound";
+      }
+      const was = `${D.struck}|${D.sunk}|${D.afire > 0.02}|${D.guns.PORT}|${D.guns.STBD}|${D.sails}`;
+      D.struck = !!s.struck;
+      D.sunk = !!s.sunk;
+      const now = `${D.struck}|${D.sunk}|${D.afire > 0.02}|${D.guns.PORT}|${D.guns.STBD}|${D.sails}`;
+      if (was !== now) this._syncAppearance();
+      this.wreckDrag = s.wreckDrag;
+   }
+
    _spawnHitFx(hit, res) {
       const D = this.debris;
       if (!D) return;

@@ -47,10 +47,11 @@ empty room id joins any open room or creates one; wind and the AI enemies from
 the scenario cards apply to the room you create. Deep link:
 `http://localhost:5173/sailing/?mp=1&server=ws://localhost:2567&vessel=lydia&name=Hornblower&enemies=amelie`.
 
-What is shared today: ships, wind, sea, damage, masts, collisions and
-grounding come from the server; the helm is local for responsiveness and is
-pulled gently onto the server's copy (proper prediction is Phase 3). Gunnery
-over the wire follows in the next PR.
+What is shared: ships, wind, sea, damage, masts, collisions, grounding and
+gunnery come from the server. Q/E/F order a broadside; the server fires it,
+every client plays the salvo, the balls (with the server's exact ballistics)
+and the hits. The helm is local for responsiveness and is pulled gently onto
+the server's copy (proper prediction is Phase 3).
 
 > **Wichtig:** Befehle immer **ohne** angehängten Kommentar ausführen.
 > In zsh ist `#` interaktiv standardmäßig *kein* Kommentar — `npm run dev  # → ...`

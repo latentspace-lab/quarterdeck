@@ -156,6 +156,7 @@ export class MultiplayerSession {
       if (this._pending.cutWreck) cmd.cutWreck = true;
       this._pending = { fire: null, ammo: null, cutWreck: false };
       this.net.send(cmd);
+      if (cmd.ammo) sim.player.battery.setAmmo(cmd.ammo);
 
       const st = this.net.state;
       if (!st || !st.ships) return;
@@ -197,28 +198,69 @@ export class MultiplayerSession {
       b.pos.z = lerp(b.pos.z, s.z, k);
       b.heading = lerpAngleDeg(b.heading, s.heading, k);
       b.speed = lerp(b.speed, s.speed, k);
-      // Damage is the server's alone.
-      const D = this.sim.player.dmg;
-      D.flooding = s.flooding;
-      D.afire = s.afire;
-      if (s.struck && !D.struck) { D.struck = true; this.sim.player._syncAppearance(); }
-      if (s.sunk && !D.sunk) { D.sunk = true; this.sim.player._syncAppearance(); }
-      this.sim.player.wreckDrag = s.wreckDrag;
+      // Damage is the server's alone; the local battery only shows.
+      const player = this.sim.player;
+      player.applyDamageState(s);
+      player.battery.reloadTime = s.reloadTime || player.battery.reloadTime;
    }
 
    _routeEvents() {
+      const player = this.sim.player;
       for (const ev of this.net.drainEvents()) {
          this._events.push(ev);
+         const mine = ev.shipId === this.shipId;
          if (ev.kind === "ship") {
-            if (ev.shipId === this.shipId) {
-               if (ev.type === "mastLost") this.sim.player._dropMast(ev.mast, ev.cause || "shot");
-               else if (ev.type === "cutAway" && this.sim.debris) this.sim.debris.cutTethers(this.sim.player.id);
+            if (mine) {
+               if (ev.type === "mastLost") player._dropMast(ev.mast, ev.cause || "shot");
+               else if (ev.type === "cutAway" && this.sim.debris) this.sim.debris.cutTethers(player.id);
             } else {
                const r = this.remotes.get(ev.shipId);
                if (r) r.onEvent(ev);
             }
+         } else if (ev.kind === "salvo") {
+            if (mine) player.battery.playSalvo(ev);
+            else this.remotes.get(ev.shipId)?.onEvent(ev);
+         } else if (ev.kind === "shots") {
+            if (mine) player.battery.replayShots(ev.shots);
+            else this.remotes.get(ev.shipId)?.onEvent(ev);
+         } else if (ev.kind === "hit") {
+            // The ball came from `from`; take it out of the air there, and
+            // show the strike on the target.
+            const firer = ev.from === this.shipId ? player : this.findShip(ev.from);
+            if (firer) firer.battery.removeBallNear(ev.world);
+            if (mine) player.showHit(ev);
+            else this.remotes.get(ev.shipId)?.onEvent(ev);
          }
       }
+   }
+
+   /** Step the remote ships' battery visuals (smoke, balls in flight, splashes). */
+   stepBatteries(dt, gunCtx) {
+      for (const r of this.remotes.values()) r.stepFixed(dt, gunCtx);
+   }
+
+   /**
+    * Gun status for the HUD from the server's state, in the shape
+    * Battery.status() has - so the panel does not know the difference.
+    */
+   gunStatus() {
+      const s = this._serverMe;
+      const B = this.sim.player.battery;
+      if (!s || !s.guns) return B.status();
+      const rt = Math.max(s.reloadTime || B.reloadTime, 0.1);
+      const side = (reload, frac) => ({
+         ready: reload <= 0 && frac > 0,
+         progress: clamp(1 - reload / rt, 0, 1),
+      });
+      return {
+         PORT: side(s.reloadPort, s.gunsPort),
+         STBD: side(s.reloadStbd, s.gunsStbd),
+         guns: s.guns,
+         gunsReady: { PORT: Math.round(s.guns * clamp(s.gunsPort, 0, 1)), STBD: Math.round(s.guns * clamp(s.gunsStbd, 0, 1)) },
+         ammo: B.ammoSpec(),
+         shots: B.shotsFired,
+         broadsides: B.broadsides,
+      };
    }
 
    /** Events since the last call, for messages and effects. */

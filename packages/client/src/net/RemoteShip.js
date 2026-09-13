@@ -40,8 +40,6 @@ export class RemoteShip {
       });
       this.buffer = new SnapshotBuffer({ delay: o.delay ?? 100 });
       this.sinkTimer = 0;
-      this._lastMasts = 3;
-      this._lastVisual = "";
    }
 
    get pos() {
@@ -60,9 +58,21 @@ export class RemoteShip {
       this.buffer.push(state, t);
    }
 
-   /** A server event about this ship. */
+   /** A server event about this ship (ship events, salvo, shots, hit). */
    onEvent(ev) {
       const sh = this.ship;
+      if (ev.kind === "salvo") {
+         sh.battery.playSalvo(ev);
+         return;
+      }
+      if (ev.kind === "shots") {
+         sh.battery.replayShots(ev.shots);
+         return;
+      }
+      if (ev.kind === "hit") {
+         sh.showHit(ev);
+         return;
+      }
       if (ev.type === "mastLost") {
          sh._dropMast(ev.mast, ev.cause || "shot");
       } else if (ev.type === "cutAway") {
@@ -74,6 +84,11 @@ export class RemoteShip {
          sh.dmg.struck = true;
          sh._syncAppearance();
       }
+   }
+
+   /** Its battery's visuals need stepping every fixed step (smoke, balls, splashes). */
+   stepFixed(dt, gunCtx) {
+      this.ship.battery.update(dt, gunCtx);
    }
 
    /**
@@ -106,17 +121,9 @@ export class RemoteShip {
       dyn.stopped = !!s.stopped;
 
       const D = sh.dmg;
-      D.flooding = s.flooding;
-      D.afire = s.afire;
-      D.struck = !!s.struck;
-      D.sunk = !!s.sunk;
-      sh.wreckDrag = s.wreckDrag;
+      sh.applyDamageState(s);
       sh.alive = !!s.alive;
-      const visual = `${D.struck}|${D.afire > 0.02}|${D.sunk}`;
-      if (visual !== this._lastVisual) {
-         this._lastVisual = visual;
-         sh._syncAppearance();
-      }
+      sh.battery.reloadTime = s.reloadTime || sh.battery.reloadTime;
 
       if (D.sunk) {
          this.sinkTimer += frameDt;

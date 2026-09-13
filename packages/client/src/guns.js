@@ -263,6 +263,77 @@ export class Battery {
       );
    }
 
+   // ------------------------------------------------------------------
+   // Multiplayer: the server decides, this battery only shows.
+   // ------------------------------------------------------------------
+
+   /**
+    * A broadside was ordered on this ship (server `salvo` event): thunder and
+    * recoil now, the guns go off as the `shots` arrive. The reload timer is
+    * started for the HUD and the crew animation; the server's is the truth.
+    */
+   playSalvo(ev) {
+      const spread = (this.spec && this.spec.spread) || 0.3;
+      if (this.sound) {
+         const n = Math.min(ev.count, 8);
+         for (let k = 0; k < n; k++) {
+            this.sound.boom((k / n) * spread + Math.random() * 0.03, 0.32 + Math.random() * 0.14);
+         }
+      }
+      this.broadsides++;
+      const muzzleCount = this.gunsPerSide() || ev.count || 1;
+      this.rollKick = ((this.spec && this.spec.rollKick) || 2) * Math.min(1, ev.count / muzzleCount);
+      this.rollKickSide = ev.side === "STBD" ? -1 : 1;
+      if (this.ship && this.ship.kickRecoil) this.ship.kickRecoil(ev.side, (this.spec && this.spec.recoil) || 0.6);
+      this.reload[ev.side] = this.reloadTime;
+      if (ev.ammo) this.setAmmo(ev.ammo);
+   }
+
+   /**
+    * Balls that left this ship's muzzles (server `shots` event), with the
+    * exact origin and velocity the server integrates. Flash and smoke at each
+    * muzzle, then the flight with the shared integrator - and no hit test:
+    * hits arrive as events and are shown by removeBallNear().
+    */
+   replayShots(shots) {
+      for (const s of shots) {
+         const origin = this._v.set(s.origin.x, s.origin.y, s.origin.z);
+         const out = this._w.set(s.vel.x, 0, s.vel.z);
+         if (out.lengthSq() < 1e-6) out.set(1, 0, 0);
+         out.normalize();
+         // The server's origin is 1.6 m outboard of the muzzle.
+         this._muzzleFx(origin.clone().addScaledVector(out, -1.6), out);
+         const a = AMMO[s.ammo] || AMMO.ball;
+         const scale = a.id === "grape" ? 0.45 : a.id === "chain" ? 1.25 : 1;
+         const mesh = new THREE.Mesh(this.shotGeo, this.shotMat);
+         mesh.scale.setScalar(scale);
+         mesh.position.set(s.origin.x, s.origin.y, s.origin.z);
+         this.group.add(mesh);
+         this._shots.push({
+            origin: { ...s.origin }, prev: { ...s.origin }, pos: { ...s.origin }, vel: { ...s.vel },
+            ammo: a.id, lb: s.lb, drag: s.drag, mesh, life: 0,
+            tumble: a.id === "chain" ? 1 : 0,
+            remote: true,
+         });
+         this.shotsFired++;
+      }
+   }
+
+   /** A ball struck near `world` (server `hit` event): take the nearest ball in flight out of the air. */
+   removeBallNear(world, within = 30) {
+      let best = -1;
+      let bestD = within;
+      for (let i = 0; i < this._shots.length; i++) {
+         const b = this._shots[i];
+         const d = Math.hypot(b.pos.x - world.x, b.pos.y - world.y, b.pos.z - world.z);
+         if (d < bestD) { bestD = d; best = i; }
+      }
+      if (best < 0) return false;
+      this.group.remove(this._shots[best].mesh);
+      this._shots.splice(best, 1);
+      return true;
+   }
+
    // Einzelnes Rohr tatsaechlich abfeuern (aus der Warteschlange)
    _discharge(p) {
       const heeler = this.ship.userData.heeler;
@@ -274,6 +345,39 @@ export class Battery {
       const outLocal = this._w.set(p.side === "STBD" ? 1 : -1, 0, 0);
       const out = outLocal.clone().transformDirection(heeler.matrixWorld).normalize();
 
+      this._muzzleFx(world, out);
+
+      // --- Geschosse ------------------------------------------------------
+      // Richtung und Streuung rechnet die geteilte Ballistik; hier entstehen
+      // nur die sichtbaren Kugeln dazu.
+      const a = AMMO[p.ammo] || AMMO.ball;
+      const origin = world.clone().addScaledVector(out, 1.6);
+      const shots = dischargeShots({
+         origin,
+         flat: { x: out.x, y: 0, z: out.z },
+         ammo: p.ammo,
+         aimElev: p.aimElev,
+         aimTrain: p.aimTrain,
+         lb: this.ballWeight,
+      }, this.rng);
+
+      const scale = a.id === "grape" ? 0.45 : a.id === "chain" ? 1.25 : 1;
+      for (const b of shots) {
+         const mesh = new THREE.Mesh(this.shotGeo, this.shotMat);
+         mesh.scale.setScalar(scale);
+         mesh.position.set(b.pos.x, b.pos.y, b.pos.z);
+         this.group.add(mesh);
+         b.mesh = mesh;
+         b.life = 0;
+         b.tumble = a.id === "chain" ? 1 : 0;
+         this._shots.push(b);
+      }
+
+      this.shotsFired++;
+   }
+
+   /** Muzzle flash and powder smoke at a muzzle position `world`, facing `out`. */
+   _muzzleFx(world, out) {
       // Muendungsfeuer
       if (this.texFlash) {
          const fl = new THREE.Sprite(new THREE.SpriteMaterial({
@@ -311,34 +415,6 @@ export class Battery {
             });
          }
       }
-
-      // --- Geschosse ------------------------------------------------------
-      // Richtung und Streuung rechnet die geteilte Ballistik; hier entstehen
-      // nur die sichtbaren Kugeln dazu.
-      const a = AMMO[p.ammo] || AMMO.ball;
-      const origin = world.clone().addScaledVector(out, 1.6);
-      const shots = dischargeShots({
-         origin,
-         flat: { x: out.x, y: 0, z: out.z },
-         ammo: p.ammo,
-         aimElev: p.aimElev,
-         aimTrain: p.aimTrain,
-         lb: this.ballWeight,
-      }, this.rng);
-
-      const scale = a.id === "grape" ? 0.45 : a.id === "chain" ? 1.25 : 1;
-      for (const b of shots) {
-         const mesh = new THREE.Mesh(this.shotGeo, this.shotMat);
-         mesh.scale.setScalar(scale);
-         mesh.position.set(b.pos.x, b.pos.y, b.pos.z);
-         this.group.add(mesh);
-         b.mesh = mesh;
-         b.life = 0;
-         b.tumble = a.id === "chain" ? 1 : 0;
-         this._shots.push(b);
-      }
-
-      this.shotsFired++;
    }
 
    // ------------------------------------------------------------------
@@ -433,7 +509,8 @@ export class Battery {
          b.mesh.position.set(b.pos.x, b.pos.y, b.pos.z);
          if (b.tumble) b.mesh.rotation.set(b.life * 21, b.life * 13, 0);
 
-         const hit = this._checkHits(b);
+         // Replayed balls are the server's: it has already decided their hits.
+         const hit = b.remote ? null : this._checkHits(b);
          if (hit) {
             this.group.remove(b.mesh);
             this._shots.splice(i, 1);
