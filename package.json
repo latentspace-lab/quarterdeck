@@ -3,15 +3,29 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "description": "3D Segel-Simulator (Webbasiert) - Semi-realistische SegeIphysik mit Freeride/Regatta/Training-Modi",
+  "description": "3D Segel-Simulator (Webbasiert) - Semi-realistische Segelphysik mit Freeride/Regatta/Training-Modi",
+  "workspaces": [
+    "packages/shared",
+    "packages/server",
+    "packages/client"
+  ],
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview",
-    "test": "node tests/physics.test.js && node tests/sim.smoke.js && node tests/visual.test.js && node tests/vessels.test.js && node tests/damage.test.js"
+    "build:shared": "npm run build -w @segel/shared",
+    "build:server": "npm run build -w @segel/server",
+    "build:client": "npm run build -w @segel/client",
+    "build": "npm run build:shared && npm run build:client",
+    "dev": "npm run dev -w @segel/client",
+    "preview": "npm run preview -w @segel/client",
+    "typecheck": "npm run build:shared --silent && npm run typecheck -w @segel/shared && npm run typecheck -w @segel/server",
+    "server": "npm run start -w @segel/server",
+    "test": "npm run build --silent && node tests/run.js",
+    "test:unit": "npm run build:shared --silent && node tests/run.js --unit",
+    "test:regression": "npm run build:shared --silent && node tests/run.js --regression",
+    "test:integration": "npm run build --silent && node tests/run.js --integration",
+    "test:pending": "npm run build:shared --silent && node tests/run.js --pending"
   },
-  "dependencies": {
-    "three": "^0.186.0",
-    "vite": "^8.3.0"
+  "devDependencies": {
+    "playwright": "^1.49.0",
+    "typescript": "^5.7.2"
   }
 }
