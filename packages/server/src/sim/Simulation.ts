@@ -61,7 +61,10 @@ export class Simulation {
    private readonly spawnRng: Rng;
 
    constructor(params: Partial<WorldParams> = {}) {
-      this.params = { ...DEFAULT_PARAMS, ...params };
+      // An explicit `undefined` (a room option that was not given) must not
+      // clobber a default - the params go out to every client as the welcome.
+      const given = Object.fromEntries(Object.entries(params).filter(([, v]) => v !== undefined));
+      this.params = { ...DEFAULT_PARAMS, ...given };
       this.world = new World(this.params.terrainSeed);
       this.wind = new Wind({
          dir: this.params.windBaseDir,

@@ -23,6 +23,8 @@ import { UI } from "./ui.js";
 // damit das ganze Spiel.
 import { voiceAnnounce, TRIGGER } from "./audio.js";
 import { DEG, clamp, lerp, normDeg, dirVec, diffDeg } from "./utils.js";
+import { MultiplayerSession } from "./net/MultiplayerSession.js";
+import { defaultServerUrl } from "./net/NetClient.js";
 
 const CAM_LABEL = {
    CHASE: "Verfolger",
@@ -96,8 +98,15 @@ export class Simulator {
       this.ui.compass.width = 160;
       this.ui.compass.height = 160;
 
-      // Alle Schiffe im Wasser (Spieler zuerst) - Ziele fuer alle Batterien
-      this.allShips = () => [this.player, ...this.fleet.ships].filter((s) => s && s.alive);
+      // Every ship in the water (player first): battery targets, debris
+      // anchors, pose interpolation. In multiplayer the others are the
+      // session's remote ships.
+      this.session = null;
+      this.allShips = () => [
+         this.player,
+         ...this.fleet.ships,
+         ...(this.session ? this.session.remoteShips() : []),
+      ].filter((s) => s && s.alive);
       this._targets = () => this.allShips().map((s) => s.targetInfo());
       this._onHit = (h) => this._handleHit(h);
 
@@ -152,6 +161,62 @@ export class Simulator {
 
       // Show menu first
       this.openMenu();
+
+      // ?mp=1&server=ws://host:2567&vessel=lydia&name=…&room=…&enemies=a,b
+      // joins a battle straight away - for links and for the browser tests.
+      const q = new URLSearchParams(typeof location !== "undefined" ? location.search : "");
+      if (q.get("mp") === "1") {
+         this.startMultiplayer({
+            url: q.get("server") || defaultServerUrl(location),
+            vesselId: q.get("vessel") || "lydia",
+            name: q.get("name") || "",
+            roomId: q.get("room") || undefined,
+            create: { enemies: q.get("enemies") ? q.get("enemies").split(",") : undefined },
+         }).catch((e) => this.ui.showMessage("Could not join: " + (e && e.message ? e.message : e)));
+      }
+   }
+
+   // ------------------------------------------------------------------
+   // Multiplayer: this Simulator becomes one player's view of a server room.
+   // The local ship keeps its own physics for a responsive helm; everything
+   // else - other ships, wind, sea, damage - is the server's.
+   // ------------------------------------------------------------------
+   async startMultiplayer(opts) {
+      if (this.session) await this.session.stop();
+      this.setVessel(opts.vesselId || this.vesselId);
+      this.fleet.clear();
+      this.debris.clear();
+      this.battery.clear();
+      this.course.setVisible(false);
+      this.ui.setTraining(null);
+      this.trainState = null;
+      this.targetMarker.visible = false;
+      this._lockMsg = false;
+      this._groundMsg = 0;
+
+      this.session = new MultiplayerSession(this);
+      this.ui.showMessage("Connecting to " + opts.url + " …");
+      try {
+         await this.session.start(opts);
+      } catch (e) {
+         this.session = null;
+         throw e;
+      }
+      this.mode = "Multiplayer";
+      this.gusts = this.wind.variability > 0;
+      this.ui.closeMenu();
+      this.menuOpen = false;
+      this.paused = false;
+      this.yacht.visible = true;
+      this.ui.showMessage(vesselLabel(this.vessel) + " has joined room " + this.session.net.roomId);
+   }
+
+   async leaveMultiplayer() {
+      if (!this.session) return;
+      const s = this.session;
+      this.session = null;
+      this.mode = "Freeride";
+      await s.stop();
    }
 
    // Schiff wechseln: 3D-Modell, Physik-Profil, Kamera, Batterie, Trainer.
@@ -233,7 +298,26 @@ export class Simulator {
          onVesselChange: (id) => this.setVessel(id),
          onStart: (mode, dir, speed, gusts, vesselId, scenarioId) => {
             if (scenarioId) this.scenarioId = scenarioId;
+            if (this.session) this.leaveMultiplayer();
             this.startMode(mode, dir, speed, gusts, vesselId);
+         },
+         multiplayer: {
+            url: (this.session && this.session.net && this.session.net.url) || defaultServerUrl(location),
+            name: this._mpName || "",
+            roomId: "",
+            connected: !!(this.session && this.session.connected),
+         },
+         onJoin: (o) => {
+            this._mpName = o.name;
+            this.startMultiplayer(o).catch((e) => {
+               this.ui.showMessage("Could not join: " + (e && e.message ? e.message : e));
+            });
+         },
+         onResume: () => {
+            // Back from the pause menu into the running battle.
+            this.ui.closeMenu();
+            this.menuOpen = false;
+            this.paused = false;
          },
          onHelp: () => this._showHelp(),
       });
@@ -477,6 +561,11 @@ export class Simulator {
       this.player.update(dt, worldCtx);
       this.player.battery.update(dt, gunCtx);
 
+      if (this.mode === "Multiplayer") {
+         this._stepMultiplayer(dt, inp, worldCtx, seaFn);
+         return;
+      }
+
       if (this.mode === "Gefecht") {
          // Besatzung nur auf Schiffen animieren, die man auch erkennen kann
          for (const e of this.fleet.ships) {
@@ -537,6 +626,46 @@ export class Simulator {
       this._uiMsg = msg;
    }
 
+   /**
+    * The multiplayer half of a step: send input, take in the server's state,
+    * let the debris drift, turn server events into messages. Collisions,
+    * grounding and enemy AI are the server's business here.
+    */
+   _stepMultiplayer(dt, inp, worldCtx, seaFn) {
+      const S = this.session;
+      if (!S) return;
+      S.stepFixed(dt, inp);
+
+      const wv = dirVec(this.wind.dir + 180);
+      this.debris.update(dt, {
+         seaHeight: seaFn,
+         windSpeed: this.wind.speed,
+         windVec: wv,
+         anchorOf: (id, local, out) => {
+            const sh = this.allShips().find((a) => a.id === id);
+            return sh ? sh.anchorPoint(local, out) : null;
+         },
+      });
+
+      // Our own ship's local model events (sails blown, mast wounded ...)
+      for (const ev of this.player.drainEvents()) this._onShipEvent(ev);
+      // What the server reports about everyone
+      for (const ev of S.drainEvents()) {
+         if (ev.kind === "ship") {
+            const ship = ev.shipId === S.shipId ? this.player : S.findShip(ev.shipId);
+            if (ship) this._onShipEvent({ ...ev, ship });
+         } else if (ev.kind === "world") {
+            const a = ev.a === S.shipId ? this.player : S.findShip(ev.a);
+            const b = ev.b === S.shipId ? this.player : S.findShip(ev.b);
+            if (a && b) this._onWorldEvent({ ...ev, a, b });
+         }
+      }
+      if (S.closed && !this._mpClosedMsg) {
+         this._mpClosedMsg = true;
+         this._uiMsg = "Connection to the server lost.";
+      }
+   }
+
    // =====================================================================
    // Darstellung - mit Bildschirmrate, nie zustandsaendernd.
    //
@@ -550,6 +679,14 @@ export class Simulator {
 
       if (!this.menuOpen && !this.paused) {
          for (const sh of this.allShips()) sh.applyPose(alpha);
+         if (this.session) {
+            this.session.render({
+               wind: this._windObj(), t: this.t,
+               waveT: this.sea.phaseT, waveRad: this.sea.windRad,
+               amp: this.sea.amp, lambda: this.sea.lambda,
+               seaFull: this.sea.sampler(1), crewLod: true,
+            }, frameDt);
+         }
 
          // Kamera: rein visuell, darf mit Bildrate laufen und profitiert davon.
          this.cam.update(frameDt, {
@@ -618,6 +755,7 @@ export class Simulator {
                this.cam.setMode(this.cam.mode === "TOP" ? "CHASE" : "TOP");
                break;
             case "restart":
+               if (this.session) break;
                this._restartCurrent();
                break;
             case "toggleGusts":
@@ -650,16 +788,24 @@ export class Simulator {
             case "cycleAmmo": {
                if (!this.vessel.guns) break;
                const a = this.battery.cycleAmmo();
+               if (this.session) this.session.setAmmo(a);
                const spec = AMMO[a];
-               this.ui.showMessage("Geladen: " + spec.name + " — " + spec.desc);
+               this.ui.showMessage("Loaded: " + spec.name + " — " + spec.desc);
                break;
             }
             case "cutWreck": {
-               if (this.debris.hasWreckage(this.player.id)) this.player.cutAwayWreckage();
-               else this.ui.showMessage("Kein Wrack im Schlepp.");
+               if (this.session) {
+                  this.session.cutWreck();
+                  this.player.cutAwayWreckage();
+               } else if (this.debris.hasWreckage(this.player.id)) this.player.cutAwayWreckage();
+               else this.ui.showMessage("No wreck in tow.");
                break;
             }
             case "cycleVessel": {
+               if (this.session) {
+                  this.ui.showMessage("The ship cannot be changed in a multiplayer battle.");
+                  break;
+               }
                const i = VESSELS.findIndex((v) => v.id === this.vesselId);
                const nxt = VESSELS[(i + 1) % VESSELS.length];
                this.setVessel(nxt.id);
@@ -685,6 +831,11 @@ export class Simulator {
          return false;
       }
       if (this.boat.isCapsized) return false;
+      if (this.session) {
+         // The server fires the guns; the order goes out with the next input.
+         this.session.fire(side);
+         return true;
+      }
       if (!this.battery.ready(side)) return false;
       const n = this.battery.gunsReady(side);
       if (n <= 0) {
@@ -947,7 +1098,8 @@ export class Simulator {
          wreck: this.debris.hasWreckage(this.player.id),
          wreckDrag: this.player.wreckDrag,
          depth: this.terrain.visible ? this.terrain.depthAt(b.pos.x, b.pos.z) : null,
-         enemies: this.mode === "Gefecht" ? this.fleet.ships.map((sh) => {
+         enemies: this.session ? this.session.others(b.pos)
+         : this.mode === "Gefecht" ? this.fleet.ships.map((sh) => {
             const dx = sh.pos.x - b.pos.x, dz = sh.pos.z - b.pos.z;
             return {
                name: sh.name,
