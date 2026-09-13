@@ -6,7 +6,7 @@
 import * as THREE from "three";
 import { matchMaker } from "@colyseus/core";
 import { startServer } from "../../packages/server/src/index.ts";
-import { NetClient } from "../../packages/client/src/net/NetClient.js";
+import { NetClient, listRooms } from "../../packages/client/src/net/NetClient.js";
 import { RemoteShip } from "../../packages/client/src/net/RemoteShip.js";
 import { MultiplayerSession } from "../../packages/client/src/net/MultiplayerSession.js";
 import { Ship } from "../../packages/client/src/ship.js";
@@ -67,6 +67,12 @@ async function run() {
       eq(welcome.params.windBaseDir, 30, "the room was created with our wind");
       await waitFor(() => added.includes(A.shipId), 3000, "own ship added");
       ok(added.includes(A.shipId), "our own ship is reported as added");
+
+      const lobby = await listRooms(srv.url);
+      eq(lobby.length, 1, "listRooms() sees the one room");
+      eq(lobby[0].roomId, A.roomId, "it is ours");
+      eq(lobby[0].clients, 1, "with one player so far");
+      ok(lobby[0].metadata.name, "and a name", lobby[0].metadata.name);
 
       const B = new NetClient(srv.url);
       await B.join({ vesselId: "hotspur", name: "B", roomId: A.roomId });

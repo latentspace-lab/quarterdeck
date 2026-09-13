@@ -187,6 +187,22 @@ small, .small { font-size: 11px; opacity: 0.85; }
 .ctrl { display: flex; flex-direction: column; gap: 4px; font-size: 13px; }
 .ctrl span { opacity: 0.9; }
 .ctrl input[type="range"] { width: 100%; }
+.room-list { display: flex; flex-direction: column; gap: 6px; margin: 4px 0 10px; }
+.room-row {
+   display: grid; grid-template-columns: 1fr auto auto; gap: 10px; align-items: center;
+   padding: 8px 10px; border-radius: 10px; background: rgba(8, 20, 32, 0.55);
+   border: 1px solid rgba(120, 180, 220, 0.25); font-size: 13px;
+}
+.room-row.full { opacity: 0.55; }
+.room-name { font-weight: 600; }
+.room-info { opacity: 0.75; font-size: 12px; }
+.room-join { padding: 5px 12px; border-radius: 8px; border: 0; background: #3da3ff; color: #061019; font-weight: 700; cursor: pointer; }
+.room-join:disabled { cursor: default; opacity: 0.5; }
+.room-empty { font-size: 12px; opacity: 0.7; padding: 6px 2px; }
+.room-refresh {
+   margin-left: 10px; padding: 2px 10px; border-radius: 8px; border: 1px solid rgba(120, 180, 220, 0.35);
+   background: transparent; color: #eef; font: inherit; font-size: 12px; cursor: pointer;
+}
 .ctrl input[type="text"] {
    width: 100%; box-sizing: border-box; padding: 6px 8px; border-radius: 8px;
    border: 1px solid rgba(120, 180, 220, 0.35); background: rgba(8, 20, 32, 0.6);

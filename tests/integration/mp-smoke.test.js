@@ -31,7 +31,7 @@ async function run() {
    let other = null;
    try {
       suite.section("The page joins a battle");
-      const url = `${site.url}?mp=1&server=${encodeURIComponent(srv.url)}&vessel=lydia&name=Browser&enemies=hirondelle`;
+      const url = `${site.url}?mp=1&server=${encodeURIComponent(srv.url)}&vessel=lydia&name=Browser&enemies=hirondelle&roomName=Smoke%20Test`;
       await page.goto(url, { waitUntil: "load", timeout: 30000 });
       await page.waitForFunction(() => window.__sim && window.__sim.mode === "Multiplayer" && window.__sim.session && window.__sim.session.shipId, null, { timeout: 15000 });
       const joined = await page.evaluate(() => ({
@@ -96,6 +96,26 @@ async function run() {
       ok(/LOADING/.test(guns.state || ""), "the HUD shows the starboard battery reloading from the server's timer", guns.state);
       const seenByOther = other.state.ships.get(joined.shipId);
       ok(seenByOther.reloadStbd > 0, "the other player sees the reload in the state", seenByOther.reloadStbd.toFixed(1) + " s");
+
+      suite.section("The lobby in the menu");
+      await page.evaluate(() => window.__sim.openMenu());
+      await page.waitForFunction(() => document.querySelector(".mode-btn[data-mode='Multiplayer']"), null, { timeout: 3000 });
+      await page.click(".mode-btn[data-mode='Multiplayer']");
+      await page.waitForFunction(() => document.querySelectorAll("#roomList .room-row").length >= 1, null, { timeout: 5000 });
+      const lobby = await page.evaluate(() => {
+         const rows = [...document.querySelectorAll("#roomList .room-row")];
+         return rows.map((r) => ({ name: r.querySelector(".room-name").textContent, info: r.querySelector(".room-info").textContent }));
+      });
+      ok(lobby.some((r) => r.name === "Smoke Test"), "the menu lists the room we are in, by name", JSON.stringify(lobby));
+      ok(lobby.some((r) => /2\/8 players/.test(r.info) && /1 AI/.test(r.info)), "with players and AI count", lobby[0] && lobby[0].info);
+      const resumed = await page.evaluate(() => {
+         const b = document.querySelector("#menuResume");
+         if (!b) return false;
+         b.click();
+         return true;
+      });
+      ok(resumed, "'Back to the battle' returns to the game");
+      await page.waitForFunction(() => window.__sim.menuOpen === false, null, { timeout: 3000 });
 
       suite.section("The other player leaves");
       await other.leave();

@@ -7,9 +7,32 @@
 // browser and in the Node tests.
 
 import { Client } from "@colyseus/sdk";
-import { MSG } from "@segel/shared";
+import { MSG, ROOMS } from "@segel/shared";
 
-export const ROOM_BATTLE = "battle";
+export const ROOM_BATTLE = ROOMS.battle;
+export const ROOM_PRACTICE = ROOMS.practice;
+
+/** The server's lobby route (see packages/server/src/index.ts). */
+export const LOBBY_ROUTE = "/rooms";
+
+/** ws://host:port -> http://host:port, wss -> https. */
+export function httpUrlOf(wsUrl) {
+   return String(wsUrl).replace(/^ws(s?):/i, "http$1:").replace(/\/+$/, "");
+}
+
+/**
+ * The lobby list: battle rooms with a free seat, newest first. Fetched from
+ * the server's /rooms route - the 0.18 SDK has no room-listing call.
+ * @returns {Promise<Array<{roomId:string, clients:number, maxClients:number, metadata:object}>>}
+ */
+export async function listRooms(url, fetchFn = globalThis.fetch) {
+   const res = await fetchFn(httpUrlOf(url) + LOBBY_ROUTE, { cache: "no-store" });
+   if (!res.ok) throw new Error("lobby request failed: " + res.status);
+   const rooms = await res.json();
+   return (Array.isArray(rooms) ? rooms : [])
+      .map((r) => ({ roomId: r.roomId, clients: r.clients, maxClients: r.maxClients, metadata: r.metadata || {} }))
+      .sort((a, b) => (b.metadata.createdAt || 0) - (a.metadata.createdAt || 0));
+}
 
 /** Default server for a page served from `host`: same host, port 2567. */
 export function defaultServerUrl(loc) {
@@ -54,9 +77,12 @@ export class NetClient {
     */
    async join(opts = {}) {
       const joinOpts = { vesselId: opts.vesselId, name: opts.name };
+      const create = { ...joinOpts, ...(opts.create || {}) };
       const room = opts.roomId
          ? await this.client.joinById(opts.roomId, joinOpts)
-         : await this.client.joinOrCreate(ROOM_BATTLE, { ...joinOpts, ...(opts.create || {}) });
+         : opts.mode === "practice"
+           ? await this.client.create(ROOM_PRACTICE, create)
+           : await this.client.joinOrCreate(ROOM_BATTLE, create);
       this.room = room;
 
       const welcome = new Promise((resolve, reject) => {

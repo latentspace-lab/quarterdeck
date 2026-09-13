@@ -24,7 +24,7 @@ import { UI } from "./ui.js";
 import { voiceAnnounce, TRIGGER } from "./audio.js";
 import { DEG, clamp, lerp, normDeg, dirVec, diffDeg } from "./utils.js";
 import { MultiplayerSession } from "./net/MultiplayerSession.js";
-import { defaultServerUrl } from "./net/NetClient.js";
+import { defaultServerUrl, listRooms } from "./net/NetClient.js";
 
 const CAM_LABEL = {
    CHASE: "Verfolger",
@@ -163,6 +163,7 @@ export class Simulator {
       this.openMenu();
 
       // ?mp=1&server=ws://host:2567&vessel=lydia&name=…&room=…&enemies=a,b
+      //   &roomName=…&mode=practice
       // joins a battle straight away - for links and for the browser tests.
       const q = new URLSearchParams(typeof location !== "undefined" ? location.search : "");
       if (q.get("mp") === "1") {
@@ -171,7 +172,11 @@ export class Simulator {
             vesselId: q.get("vessel") || "lydia",
             name: q.get("name") || "",
             roomId: q.get("room") || undefined,
-            create: { enemies: q.get("enemies") ? q.get("enemies").split(",") : undefined },
+            mode: q.get("mode") === "practice" ? "practice" : "battle",
+            create: {
+               enemies: q.get("enemies") ? q.get("enemies").split(",") : undefined,
+               roomName: q.get("roomName") || undefined,
+            },
          }).catch((e) => this.ui.showMessage("Could not join: " + (e && e.message ? e.message : e)));
       }
    }
@@ -305,8 +310,11 @@ export class Simulator {
             url: (this.session && this.session.net && this.session.net.url) || defaultServerUrl(location),
             name: this._mpName || "",
             roomId: "",
+            roomName: "",
+            practice: false,
             connected: !!(this.session && this.session.connected),
          },
+         onListRooms: (url) => listRooms(url),
          onJoin: (o) => {
             this._mpName = o.name;
             this.startMultiplayer(o).catch((e) => {
