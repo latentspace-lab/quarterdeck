@@ -17,6 +17,7 @@ import { Course } from "./marks.js";
 import { makeTrainer } from "./trainer.js";
 import { UI } from "./ui.js";
 import { DEG, clamp, lerp, normDeg, dirVec, diffDeg } from "./utils.js";
+import { voiceAudio, TRIGGER, voiceAnnounce } from "./audio.js";
 
 const CAM_LABEL = {
    CHASE: "Verfolger",
@@ -107,6 +108,7 @@ export class Simulator {
       this.player = null;
       this.vessel = null;
       this.vesselId = null;
+      this.nation = "GB";
       this.scenarioId = "single";
       this.setVessel("yacht");
 
@@ -123,6 +125,7 @@ export class Simulator {
       this.seaWind = 12;
       this._groundMsg = 0;
       this._battleOver = false;
+      this._battleStarted = false;
       this._lockMsg = false;
       this.mode = "Freeride";
       this.gusts = true;
@@ -141,6 +144,7 @@ export class Simulator {
 
       // Zuerst Menü anzeigen
       this.openMenu();
+      voiceAudio.preload(); // preloads both GB and FR
    }
 
    // Schiff wechseln: 3D-Modell, Physik-Profil, Kamera, Batterie, Trainer.
@@ -155,6 +159,7 @@ export class Simulator {
       const old = this.player;
       this.vessel = v;
       this.vesselId = v.id;
+      this.nation = v.nation || "GB";
 
       this.player = new Ship({
          id: "player",
@@ -163,6 +168,7 @@ export class Simulator {
          debris: this.debris,
          targets: this._targets,
          onHit: this._onHit,
+         onReloadDone: (side) => voiceAnnounce(TRIGGER.ceasefire, this.nation),
          isPlayer: true,
          heading: old ? old.dyn.heading : 0,
          x: old ? old.pos.x : 0,
@@ -672,6 +678,12 @@ export class Simulator {
       if (ok) {
          this.ui.showMessage((side === "PORT" ? "Backbord" : "Steuerbord")
             + "-Breitseite — " + n + " Rohre " + this.battery.ammoSpec().short + "!");
+         if (!this._battleStarted) {
+            this._battleStarted = true;
+            voiceAnnounce(TRIGGER.fireatwill, this.nation);
+         } else {
+            voiceAnnounce(TRIGGER.battlestations, this.nation);
+         }
       }
       return ok;
    }
@@ -690,6 +702,8 @@ export class Simulator {
       this.seaWind = 12;
       this._groundMsg = 0;
       this._battleOver = false;
+      this._battleStarted = false;
+      this._lockMsg = false;
 
       if (!list.length) {
          this.ui.showMessage("Die " + this.vessel.name + " ist kein Kriegsschiff — kein Gegner in Sicht.");
@@ -723,6 +737,7 @@ export class Simulator {
       if (this.player.dmg.sunk) {
          msg = "Die " + this.vessel.name + " ist gesunken. R für ein neues Gefecht.";
          this._battleOver = true;
+         voiceAnnounce(TRIGGER.sunk, this.nation);
       } else if (this.player.dmg.beaten() && this.player.dmg.mastsStanding() <= 1) {
          msg = "Schwer angeschlagen — R setzt das Gefecht zurück.";
          this._battleOver = true;
@@ -732,6 +747,7 @@ export class Simulator {
          msg = "Gefecht gewonnen! " + (struck ? struck + " gestrichen" : "")
             + (struck && sunk ? ", " : "") + (sunk ? sunk + " gesunken" : "") + ".";
          this._battleOver = true;
+         voiceAnnounce(TRIGGER.victory, this.nation);
       }
       return msg;
    }
@@ -772,7 +788,10 @@ export class Simulator {
             if (isUs) this.ui.showMessage(M[ev.mast] + " angeschlagen — Tuch wegnehmen!");
             break;
          case "holed":
-            if (isUs && Math.random() < 0.4) this.ui.showMessage("Leck unter Wasser — die Pumpen!");
+            if (isUs && Math.random() < 0.4) {
+               this.ui.showMessage("Leck unter Wasser — die Pumpen!");
+               voiceAnnounce(TRIGGER.pumps, this.nation);
+            }
             break;
          case "rudder":
             if (isUs) this.ui.showMessage("Das Ruder ist getroffen!");
@@ -782,6 +801,7 @@ export class Simulator {
             break;
          case "sunk":
             this.ui.showMessage(isUs ? "Wir sinken." : ev.ship.name + " sinkt.");
+            if (!isUs) voiceAnnounce(TRIGGER.sunk, this.nation);
             break;
          case "exploded":
             this.ui.showMessage(ev.ship.name + " fliegt in die Luft!");
@@ -802,6 +822,7 @@ export class Simulator {
          if (us) {
             this.cam.shake(1.6);
             this.ui.showMessage("Zusammenstoß! " + ev.closing.toFixed(1) + " kn Annäherung.");
+            voiceAnnounce(TRIGGER.braceforimpact, this.nation);
          }
       } else if (ev.type === "locked") {
          const us = ev.a === this.player || ev.b === this.player;
