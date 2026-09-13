@@ -1,11 +1,12 @@
 // game.js - Simulation: bindet Szene, Boot, Physik, Kamera, Steuerung, Modi, UI
 import * as THREE from "three";
 import { createOcean, seaHeight, ampForWind, waveHeightForWind, seaStateName } from "./ocean.js";
-import { SeaState, SIM_DT } from "@segel/shared";
+import { SeaState, SIM_DT, makeRng } from "@segel/shared";
 import { createScene } from "./scene.js";
 import { getVessel, VESSELS, vesselLabel } from "./vessels.js";
 import { Ship } from "./ship.js";
 import { Fleet, SCENARIOS, scenarioFor } from "./fleet.js";
+import { battleWind, battleSpawns } from "./battleStart.js";
 import { DebrisField } from "./debris.js";
 import { createTerrain } from "./terrain.js";
 import * as collide from "./collide.js";
@@ -150,6 +151,10 @@ export class Simulator {
       this.mode = "Freeride";
       this.gusts = true;
       this.hudVisible = true;
+      // Battle opening: random wind and enemy bearing (issue #6). ?seed= replays one.
+      this.randomStart = true;
+      this.battleSeed = null;
+      this._battle = null;
 
       // Train target buoy anchor for training task 7
       this.trainTarget = { x: 0, z: 500 };
@@ -169,6 +174,8 @@ export class Simulator {
       //   &roomName=…&mode=practice
       // joins a battle straight away - for links and for the browser tests.
       const q = new URLSearchParams(typeof location !== "undefined" ? location.search : "");
+      if (q.get("seed") !== null && q.get("seed") !== "") this.battleSeed = Number(q.get("seed")) | 0;
+      if (q.get("random") === "0") this.randomStart = false;
       if (q.get("mp") === "1") {
          this.startMultiplayer({
             url: q.get("server") || defaultServerUrl(location),
@@ -309,6 +316,8 @@ export class Simulator {
          scenarioId: this.scenarioId,
          scenarios: SCENARIOS,
          onScenarioChange: (id) => { this.scenarioId = id; },
+         randomStart: this.randomStart,
+         onRandomChange: (on) => { this.randomStart = !!on; },
          onVesselChange: (id) => this.setVessel(id),
          onStart: (mode, dir, speed, gusts, vesselId, scenarioId) => {
             if (scenarioId) this.scenarioId = scenarioId;
@@ -365,7 +374,8 @@ export class Simulator {
            powder smoke drifts with the wind — standing to leeward you are quickly in
            your own smoke. Reloading takes 60 to 75 seconds depending on the ship, longer with a thinned crew.</p>
            <h3>Battle, Damage and Wreck</h3>
-           <p>In <b>Battle</b> mode a French enemy stands to windward.
+           <p>In <b>Battle</b> mode the wind and the enemy's bearing are rolled afresh each
+           fight (switch it off in the menu for the classic start dead to windward; add <i>?seed=N</i> to the address to replay a battle).
            <b>Z</b> changes the load: <i>Round shot</i> into the hull (leaks, guns,
            eventually sinks), <i>Chain shot</i> into the rigging (masts and sails —
            the French way to cripple a ship and escape),
@@ -414,6 +424,7 @@ export class Simulator {
       this.ui.closeMenu();
       this.menuOpen = false;
       this.paused = false;
+      if (mode === "Gefecht") this._rollBattle();
       this._placeAtStart(mode);
       this.battery.clear();
       this.debris.clear();
@@ -907,6 +918,22 @@ export class Simulator {
    // ------------------------------------------------------------------
    // Gefecht
    // ------------------------------------------------------------------
+   /**
+    * A fresh battle: seed the dice and, unless switched off in the menu, roll
+    * the wind. Runs before the player is placed, because the start heading
+    * is laid relative to the wind.
+    */
+   _rollBattle() {
+      const seed = this.battleSeed ?? ((Math.random() * 0x7fffffff) | 0);
+      this._battle = { seed, rng: makeRng(seed) };
+      if (this.randomStart) {
+         const w = battleWind(this._battle.rng);
+         this.wind.baseDir = w.dir;
+         this.wind.baseSpeed = w.speed;
+      }
+      console.info("Battle seed " + seed + " (replay with ?seed=" + seed + ")");
+   }
+
    _startBattle() {
       this.fleet.clear();
       this.debris.clear();
@@ -915,7 +942,7 @@ export class Simulator {
       this.terrain.setVisible(true);
       // Der Seegang folgt dem Wind nur traege: eine See baut sich auf und
       // laeuft langsamer wieder ab. Sonst wuerde jede Boe die Wellen pumpen.
-      this.sea.snapTo(12);
+      this.sea.snapTo(this.wind.baseSpeed);
       this._groundMsg = 0;
       this._battleOver = false;
 
@@ -923,22 +950,13 @@ export class Simulator {
          this.ui.showMessage("Die " + this.vessel.name + " ist kein Kriegsschiff — kein Gegner in Sicht.");
          return;
       }
-      // Gegner in Luv aufstellen, gestaffelt, gut zwei Kilometer entfernt
-      const windDir = this.wind.baseDir;
-      const up = dirVec(windDir);       // Richtung, aus der es weht
-      list.forEach((id, i) => {
-         const spread = (i - (list.length - 1) / 2) * 420;
-         const across = dirVec(windDir + 90);
-         const x = this.player.pos.x + up.x * 900 + across.x * spread;
-         const z = this.player.pos.z + up.z * 900 + across.z * spread;
-         const heading = normDeg(Math.atan2(this.player.pos.x - x, this.player.pos.z - z) * 180 / Math.PI);
-         this.fleet.spawn(id, {
-            x, z, heading, speed: 4,
-            doctrine: "rig",
-            skill: 0.80 + Math.random() * 0.25,
-            engage: 170 + Math.random() * 120,
-         });
+      if (!this._battle) this._rollBattle();
+      // Classic: a line abreast dead upwind. Random: somewhere on the horizon.
+      const spawns = battleSpawns({
+         enemies: list, player: this.player.pos, windDir: this.wind.baseDir,
+         random: this.randomStart, rng: this._battle.rng,
       });
+      for (const { id, ...o } of spawns) this.fleet.spawn(id, o);
       const names = this.fleet.ships.map((s) => s.name).join(" und ");
       this.ui.showMessage("Segel in Sicht: " + names + " — klar Schiff zum Gefecht!");
    }
@@ -1045,6 +1063,7 @@ export class Simulator {
       if (this.mode === "Gefecht") {
          this.debris.clear();
          this.setVessel(this.vesselId, true);
+         this._rollBattle();
          this._placeAtStart("Gefecht");
          this._startBattle();
          return;
