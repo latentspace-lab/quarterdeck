@@ -3,12 +3,13 @@
 import * as THREE from "three";
 import { DamageModel, AMMO, sectionAt } from "../src/damage.js";
 import { DebrisField, RHO } from "../src/debris.js";
-import { getVessel, ENEMIES } from "../src/vessels.js";
+import { getVessel, ENEMIES, shipsOfFaction, shipOfTier } from "../src/vessels.js";
+import { FACTIONS, getFaction, enemyFactionFor } from "../src/factions.js";
 import { buildWarship } from "../src/warship.js";
 import { Battery, segmentBox, rangeForElevation, elevationForRange } from "../src/guns.js";
 import { Ship } from "../src/ship.js";
-import { Captain, sailableHeading, SCENARIOS } from "../src/fleet.js";
-import { waterDepth, groundHeight } from "../src/terrain.js";
+import { Captain, sailableHeading, SCENARIOS, forcesFor } from "../src/fleet.js";
+import { waterDepth, groundHeight, generateWorld, worldInfo, isOpenWater, findOpenWater } from "../src/terrain.js";
 import { whitecapsForWind } from "../src/ocean.js";
 import { testPair, groundStep } from "../src/collide.js";
 import { seaHeight, ampForWind } from "../src/ocean.js";
@@ -37,9 +38,13 @@ function pound(vessel, ammo, n, o = {}) {
    }
    return d;
 }
+const hull8 = pound(LY, "ball", 8);
+ok(hull8.integrity() < 0.85 && hull8.integrity() > 0.45,
+   "eine volle Breitseite kostet die Fregatte ein Viertel ihrer Gefechtskraft",
+   hull8.integrity().toFixed(2));
 const hull20 = pound(LY, "ball", 20);
-ok(hull20.integrity() < 0.85 && hull20.integrity() > 0.4,
-   "20 Vollkugeln setzen der Fregatte zu, erledigen sie aber nicht",
+ok(hull20.integrity() < 0.40,
+   "zweieinhalb Breitseiten machen sie gefechtsunfaehig",
    hull20.integrity().toFixed(2));
 ok(hull20.guns.STBD < 0.9, "Vollkugeln schlagen Rohre aus", hull20.guns.STBD.toFixed(2));
 const rig20 = pound(LY, "chain", 20, { y: 14 });
@@ -232,21 +237,91 @@ console.log("\n== Schiff zerlegen ==");
 
 // ------------------------------------------------------------ Gelaende
 console.log("\n== Untiefen ==");
+// Die Seekarte wird jetzt gewuerfelt - der Test erzeugt eine feste Welt und
+// sucht sich Riff und Insel darin selbst.
+const WORLD = generateWorld(20250913);
+ok(WORLD.islands.length >= 2, "der Generator legt ein Archipel an",
+   WORLD.islands.length + " Inseln, " + WORLD.reefs.length + " Riffe");
 ok(waterDepth(0, 0) > 20, "offenes Wasser ist tief", waterDepth(0, 0).toFixed(0) + " m");
-ok(waterDepth(420, 780) < LY.hull.draft * 1.12, "auf dem Riff laeuft die Fregatte auf",
-   waterDepth(420, 780).toFixed(1) + " m");
-ok(groundHeight(1500, 700) > 40, "die Insel ragt aus dem Wasser",
-   groundHeight(1500, 700).toFixed(0) + " m");
+// flachste Stelle aller Untiefen suchen
+let SHOAL = null, PEAK = null;
+for (const f of [...WORLD.islands, ...WORLD.reefs]) {
+   const d = waterDepth(f.x, f.z);
+   if (!SHOAL || d < SHOAL.d) SHOAL = { x: f.x, z: f.z, d };
+   const h = groundHeight(f.x, f.z);
+   if (!PEAK || h > PEAK.h) PEAK = { x: f.x, z: f.z, h };
+}
+ok(SHOAL && SHOAL.d < LY.hull.draft * 1.12, "auf dem Riff laeuft die Fregatte auf",
+   SHOAL ? SHOAL.d.toFixed(1) + " m" : "kein Riff");
+ok(PEAK && PEAK.h > 40, "die Insel ragt aus dem Wasser",
+   PEAK.h.toFixed(0) + " m");
 
 // ------------------------------------------------------------ Gefecht
 console.log("\n== Kapitaene und Gefecht ==");
 ok(sailableHeading(0, 0, 65) === 65 || sailableHeading(0, 0, 65) === 295,
    "ein Kurs in der No-Go-Zone wird auf die segelbare Kante gelegt");
 ok(sailableHeading(120, 0, 65) === 120, "segelbare Kurse bleiben unveraendert");
-ok(SCENARIOS.length === 3 && SCENARIOS.every((s) => s.forces.lydia.length > 0),
-   "drei Gefechtslagen, jede mit Gegner fuer die Lydia");
-ok(ENEMIES.length === 3 && ENEMIES.every((v) => v.nation === "FR"),
-   "drei franzoesische Gegner im Katalog");
+ok(SCENARIOS.length === 3, "drei Gefechtslagen");
+ok(ENEMIES.length === 3 && ENEMIES.every((v) => v.faction === "fr"),
+   "drei franzoesische Schiffe im Katalog");
+
+// ---- Parteien -------------------------------------------------------------
+console.log("\n== Parteien ==");
+ok(FACTIONS.length === 4, "vier Parteien", FACTIONS.map((f) => f.short).join(" "));
+for (const f of FACTIONS) {
+   const list = shipsOfFaction(f.id);
+   ok(list.length >= 3, f.name + ": mindestens drei Schiffe", list.map((v) => v.name).join(", "));
+   // shipOfTier() braucht jede Groessenklasse besetzt. Mehrere Schiffe in
+   // derselben Klasse sind erlaubt - als Gegner zieht es davon das erste.
+   ok([1, 2, 3].every((t) => list.some((v) => v.tier === t)),
+      f.name + ": jede Groessenklasse besetzt", list.map((v) => v.tier).join());
+   ok(list.every((v) => v.guns && v.paint && v.rig === "square"),
+      f.name + ": alle bewaffnet, eigener Anstrich");
+}
+ok(shipsOfFaction("yacht").length === 0 && getVessel("yacht").faction === null,
+   "die Yacht gehoert keiner Partei an");
+// Jede Partei hat einen Gegner, und nie sich selbst
+for (const f of FACTIONS) {
+   const e = enemyFactionFor(f.id);
+   ok(e && e.id !== f.id, f.name + " hat einen Gegner", e.name);
+}
+// Gefechtslagen funktionieren mit jeder Paarung
+let combos = 0, bad = 0;
+for (const f of FACTIONS) {
+   for (const v of shipsOfFaction(f.id)) {
+      for (const sc of SCENARIOS) {
+         const force = forcesFor(sc.id, v, enemyFactionFor(f.id));
+         combos++;
+         if (!force.length || force.some((x) => !x || !x.guns)) bad++;
+      }
+   }
+}
+ok(bad === 0, "jede Kombination aus Partei, Schiff und Lage ergibt Gegner",
+   combos + " Kombinationen geprueft");
+ok(shipOfTier("es", 3).name === "San Juan Nepomuceno", "Groessenklasse 3 der Armada");
+// Die Indefatigable teilt sich die zweite Klasse mit der Lydia. Gegner bleibt
+// die Lydia - sonst haette ein fahrbares Schiff die Gegnerliste verschoben.
+ok(shipOfTier("gb", 2).name === "Lydia", "britischer Zweier bleibt die Lydia",
+   shipOfTier("gb", 2).name);
+
+// Piraten streichen nie die Flagge
+{
+   const pir = shipsOfFaction("pirate")[1];
+   const d = new DamageModel(pir, { isPlayer: false, neverStrikes: true });
+   for (let i = 0; i < 200; i++) {
+      d.applyHit({ side: "STBD", s: 0.15 + Math.random() * 0.7, y: 2.6,
+         ammo: AMMO.ball, lb: 24, range01: 0.1, freeboard: 4 });
+   }
+   d.update(0.1, {});
+   ok(d.beaten() && !d.struck, "ein geschlagener Pirat streicht trotzdem nicht");
+   const nav = new DamageModel(pir, { isPlayer: false });
+   for (let i = 0; i < 200; i++) {
+      nav.applyHit({ side: "STBD", s: 0.15 + Math.random() * 0.7, y: 2.6,
+         ammo: AMMO.ball, lb: 24, range01: 0.1, freeboard: 4 });
+   }
+   nav.update(0.1, {});
+   ok(nav.struck, "ein Kriegsschiff derselben Bauart schon");
+}
 
 // Ein vollstaendiges Gefecht: beide Seiten KI-gefuehrt
 {
@@ -280,7 +355,7 @@ ok(ENEMIES.length === 3 && ENEMIES.every((v) => v.nation === "FR"),
    }
    shots = A.battery.status().shots + B.battery.status().shots;
    ok(t < 1200, "das Gefecht wird entschieden", t.toFixed(0) + " s");
-   ok(shots > 100, "es wird ordentlich geschossen", shots + " Schuss");
+   ok(shots > 50, "es wird ordentlich geschossen", shots + " Schuss");
    ok(peakDebris > 20, "Splitter und Wrackteile fliegen", peakDebris + " Teile");
    const loser = A.dmg.struck || A.dmg.sunk ? A : B;
    ok(loser.dmg.integrity() < 0.99 || loser.dmg.flooding > 0.1 || loser.dmg.mastsStanding() < 3,
@@ -293,13 +368,17 @@ ok(ENEMIES.length === 3 && ENEMIES.every((v) => v.nation === "FR"),
    B.place(A.pos.x + 400, A.pos.z, A.dyn.heading, 3);
    ok(testPair(A, B) === null, "auf Distanz nicht");
    // Grundberuehrung
-   A.place(420, 780, 0, 8);
+   A.place(SHOAL.x, SHOAL.z, 0, 8);
    const g = groundStep(A, waterDepth, 0.1);
    ok(g !== null, "Grundberuehrung auf dem Riff wird erkannt",
       g ? "Tiefe " + g.depth.toFixed(1) + " m bei " + A.vessel.hull.draft + " m Tiefgang" : "nicht erkannt");
    ok(g && g.hard && A.dyn.stopped, "hart aufgelaufen: das Schiff sitzt fest");
    A.place(0, 0, 0, 8);
    ok(groundStep(A, waterDepth, 0.1) === null, "im tiefen Wasser passiert nichts");
+   const free = findOpenWater({ maxDist: 900, minDepth: 20 });
+   ok(isOpenWater(free.x, free.z, 20, 220),
+      "der Generator findet einen freien Startplatz",
+      "(" + free.x.toFixed(0) + ", " + free.z.toFixed(0) + ")");
 }
 
 
