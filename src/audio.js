@@ -21,6 +21,20 @@ const VOICE_GB = {
    victory:           { key: "victory",           src: "/sounds/victory.ogg",           cooldown: 15 },
 };
 
+const VOICE_ES = {
+   ahoi:              { key: "ahoi",              src: "/sounds/ahoi_es.ogg",           cooldown: 0  },
+   battlestations:    { key: "battlestations",    src: "/sounds/battlestations_es.ogg",cooldown: 8  },
+   braceforimpact:    { key: "braceforimpact",    src: "/sounds/braceforimpact_es.ogg",cooldown: 6  },
+   ceasefire:         { key: "ceasefire",         src: "/sounds/ceasefire_es.ogg",     cooldown: 5  },
+   fireatwill:        { key: "fireatwill",        src: "/sounds/fireatwill_es.ogg",    cooldown: 2  },
+   makesail:          { key: "makesail",          src: "/sounds/makesail_es.ogg",      cooldown: 3  },
+   pumps:             { key: "pumps",             src: "/sounds/pumps_es.ogg",         cooldown: 15 },
+   pointouttheguns:   { key: "pointouttheguns",   src: "/sounds/pointouttheguns_es.ogg",cooldown: 10 },
+   sunk:              { key: "sunk",              src: "/sounds/sunk_es.ogg",          cooldown: 8  },
+   takethatvessel:    { key: "takethatvessel",    src: "/sounds/takethatvessel_es.ogg",cooldown: 5  },
+   victory:           { key: "victory",           src: "/sounds/victory_es.ogg",       cooldown: 15 },
+};
+
 const VOICE_FR = {
    ahoi:              { key: "ahoi",              src: "/sounds/ahoi_fr.ogg",           cooldown: 0  },
    battlestations:    { key: "battlestations",    src: "/sounds/battlestations_fr.ogg",cooldown: 8  },
@@ -35,7 +49,7 @@ const VOICE_FR = {
    victory:           { key: "victory",           src: "/sounds/victory_fr.ogg",       cooldown: 15 },
 };
 
-export const NATIONS = { GB: "GB", FR: "FR" };
+export const NATIONS = { GB: "GB", FR: "FR", ES: "ES" };
 
 // ---------------------------------------------------------------------------
 // Audio player
@@ -60,7 +74,9 @@ export class VoiceAudio {
    }
 
    _voiceFor(nation) {
-      return nation === "FR" ? VOICE_FR : VOICE_GB;
+      if (nation === "FR") return VOICE_FR;
+      if (nation === "ES") return VOICE_ES;
+      return VOICE_GB;
    }
 
    // Pre-load a single sound file
