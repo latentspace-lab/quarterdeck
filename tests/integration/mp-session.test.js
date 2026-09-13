@@ -59,7 +59,10 @@ async function run() {
       const removed = [];
       A.onShipAdd((id) => added.push(id));
       A.onShipRemove((id) => removed.push(id));
-      const welcome = await A.join({ vesselId: "lydia", name: "A", create: { windBaseDir: 30, windBaseSpeed: 14 } });
+      const welcome = await A.join({
+         vesselId: "lydia", name: "A",
+         create: { windBaseDir: 30, windBaseSpeed: 14, windVariability: 0, rngSeed: 1805, terrainSeed: 99 },
+      });
       eq(welcome.shipId, A.shipId, "welcome names our ship");
       eq(welcome.params.windBaseDir, 30, "the room was created with our wind");
       await waitFor(() => added.includes(A.shipId), 3000, "own ship added");
@@ -150,14 +153,17 @@ async function run() {
       ok(others.some((o) => o.masts === 2), "one of them shows the lost mast");
 
       suite.section("A broadside between players, seen from a third");
-      // Server-side: put B abeam of C at pistol shot, then B fires at C.
+      // Server-side: put B abeam of C at point-blank range, then B fires at C.
       // Player C's session must show B's salvo and balls on B's remote ship,
       // and the hits on C's own ship - with the damage detail in the state.
+      // 60 m, not pistol shot: the gunnery dice (ship ids are random session
+      // ids, so no seed makes them repeatable) must not decide this test. At
+      // 60 m every ball crosses the hull box whatever the range estimate.
       const sB = room.sim.ships.get(B.shipId);
       const sC = room.sim.ships.get(session.shipId);
       sB.dyn.pos.x = 0; sB.dyn.pos.z = 0; sB.dyn.heading = 0; sB.dyn.speed = 2;
-      sC.dyn.pos.x = 130; sC.dyn.pos.z = 0; sC.dyn.heading = 0; sC.dyn.speed = 2;
-      sim.boat.pos.x = 130; sim.boat.pos.z = 0; sim.boat.heading = 0;
+      sC.dyn.pos.x = 60; sC.dyn.pos.z = 0; sC.dyn.heading = 0; sC.dyn.speed = 2;
+      sim.boat.pos.x = 60; sim.boat.pos.z = 0; sim.boat.heading = 0;
       const remoteB = session.remotes.get(B.shipId);
       const gunCtx = { windDir: 30, windSpeed: 14, seaHeight: () => 0 };
       const stepSession = async (n, rudder = 0) => {
