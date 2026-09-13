@@ -689,32 +689,42 @@ export class Simulator {
       const enemyFaction = enemyFactionFor(this.vessel?.faction || "gb");
       const list = forcesFor(this.scenarioId, this.vessel, enemyFaction);
       this.terrain.setVisible(true);
-      // Der Seegang folgt dem Wind nur traege: eine See baut sich auf und
-      // laeuft langsamer wieder ab. Sonst wuerde jede Boe die Wellen pumpen.
-      this.seaWind = 12;
-      this._groundMsg = 0;
-      this._battleOver = false;
 
       if (!list.length) {
          this.ui.showMessage("Die " + this.vessel.name + " ist kein Kriegsschiff — kein Gegner in Sicht.");
          return;
-      }
-      // Gegner in Luv aufstellen, gestaffelt, gut zwei Kilometer entfernt
-      const windDir = this.wind.baseDir;
-      const up = dirVec(windDir);       // Richtung, aus der es weht
+       }
+
+         // Jedes Gefecht ist anders: Windrichtung und -staerke variieren pro Kampf.
+      const windDir = Math.floor(Math.random() * 360);
+      const windSpeed = 10 + Math.floor(Math.random() * 15); // 10..24 kts
+      this.wind.baseDir = windDir;
+      this.wind.baseSpeed = windSpeed;
+      this.wind.dir = windDir;
+      this.wind.speed = windSpeed;
+      this.seaWind = windSpeed;
+      this.ocean.windKts = windSpeed;
+      this._groundMsg = 0;
+      this._battleOver = false;
+
+           // Gegner auf einem zufaelligen Bogen um den Spieler: mal in Luv, mal
+           // querab, mal im Backwind — die Lage haengt vom (zufaelligen) Wind ab.
+      const dist = 700 + Math.random() * 700;            // 700..1400 m
+      const arc = Math.random() * 360;                    // Bogen-Mitte als Kurs
+      const bow = dirVec(arc);
+      const across = dirVec(arc + 90);
       list.forEach((id, i) => {
-         const spread = (i - (list.length - 1) / 2) * 420;
-         const across = dirVec(windDir + 90);
-         const x = this.player.pos.x + up.x * 900 + across.x * spread;
-         const z = this.player.pos.z + up.z * 900 + across.z * spread;
+         const spread = (i - (list.length - 1) / 2) * (380 + Math.random() * 120);
+         const x = this.player.pos.x + bow.x * dist + across.x * spread;
+         const z = this.player.pos.z + bow.z * dist + across.z * spread;
          const heading = normDeg(Math.atan2(this.player.pos.x - x, this.player.pos.z - z) * 180 / Math.PI);
          this.fleet.spawn(id, {
             x, z, heading, speed: 4,
             doctrine: "rig",
             skill: 0.80 + Math.random() * 0.25,
             engage: 170 + Math.random() * 120,
-         });
-      });
+          });
+       });
       const names = this.fleet.ships.map((s) => s.name).join(" und ");
       this.ui.showMessage("Segel in Sicht: " + names + " — klar Schiff zum Gefecht!");
    }
