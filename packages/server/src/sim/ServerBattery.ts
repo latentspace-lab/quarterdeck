@@ -182,7 +182,8 @@ export class ServerBattery {
    private discharge(p: SalvoShot, ownMatrix: Matrix4): Projectile[] {
       const local = this.muzzles[p.side][p.idx];
       const world = this._v.set(local.x, local.y, local.z).applyMatrix4(ownMatrix);
-      const out = this._out.set(p.side === "STBD" ? 1 : -1, 0, 0).transformDirection(ownMatrix).normalize();
+      // Starboard is -x in the ship frame (bow +z, up +y).
+      const out = this._out.set(p.side === "STBD" ? -1 : 1, 0, 0).transformDirection(ownMatrix).normalize();
       const origin = { x: world.x + out.x * 1.6, y: world.y + out.y * 1.6, z: world.z + out.z * 1.6 };
       const shots = dischargeShots(
          { origin, flat: { x: out.x, y: 0, z: out.z }, ammo: p.ammo, aimElev: p.aimElev, aimTrain: p.aimTrain, lb: this.ballWeight },

@@ -342,7 +342,7 @@ export class Battery {
       heeler.localToWorld(world);
 
       // Auswaerts-Richtung (Bordwandnormale) in Weltkoordinaten
-      const outLocal = this._w.set(p.side === "STBD" ? 1 : -1, 0, 0);
+      const outLocal = this._w.set(p.side === "STBD" ? -1 : 1, 0, 0); // starboard is -x
       const out = outLocal.clone().transformDirection(heeler.matrixWorld).normalize();
 
       this._muzzleFx(world, out);

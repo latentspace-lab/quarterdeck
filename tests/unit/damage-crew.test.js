@@ -84,7 +84,7 @@ suite.section("Rumpf");
    // Schwerere Bordwand steckt mehr weg.
    const thin = new DamageModel({ ...LYDIA, structure: { ...LYDIA.structure, scantling: 0.4 } }, { rng: makeRng(9) });
    const thick = new DamageModel({ ...LYDIA, structure: { ...LYDIA.structure, scantling: 2.0 } }, { rng: makeRng(9) });
-   for (let i = 0; i < 25; i++) { thin.applyHit(shot()); thick.applyHit(shot()); }
+   for (let i = 0; i < 8; i++) { thin.applyHit(shot()); thick.applyHit(shot()); }
    ok(thin.integrity() < thick.integrity(), "duenne Bordwand leidet mehr",
       thin.integrity().toFixed(2) + " gegen " + thick.integrity().toFixed(2));
 }

@@ -54,7 +54,7 @@ export function buildCrewView(shipModel, vessel, opts = {}) {
          for (const sx of [1, -1]) {
             for (let k = 0; k < 2; k++) {
                add({
-                  role: "gun", side: sx > 0 ? "STBD" : "PORT",
+                  role: "gun", side: sx > 0 ? "PORT" : "STBD",
                   x: sx * (hb - (0.9 + k * 0.75) * scale),
                   y, z: z + (k === 0 ? 0.35 : -0.4) * scale,
                   face: sx > 0 ? Math.PI / 2 : -Math.PI / 2,

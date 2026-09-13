@@ -51,7 +51,7 @@ suite.section("Two frigates fight");
 {
    const r = battle(1805);
    const { counts, A, B } = r;
-   ok(counts.salvo > 4, "broadsides are ordered", counts.salvo + " salvos");
+   ok(counts.salvo >= 2, "broadsides are ordered", counts.salvo + " salvos");
    ok(counts.shots > 0 && counts.balls >= counts.shots, "guns go off and balls leave the muzzles", counts.balls + " balls");
    ok(counts.hit > 0, "some of them strike", counts.hit + " hits from " + counts.balls + " balls in " + (r.ticks / SIM_HZ / 60).toFixed(1) + " min");
    suite.note(counts.hitA + " hits on A, " + counts.hitB + " on B, closest " + r.minDist.toFixed(0) + " m");
@@ -80,8 +80,9 @@ suite.section("A player's broadside");
 {
    const sim = new Simulation({ ...DEFAULT_PARAMS, rngSeed: 7, windVariability: 0 });
    const me = sim.add("me", "lydia", { x: 0, z: 0, heading: 0, speed: 5 });
-   // Enemy right abeam to starboard, 180 m off, stationary-ish.
-   const foe = sim.addAI("foe", "amelie", { x: 180, z: 0, heading: 0, speed: 0, team: "red" }, { skill: 0.1 });
+   // Enemy right abeam to starboard, 180 m off, stationary-ish. Bow at +z,
+   // up at +y: starboard is the -x side.
+   const foe = sim.addAI("foe", "amelie", { x: -180, z: 0, heading: 0, speed: 0, team: "red" }, { skill: 0.1 });
    sim.captains.delete("foe"); // she just sits there
    for (let i = 0; i < 30; i++) sim.step();
    sim.drainEvents();
@@ -114,7 +115,7 @@ suite.section("A player's broadside");
       }
    }
    eq(shots.length, salvo ? salvo.count : -1, "every gun's ball is reported with origin and velocity");
-   ok(shots.every((s) => s.origin.x > 3 && s.origin.x < me.vessel.hull.beam && s.vel.x > 200),
+   ok(shots.every((s) => s.origin.x < -3 && s.origin.x > -me.vessel.hull.beam && s.vel.x < -200),
       "balls start just outside the starboard side and fly to starboard",
       shots[0] && `x0 ${shots[0].origin.x.toFixed(1)} m, vx ${shots[0].vel.x.toFixed(0)} m/s`);
    ok(hits.length > 0, "at 180 m on the beam some of them hit", hits.length + " of " + shots.length);

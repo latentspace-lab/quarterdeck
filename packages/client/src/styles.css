@@ -76,6 +76,28 @@ small, .small { font-size: 11px; opacity: 0.85; }
    background: rgba(8,18,30,0.45); border-radius: 8px; padding: 8px 10px; font-size: 11px; }
 .keys b { color: #6fe1ff; }
 
+/* Captain's orders: the one HUD panel that takes the mouse */
+.panel.cmd { right: 12px; bottom: 16px; width: 262px; pointer-events: auto; padding: 8px 10px; }
+.cmd-title { font-size: 11px; letter-spacing: 2px; color: #6fe1ff; font-weight: 700; margin-bottom: 2px; }
+.cmd-label { font-size: 9px; letter-spacing: 1.5px; text-transform: uppercase;
+   color: rgba(150,200,235,0.65); margin: 6px 0 3px; }
+.cmd-row { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+button.cmd {
+   flex: 1 1 auto; display: inline-flex; justify-content: space-between; align-items: center; gap: 6px;
+   font: inherit; font-size: 11px; color: #dfe9f2; background: rgba(255,255,255,0.08);
+   border: 1px solid rgba(120,180,220,0.25); border-radius: 7px; padding: 4px 7px;
+   cursor: pointer; user-select: none; -webkit-user-select: none; touch-action: none;
+}
+button.cmd.small { flex: 0 1 auto; }
+button.cmd:hover:not(:disabled) { background: rgba(111,225,255,0.18); }
+button.cmd:active:not(:disabled), button.cmd.held { background: rgba(111,225,255,0.32); }
+button.cmd:disabled { opacity: 0.4; cursor: default; }
+button.cmd.ready { border-color: rgba(255,176,61,0.6); color: #ffcf5d; }
+button.cmd.on { background: rgba(255,176,61,0.24); color: #ffcf5d; border-color: rgba(255,176,61,0.5); }
+.cmd kbd { font: inherit; font-size: 9px; opacity: 0.55; border: 1px solid rgba(255,255,255,0.25);
+   border-radius: 4px; padding: 0 4px; }
+.cmd-state { font-size: 10px; opacity: 0.7; margin-left: auto; }
+
 .msgwrap {
    position: absolute; top: 22%; left: 50%;
    transform: translateX(-50%);
@@ -277,7 +299,7 @@ small, .small { font-size: 11px; opacity: 0.85; }
    display: flex; align-items: center; gap: 7px; margin: 4px 0;
    font-size: 10px;
 }
-.gun-side { width: 46px; font-weight: 700; color: #cfe2f2; }
+.gun-side { width: 58px; font-weight: 700; color: #cfe2f2; }
 .gun-track {
    position: relative; flex: 1; height: 7px;
    background: rgba(255,255,255,0.12); border-radius: 4px; overflow: hidden;

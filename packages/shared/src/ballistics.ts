@@ -421,7 +421,8 @@ export function checkProjectileHits(
 
       _hitLocal.lerpVectors(_p0, _p1, t);
       const sPos = clamp((tg.LOA / 2 - _hitLocal.z) / tg.LOA, 0, 1);
-      const side: Side = _hitLocal.x >= 0 ? "STBD" : "PORT";
+      // Bow at +z, up at +y: the -x side is starboard.
+      const side: Side = _hitLocal.x < 0 ? "STBD" : "PORT";
       const dx = shot.pos.x - shot.origin.x;
       const dy = shot.pos.y - shot.origin.y;
       const dz = shot.pos.z - shot.origin.z;
@@ -464,7 +465,7 @@ export function rangeToTarget(
    for (const tg of targets) {
       if (!tg || (skipId != null && tg.id === skipId)) continue;
       _p0.setFromMatrixPosition(tg.matrixWorld).applyMatrix4(_inv);
-      const onSide = side === "STBD" ? _p0.x > 0 : _p0.x < 0;
+      const onSide = side === "STBD" ? _p0.x < 0 : _p0.x > 0;
       if (!onSide) continue;
       const d = Math.hypot(_p0.x, _p0.z);
       // nur was halbwegs querab steht, laesst sich mit der Breitseite fassen

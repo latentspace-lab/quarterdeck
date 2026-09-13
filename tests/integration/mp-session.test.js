@@ -178,8 +178,9 @@ async function run() {
       const sB = room.sim.ships.get(B.shipId);
       const sC = room.sim.ships.get(session.shipId);
       sB.dyn.pos.x = 0; sB.dyn.pos.z = 0; sB.dyn.heading = 0; sB.dyn.speed = 2;
-      sC.dyn.pos.x = 60; sC.dyn.pos.z = 0; sC.dyn.heading = 0; sC.dyn.speed = 2;
-      sim.boat.pos.x = 60; sim.boat.pos.z = 0; sim.boat.heading = 0;
+      // C to starboard of B: the -x side (bow +z, up +y).
+      sC.dyn.pos.x = -60; sC.dyn.pos.z = 0; sC.dyn.heading = 0; sC.dyn.speed = 2;
+      sim.boat.pos.x = -60; sim.boat.pos.z = 0; sim.boat.heading = 0;
       const remoteB = session.remotes.get(B.shipId);
       const gunCtx = { windDir: 30, windSpeed: 14, seaHeight: () => 0 };
       const stepSession = async (n, rudder = 0) => {
@@ -212,7 +213,8 @@ async function run() {
       ok(D.hull.PORT_BOW < 1 || D.hull.PORT_MID < 1 || D.hull.PORT_QUARTER < 1,
          "C's local damage plan shows the port side hurt (applyDamageState)",
          [D.hull.PORT_BOW, D.hull.PORT_MID, D.hull.PORT_QUARTER].map((v) => v.toFixed(2)).join("/"));
-      near(D.hull.STBD_MID, 1, 1e-6, "and the starboard side untouched");
+      // Not exactly 1: a hit can start a fire, and fire chars every section a little.
+      ok(D.hull.STBD_MID > 0.99, "and the starboard side untouched by shot", D.hull.STBD_MID.toFixed(4));
 
       suite.section("C fires back and the HUD follows the server");
       session.fire("PORT");

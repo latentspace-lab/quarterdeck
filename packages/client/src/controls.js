@@ -1,5 +1,15 @@
 // controls.js - Eingabe (Tastatur + Maus)
 // Gibt jedes Frame ein Input-Objekt und liefert Edge-Ereignisse ueber eine Queue.
+
+/** True when the key event comes from an element the user is typing into. */
+export function isTyping(e) {
+   const t = e && e.target;
+   if (!t) return false;
+   if (t.isContentEditable) return true;
+   const tag = typeof t.tagName === "string" ? t.tagName.toUpperCase() : "";
+   return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT";
+}
+
 export class Controls {
    constructor(dom) {
       this.dom = dom || document;
@@ -14,6 +24,10 @@ export class Controls {
 
     bind() {
       this._onKey = (e) => {
+         // Typing in a text field (server URL, player or room name in the
+         // menu) must not steer the ship: every "h" would hide the HUD,
+         // every "q" fire a broadside.
+         if (isTyping(e)) return;
          if (this.keys[e.code]) return; // kein Auto-Repeat
          this.keys[e.code] = true;
          this._handle(e, true);
