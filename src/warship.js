@@ -397,6 +397,56 @@ function updateTriSail(mesh, o) {
 // =========================================================================
 // Flaggen (White Ensign + Kommandowimpel) als Canvas-Textur
 // =========================================================================
+// Spanische Marineflagge (ab 1785): rot-gelb-rot, der gelbe Streifen doppelt
+// so hoch, mit vereinfachtem Wappen zur Stange hin.
+function spainTexture() {
+   if (typeof document === "undefined") return null;
+   const c = document.createElement("canvas");
+   c.width = 128; c.height = 64;
+   const g = c.getContext("2d");
+   g.fillStyle = "#c60b1e"; g.fillRect(0, 0, 128, 64);
+   g.fillStyle = "#ffc400"; g.fillRect(0, 16, 128, 32);
+   // Wappenschild
+   g.fillStyle = "#c60b1e"; g.fillRect(26, 22, 9, 20);
+   g.fillStyle = "#f4f4f2"; g.fillRect(35, 22, 9, 20);
+   g.fillStyle = "#c60b1e"; g.fillRect(35, 22, 9, 7);
+   g.fillStyle = "#ffc400"; g.fillRect(28, 18, 14, 4);   // Krone
+   const t = new THREE.CanvasTexture(c); t.needsUpdate = true; return t;
+}
+
+// Totenkopfflagge. Schwarzes Tuch, weisser Schaedel ueber gekreuzten Knochen -
+// das Zeichen, unter dem kein Pardon gegeben und keiner erwartet wurde.
+function jollyTexture() {
+   if (typeof document === "undefined") return null;
+   const c = document.createElement("canvas");
+   c.width = 128; c.height = 64;
+   const g = c.getContext("2d");
+   g.fillStyle = "#0d0d0e"; g.fillRect(0, 0, 128, 64);
+   g.fillStyle = "#eeeeea";
+   // gekreuzte Knochen
+   g.save();
+   g.translate(64, 36);
+   for (const a of [0.72, -0.72]) {
+      g.save(); g.rotate(a);
+      g.fillRect(-26, -2.6, 52, 5.2);
+      for (const x of [-26, 26]) {
+         g.beginPath(); g.arc(x, -3.4, 3.6, 0, Math.PI * 2); g.fill();
+         g.beginPath(); g.arc(x, 3.4, 3.6, 0, Math.PI * 2); g.fill();
+      }
+      g.restore();
+   }
+   g.restore();
+   // Schaedel
+   g.beginPath(); g.arc(64, 26, 13, 0, Math.PI * 2); g.fill();
+   g.fillRect(57, 34, 14, 8);
+   g.fillStyle = "#0d0d0e";
+   g.beginPath(); g.ellipse(59, 25, 4, 4.6, 0, 0, Math.PI * 2); g.fill();
+   g.beginPath(); g.ellipse(69, 25, 4, 4.6, 0, 0, Math.PI * 2); g.fill();
+   g.beginPath(); g.moveTo(64, 30); g.lineTo(61.5, 34); g.lineTo(66.5, 34); g.closePath(); g.fill();
+   g.fillRect(60, 37, 1.6, 5); g.fillRect(63.2, 37, 1.6, 5); g.fillRect(66.4, 37, 1.6, 5);
+   const t = new THREE.CanvasTexture(c); t.needsUpdate = true; return t;
+}
+
 // Tricolore (franzoesische Marineflagge ab 1794)
 function tricolorTexture() {
    if (typeof document === "undefined") return null;
@@ -783,7 +833,15 @@ export function buildWarship(vessel) {
    heeler.add(spanker);
 
    // ---- Flaggen ----
-   const ensTex = vessel.nation === "FR" ? tricolorTexture() : ensignTexture();
+   // Flagge nach Partei
+   const flagKind = vessel.flag
+      || (vessel.faction === "fr" ? "tricolor"
+        : vessel.faction === "es" ? "spain"
+        : vessel.faction === "pirate" ? "jolly" : "white");
+   const ensTex = flagKind === "tricolor" ? tricolorTexture()
+      : flagKind === "spain" ? spainTexture()
+      : flagKind === "jolly" ? jollyTexture()
+      : ensignTexture();
    const ensignPivot = new THREE.Group();
    ensignPivot.position.set(0, mz.deckY + mz.H * 0.40, mz.z - gaffLen * 0.9);
    const ensign = makeFlag(LOA * 0.09, LOA * 0.055, ensTex);
@@ -842,7 +900,7 @@ export function buildWarship(vessel) {
       rudder: rudderPivot, rudderPivot,
       sails: squareSails.filter((s) => s.mesh).map((s) => s.mesh).concat([jib, staysail, spanker]),
       vesselId: vessel.id,
-      nation: vessel.nation || "GB",
+      faction: vessel.faction || "gb",
       kind: "warship",
       lostMasts,
       // Decksgeometrie - damit die Mannschaft auf dem Deck steht und nicht darin

@@ -2,9 +2,10 @@
 import * as THREE from "three";
 import { createOcean, seaHeight, ampForWind, waveHeightForWind, seaStateName } from "./ocean.js";
 import { createScene } from "./scene.js";
-import { getVessel, VESSELS, vesselLabel } from "./vessels.js";
+import { getVessel, VESSELS, vesselLabel, shipsOfFaction } from "./vessels.js";
+import { getFaction, enemyFactionFor } from "./factions.js";
 import { Ship } from "./ship.js";
-import { Fleet, SCENARIOS, scenarioFor } from "./fleet.js";
+import { Fleet, SCENARIOS, scenarioFor, forcesFor } from "./fleet.js";
 import { DebrisField } from "./debris.js";
 import { createTerrain } from "./terrain.js";
 import * as collide from "./collide.js";
@@ -108,7 +109,9 @@ export class Simulator {
       this.vessel = null;
       this.vesselId = null;
       this.scenarioId = "single";
-      this.setVessel("yacht");
+      this.factionId = "gb";
+      this.faction = getFaction("gb");
+      this.setVessel("lydia");
 
       // Regatta-Kurs
       this.course = new Course(scene.scene, { x: 0, z: 0 });
@@ -149,6 +152,21 @@ export class Simulator {
    get yacht() { return this.player ? this.player.model : null; }
    get battery() { return this.player ? this.player.battery : null; }
 
+   // Partei wechseln: Schiffsliste, Anstrich, Flagge und Gegner haengen daran
+   setFaction(id, vesselId) {
+      const f = getFaction(id);
+      if (f.id === this.factionId && !vesselId) return f;
+      this.factionId = f.id;
+      this.faction = f;
+      const list = shipsOfFaction(f.id);
+      let want = vesselId || this.vesselId;
+      if (want !== "yacht" && !list.some((v) => v.id === want)) {
+         want = list.length ? list[0].id : "yacht";
+      }
+      this.setVessel(want, true);
+      return f;
+   }
+
    setVessel(id, force = false) {
       const v = getVessel(id);
       if (!force && this.vesselId === v.id && this.player) return this.vessel;
@@ -159,6 +177,7 @@ export class Simulator {
       this.player = new Ship({
          id: "player",
          vessel: v,
+         faction: this.faction,
          scene: this.scene,
          debris: this.debris,
          targets: this._targets,
@@ -204,6 +223,9 @@ export class Simulator {
       this.ui.openMenu({
          mode: this.mode,
          vesselId: this.vesselId,
+         factionId: this.factionId,
+         forcesFor,
+         onFactionChange: (fid, vid) => this.setFaction(fid, vid),
          windDir: this.wind.baseDir,
          windSpeed: this.wind.baseSpeed,
          gusts: this.gusts,
@@ -220,8 +242,9 @@ export class Simulator {
          scenarios: SCENARIOS,
          onScenarioChange: (id) => { this.scenarioId = id; },
          onVesselChange: (id) => this.setVessel(id),
-         onStart: (mode, dir, speed, gusts, vesselId, scenarioId) => {
+         onStart: (mode, dir, speed, gusts, vesselId, scenarioId, factionId) => {
             if (scenarioId) this.scenarioId = scenarioId;
+            if (factionId && factionId !== this.factionId) this.setFaction(factionId, vesselId);
             this.startMode(mode, dir, speed, gusts, vesselId);
          },
          onHelp: () => this._showHelp(),
@@ -632,8 +655,9 @@ export class Simulator {
                break;
             }
             case "cycleVessel": {
-               const i = VESSELS.findIndex((v) => v.id === this.vesselId);
-               const nxt = VESSELS[(i + 1) % VESSELS.length];
+               const roster = shipsOfFaction(this.factionId).concat([getVessel("yacht")]);
+               const i = roster.findIndex((v) => v.id === this.vesselId);
+               const nxt = roster[(i + 1) % roster.length];
                this.setVessel(nxt.id);
                if (this.mode === "Training") {
                   this.trainer.setIndex(0);
@@ -667,7 +691,7 @@ export class Simulator {
       const ok = this.battery.fire(side, {
          windDir: this.wind.dir,
          windSpeed: this.wind.speed,
-         gunnery: 1.0,
+         gunnery: this.faction.gunnery,
       });
       if (ok) {
          this.ui.showMessage((side === "PORT" ? "Backbord" : "Steuerbord")
@@ -682,8 +706,8 @@ export class Simulator {
    _startBattle() {
       this.fleet.clear();
       this.debris.clear();
-      const sc = scenarioFor(this.scenarioId);
-      const list = sc.forces[this.vesselId] || [];
+      const foeFaction = enemyFactionFor(this.factionId);
+      const list = forcesFor(this.scenarioId, this.vessel, foeFaction);
       this.terrain.setVisible(true);
       // Der Seegang folgt dem Wind nur traege: eine See baut sich auf und
       // laeuft langsamer wieder ab. Sonst wuerde jede Boe die Wellen pumpen.
@@ -704,15 +728,17 @@ export class Simulator {
          const x = this.player.pos.x + up.x * 900 + across.x * spread;
          const z = this.player.pos.z + up.z * 900 + across.z * spread;
          const heading = normDeg(Math.atan2(this.player.pos.x - x, this.player.pos.z - z) * 180 / Math.PI);
-         this.fleet.spawn(id, {
+         this.fleet.spawn(id.id, {
             x, z, heading, speed: 4,
-            doctrine: "rig",
-            skill: 0.80 + Math.random() * 0.25,
+            faction: foeFaction,
+            skill: foeFaction.gunnery * (0.88 + Math.random() * 0.24),
             engage: 170 + Math.random() * 120,
          });
       });
       const names = this.fleet.ships.map((s) => s.name).join(" und ");
-      this.ui.showMessage("Segel in Sicht: " + names + " — klar Schiff zum Gefecht!");
+      this.ui.showMessage(foeFaction.short === "☠"
+         ? "Totenkopf in Sicht: " + names + " — klar Schiff zum Gefecht!"
+         : "Segel in Sicht: " + names + " (" + foeFaction.country + ") — klar Schiff zum Gefecht!");
    }
 
    _updateBattle(dt) {
@@ -912,6 +938,7 @@ export class Simulator {
          pos: pointOfSail(b.twa, b.luffing, this.vessel.rig, this.vessel.sail.noGo),
          noGo: this.vessel.sail.noGo,
          vessel: this.vessel,
+         faction: this.faction,
          guns: this.battery.status(),
          sailSet: b.sailSet,
          damage: this.player.dmg.status(),
