@@ -237,50 +237,49 @@ export class Simulator {
            <h2>Hilfe & Steuerung</h2>
            <h3>Grundregeln der Segelphysik</h3>
            <p>Der <b>Segelkurs (TWA)</b> ist der Winkel zwischen Bootskurs und Wind.
-           Gegen den Wind (Upwind) segelt man nie in 0°, sondern in <i>Krausen</i> (~45°) und wendet (Halse).
-           Der schnellste Windkurs ist der <i>Raumschot</i> (Beam, ~90°).
-           Downwind (Raumschot/Raum) segelt man tiefer (~135°) als direkt vor dem Wind (180°).</p>
-           <h3>Rahsegler der Royal Navy</h3>
-           <p>Ein Rahsegler (Sloop, Fregatte, Linienschiff) kommt nur etwa
-           <b>sechs Strich</b> — rund 65° — an den Wind heran; darunter liegen die
-           Segel back und das Schiff verliert Fahrt. Die <b>Rahen werden gebrasst</b>:
-           je spitzer der Wind, desto schräger stehen sie, bis bei 45° die Takelage
-           nicht mehr mitgeht. Am schnellsten laeuft so ein Schiff mit dem Wind
-           schräg von achtern (Backstagsbrise, ~135°). Masse bedeutet Trägheit:
-           anluven, abfallen und wenden dauern lange — vorausdenken.</p>
-           <h3>Geschütze</h3>
-           <p>Die Batterie feuert seitwaerts. <b>Q</b> gibt die Backbord-Breitseite,
-           <b>E</b> die Steuerbord-Breitseite, <b>F</b> beide. Die Bedienungen lösen
-           versetzt aus, das Schiff bekommt einen Rückstoß-Krängungsstoß, und der
-           Pulverrauch treibt mit dem Wind ab — zu Lee steht man schnell im eigenen
-           Qualm. Nachladen dauert je nach Schiff 9 bis 13 Sekunden.</p>
-           <h3>Gefecht, Schäden und Wrack</h3>
-           <p>Im Modus <b>Gefecht</b> steht ein französischer Gegner in Luv.
-           <b>Z</b> wechselt die Ladung: <i>Vollkugel</i> in den Rumpf (Lecks, Rohre,
-           am Ende sinkt er), <i>Kettenkugel</i> in die Takelage (Masten und Segel —
-           die französische Art, einen Gegner manövrierunfähig zu machen),
-           <i>Kartätsche</i> nur auf Pistolenschussweite.</p>
-           <p>Ein gefallener Mast nimmt seine Segelfläche mit und hängt im
-           stehenden Gut <b>längsseit</b> — das Schiff wird langsam und zieht zur
-           Wrackseite. <b>X</b> kappt die Wanten und macht sie wieder frei.
-           Lecks unter Wasser lassen sich von den Pumpen nur begrenzt halten;
-           zu viele, und sie sinkt. Zu viel Tuch im Sturm kostet die Stengen,
-           und auf einem Riff bricht der Kiel auf.</p>
-           <h3>Steuerung</h3>
+           Sailing against the wind (upwind), you never point at 0° — you sail in <i>luffing</i> (~45°) and tack.
+           The fastest point of sail is <i>beam reach</i> (~90°).
+           Downwind you sail deeper (~135°) than directly before the wind (180°).</p>
+           <h3>Royal Navy Square-Rigged Ships</h3>
+           <p>A square-rigged ship (Sloop, Frigate, Ship of the Line) can only point about
+           <b>six points</b> — roughly 65° — into the wind; darunter liegen die
+           Segel back und das Schiff verliert Fahrt. The <b>yards are braced</b>:
+           the sharper the wind angle, the more oblique the yards — until at 45° the rigging
+           cannot follow. The fastest running point is with the wind
+           well aft (backstays' breeze, ~135°). Mass means inertia:
+           luffing, bearing away, and tacking take a long time — think ahead.</p>
+           <h3>Gunnery</h3>
+           <p>The battery fires to the sides. <b>Q</b> fires the port broadside,
+           <b>E</b> the starboard, <b>F</b> both. The crews fire in sequence, the ship gets a recoil-heel impulse, and the
+           powder smoke drifts with the wind — standing to leeward you are quickly in
+           your own smoke. Reloading takes 9 to 13 seconds depending on the ship.</p>
+           <h3>Battle, Damage and Wreck</h3>
+           <p>In <b>Battle</b> mode a French enemy stands to windward.
+           <b>Z</b> changes the load: <i>Round shot</i> into the hull (leaks, guns,
+           eventually sinks), <i>Chain shot</i> into the rigging (masts and sails —
+           the French way to cripple a ship and escape),
+           <i>Grape shot</i> only at pistol-shot range.</p>
+           <p>A fallen mast takes its sail area with it and hangs in the
+           standing rigging <b>alongside</b> — the ship slows and lists toward the
+           wreck side. <b>X</b> cuts the shrouds and clears the wreck.
+           Below-water leaks can only be kept in check by the pumps;
+           too many, and she sinks. Too much sail in a storm carries away the topmasts,
+           and on a reef the keel breaks open.</p>
+           <h3>Controls</h3>
            <ul style="margin:6px 0 0 18px">
-             <li><b>A / D</b> oder <b>← / →</b> : Ruder (Backbord / Steuerbord)</li>
-             <li><b>W / S</b> : Segel trimmen (ein / aus) — bei manueller Trimmung</li>
-             <li><b>C</b> / <b>1–4</b> : Kamera (Verfolger, Cockpit, Draufsicht, Orbit)</li>
-             <li><b>M</b> / <b>Esc</b> : Menü · <b>R</b> : Kurs/Training neu · <b>G</b> : Gusts</li>
-             <li><b>Q / E / F</b> : Breitseite Backbord / Steuerbord / beide</li>
-             <li><b>Z</b> : Ladung wechseln &nbsp;·&nbsp; <b>X</b> : Wrack kappen</li>
-             <li><b>V</b> : Schiff wechseln &nbsp;·&nbsp; <b>W / S</b> : bei Rahseglern Segel setzen / reffen</li>
-             <li><b>Leertaste</b> : Boot nach Kenter aufrichten</li>
-             <li><b>Mausrad</b> : Zoom · <b>Ziehen</b> : Ansicht drehen</li>
+             <li><b>A / D</b> or <b>← / →</b> : Rudder (Port / Starboard)</li>
+             <li><b>W / S</b> : Trim sails (in / out) — for manual trimming</li>
+             <li><b>C</b> / <b>1–4</b> : Camera (Follow, Cockpit, Top-Down, Orbit)</li>
+             <li><b>M</b> / <b>Esc</b> : Menu · <b>R</b> : Restart course/training · <b>G</b> : Gusts</li>
+             <li><b>Q / E / F</b> : Port / Starboard / Both broadsides</li>
+             <li><b>Z</b> : Change load &nbsp;·&nbsp; <b>X</b> : Cut away wreck</li>
+             <li><b>V</b> : Change ship &nbsp;·&nbsp; <b>W / S</b> : set / reef sails on square-riggers</li>
+             <li><b>Space</b> : Right the boat after capsize</li>
+             <li><b>Mouse wheel</b> : Zoom · <b>Drag</b> : Rotate view</li>
            </ul>
            <p style="margin-top:12px"><b class="prim">Tipp:</b> Halte dich an den Kompass.
-           Der rote Pfeil = Boot, der blaue = Wind (woher), der türkise = scheinbarer Wind.</p>
-           <button class="help-close" style="margin-top:14px;padding:10px 22px;border-radius:10px;border:0;background:#3da3ff;color:#061019;font-weight:700;cursor:pointer">Verstanden</button>
+           The red arrow = ship, the blue = wind (from where), the turquoise = apparent wind.</p>
+           <button class="help-close" style="margin-top:14px;padding:10px 22px;border-radius:10px;border:0;background:#3da3ff;color:#061019;font-weight:700;cursor:pointer">Got it</button>
          </div>`;
       document.body.appendChild(help);
       help.style.display = "flex";
@@ -312,7 +311,7 @@ export class Simulator {
          this.terrain.setVisible(false);
       }
       this.ui.showMessage(
-         vesselLabel(this.vessel) + " klar zum Auslaufen — " + this.vessel.rate);
+         vesselLabel(this.vessel) + " ready to get under way — " + this.vessel.rate);
       if (mode === "Regatta") {
          this.course.reset();
          this.ui.setTraining(null);
@@ -356,7 +355,7 @@ export class Simulator {
          ? V.sail.noGo + 8
          : mode === "Gefecht" ? 100
          : (V.rig === "square" ? 110 : 90);
-      // twa = windDir - heading  ->  heading = windDir - twa (Wind von Steuerbord)
+      // twa = windDir - heading  ->  heading = windDir - twa (Wind von Starboard)
       this.boat.heading = normDeg(this.wind.baseDir - startTwa);
       this.boat.heel = 0;
       this.boat.pos.x = 0;
@@ -497,7 +496,7 @@ export class Simulator {
                this._groundMsg = 6;
                this.ui.showMessage(g.hard
                   ? "AUFGELAUFEN! Der Kiel sitzt fest — Wasser kommt ein."
-                  : "Grundberührung! Sofort abfallen, hier ist es zu flach.");
+                  : "Ground contact! Bear away immediately, the water is too shallow.");
             }
          }
          this.terrain.update(this.t);
@@ -657,7 +656,7 @@ export class Simulator {
    // Breitseite: nur bewaffnete Schiffe, nicht gekentert, nicht im Menue
    _fire(side) {
       if (!this.vessel.guns) {
-         this.ui.showMessage("Die " + this.vessel.name + " führt keine Geschütze.");
+         this.ui.showMessage("Die " + this.vessel.name + "  has no guns.");
          return false;
       }
       if (this.boat.isCapsized) return false;
@@ -665,7 +664,7 @@ export class Simulator {
       const n = this.battery.gunsReady(side);
       if (n <= 0) {
          this.ui.showMessage(
-            (side === "PORT" ? "Backbord" : "Steuerbord") + "-Batterie ist ausgeschlagen!");
+            (side === "PORT" ? "Port" : "Starboard") + " battery is knocked out!");
          return false;
       }
       const ok = this.battery.fire(side, {
@@ -674,8 +673,8 @@ export class Simulator {
          gunnery: 1.0,
       });
       if (ok) {
-         this.ui.showMessage((side === "PORT" ? "Backbord" : "Steuerbord")
-            + "-Breitseite — " + n + " Rohre " + this.battery.ammoSpec().short + "!");
+         this.ui.showMessage((side === "PORT" ? "Port" : "Starboard")
+            + "- broadside — " + n + "  guns " + this.battery.ammoSpec().short + "!");
       }
       return ok;
    }
@@ -725,15 +724,15 @@ export class Simulator {
       let msg = "";
       if (this._battleOver) return "";   // Ergebnis wurde schon gemeldet
       if (this.player.dmg.sunk) {
-         msg = "Die " + this.vessel.name + " ist gesunken. R für ein neues Gefecht.";
+         msg = "Die " + this.vessel.name + " has sunk. R for a new battle.";
          this._battleOver = true;
       } else if (this.player.dmg.beaten() && this.player.dmg.mastsStanding() <= 1) {
-         msg = "Schwer angeschlagen — R setzt das Gefecht zurück.";
+         msg = "Badly damaged — R resets the battle.";
          this._battleOver = true;
       } else if (enemies.length && fighting.length === 0) {
          const struck = enemies.filter((s) => s.dmg.struck).length;
          const sunk = enemies.filter((s) => s.dmg.sunk).length;
-         msg = "Gefecht gewonnen! " + (struck ? struck + " gestrichen" : "")
+         msg = "Gefecht wins! " + (struck ? struck + " gestrichen" : "")
             + (struck && sunk ? ", " : "") + (sunk ? sunk + " gesunken" : "") + ".";
          this._battleOver = true;
       }
@@ -744,22 +743,22 @@ export class Simulator {
       const who = ev.ship === this.player ? "Wir" : ev.ship.name;
       const isUs = ev.ship === this.player;
       const M = {
-         fore: "Fockmast", main: "Großmast", mizzen: "Kreuzmast",
+         fore: "Foremast", main: "Mainmast", mizzen: "Mizzenmast",
       };
       switch (ev.type) {
          case "mastLost": {
             const cause = ev.cause === "overpress" ? " — zu viel Tuch im Sturm!"
-               : ev.cause === "ram" ? " — beim Zusammenstoß" : "";
+               : ev.cause === "ram" ? " — in the collision" : "";
             this.ui.showMessage((isUs ? "Der " : ev.ship.name + ": ") + M[ev.mast]
-               + " geht über Bord" + cause + (isUs ? " — X kappt das Wrack." : ""));
+               + " goes overboard" + cause + (isUs ? " — X cuts the wreck." : ""));
             if (isUs) this.cam.shake(1.2);
             break;
          }
          case "casualties": {
             if (isUs && ev.n >= 4) {
-               const R = { gun: "an den Geschützen", top: "in der Takelage",
-                  marine: "unter den Seesoldaten", officer: "unter den Offizieren",
-                  carpenter: "bei den Zimmerleuten", powder: "unter den Pulverjungen" };
+               const R = { gun: "at the guns", top: "aloft",
+                  marine: "unter den Marines", officer: "unter den Offizieren",
+                  carpenter: "bei den Zimmerleuten", powder: "unter den Powder Boys" };
                this.ui.showMessage(ev.n + " Mann " + (R[ev.worst] || "an Deck")
                   + " gefallen oder verwundet!");
             }
@@ -767,13 +766,13 @@ export class Simulator {
          }
          case "sailBlown": {
             const L = { course: "Untersegel", topsail: "Marssegel", topgallant: "Bramsegel" };
-            const nm = { fore: "Fock", main: "Groß", mizzen: "Kreuz" }[ev.mast] || "";
+            const nm = { fore: "Fore", main: "Main", mizzen: "Mizzen" }[ev.mast] || "";
             this.ui.showMessage((isUs ? "Unser " : ev.ship.name + ": ")
                + nm + (L[ev.level] || "Segel").toLowerCase() + " ist aus den Lieken geflogen!");
             break;
          }
          case "mastWounded":
-            if (isUs) this.ui.showMessage(M[ev.mast] + " angeschlagen — Tuch wegnehmen!");
+            if (isUs) this.ui.showMessage(M[ev.mast] + " damaged — Tuch wegnehmen!");
             break;
          case "holed":
             if (isUs && Math.random() < 0.4) this.ui.showMessage("Leck unter Wasser — die Pumpen!");
@@ -791,7 +790,7 @@ export class Simulator {
             this.ui.showMessage(ev.ship.name + " fliegt in die Luft!");
             break;
          case "aground":
-            if (isUs) this.ui.showMessage("Grundberührung — der Kiel schrammt über den Fels!");
+            if (isUs) this.ui.showMessage("Ground contact — the keel scrapes on the rock!");
             break;
          case "cutAway":
             if (isUs) this.ui.showMessage("Wrack gekappt — das Schiff ist wieder frei.");
@@ -805,7 +804,7 @@ export class Simulator {
          const us = ev.a === this.player || ev.b === this.player;
          if (us) {
             this.cam.shake(1.6);
-            this.ui.showMessage("Zusammenstoß! " + ev.closing.toFixed(1) + " kn Annäherung.");
+            this.ui.showMessage("Collision! " + ev.closing.toFixed(1) + " kn closing.");
          }
       } else if (ev.type === "locked") {
          const us = ev.a === this.player || ev.b === this.player;
@@ -841,7 +840,7 @@ export class Simulator {
             done: false,
          });
          this._placeAtStart("Training");
-         this.ui.showMessage("Übung zurückgesetzt: " + c.title);
+         this.ui.showMessage("Übung reset: " + c.title);
       }
    }
 
@@ -864,7 +863,7 @@ export class Simulator {
       this.trainState = this.trainer.update(state, dt);
       const tr = this.trainState;
       if (tr.done && this.trainDoneTimer <= 0) {
-         this.ui.showMessage("✅ " + tr.title + " — geschafft! Nächste folgt…");
+         this.ui.showMessage("✅ " + tr.title + " — done! Next follows…");
          this.trainDoneTimer = 2.5;
          this.trainer.next();
          const nc = this.trainer.current;

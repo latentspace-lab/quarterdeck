@@ -1,4 +1,4 @@
-// ui.js - 2D-HUD + 2D-Kompass + Menue + Training-Panel
+// ui.js - 2D HUD + compass + menu + training panel
 import { normDeg } from "./utils.js";
 import { VESSELS, vesselLabel, broadsideWeight, gunCount } from "./vessels.js";
 
@@ -21,10 +21,10 @@ export class UI {
            <div class="panel tl">
               <div class="mode" id="hudMode">FREERIDE</div>
               <div class="ship-name" id="hudShip">Nordwind</div>
-              <div class="small" id="hudShipRate">Bermuda-Sloop</div>
-              <div class="small" id="hudLap">Runde 0</div>
-              <div class="small" id="hudTime">0.0s · Beste: --</div>
-              <div class="small" id="hudCourse">Kurs: Start</div>
+              <div class="small" id="hudShipRate">Bermuda Sloop</div>
+              <div class="small" id="hudLap">Lap 0</div>
+              <div class="small" id="hudTime">0.0s · Best: --</div>
+              <div class="small" id="hudCourse">Course: Start</div>
               <div class="small" id="hudProgress">0%</div>
            </div>
            <div class="panel tr windbox">
@@ -33,7 +33,7 @@ export class UI {
               <div class="wind-speed"><span id="windSpeed">0.0</span> kn · <span id="beaufort">Bft 0</span></div>
               <div class="awa">AwA <span id="awaFrom">--</span>° · <span id="awaSpeed">--</span> kn</div>
               <div class="small" id="seaState">See: --</div>
-              <div class="small" id="hudGust">Gusts: an</div>
+              <div class="small" id="hudGust">Gusts: on</div>
            </div>
            <div class="panel bl">
               <div class="readbig"><span id="hSpeed">0.0</span><span class="u">kn</span></div>
@@ -41,29 +41,29 @@ export class UI {
               <div class="small" id="twa">TWA -- · <span id="tack">Port</span></div>
            </div>
            <div class="panel bc">
-              <div class="pos" id="pos"><span class="dot"></span><span id="posText">Krausen</span></div>
+              <div class="pos" id="pos"><span class="dot"></span><span id="posText">Luffing</span></div>
               <div class="rudder">
                  <span class="rr" style="opacity:.8">BB ←</span>
                  <div class="rudder-track"><div class="rudder-ind" id="rudderInd"></div></div>
                  <span class="rr" style="opacity:.8">→ STB</span>
               </div>
-              <div class="camera" id="camera">KAMERA: Verfolger</div>
-              <div class="hint">Leertaste: Boot aufrichten nach Kenter · C: Kamera</div>
+              <div class="camera" id="camera">CAM: Follow</div>
+              <div class="hint">Space: Right the boat after capsize · C: Camera</div>
            </div>
            <div class="br small keys">
-              <div><b>Steuer:</b> A / D &nbsp;|&nbsp; ← / → &nbsp;Ruder</div>
-              <div><b>Segeltrimm:</b> W in · S aus &nbsp;|&nbsp; C / 1-4 Kamera · H HUD · T Top</div>
-              <div><b>Menü:</b> M / Esc &nbsp;·&nbsp; R Neustart (Kurs) &nbsp;·&nbsp; G Gusts</div>
+              <div><b>Helm:</b> A / D &nbsp;|&nbsp; ← / → &nbsp;Rudder</div>
+              <div><b>Sail trim:</b> W in · S out &nbsp;|&nbsp; C / 1-4 Camera · H HUD · T Top</div>
+              <div><b>Menu:</b> M / Esc &nbsp;·&nbsp; R Restart (Course) &nbsp;·&nbsp; G Gusts</div>
            </div>
            <div class="panel crew" id="crewPanel" style="display:none">
-              <div class="crew-title">BESATZUNG <span id="crewHead"></span></div>
+              <div class="crew-title">CREW <span id="crewHead"></span></div>
               <div id="crewList"></div>
               <div class="crew-foot"><span>Moral</span>
                  <div class="dmg-track"><div class="dmg-fill" id="crewMoral"></div></div>
                  <span class="dv" id="crewMoralV">100%</span></div>
            </div>
            <div class="panel dmg" id="dmgPanel" style="display:none">
-              <div class="dmg-title">SCHIFFSZUSTAND</div>
+              <div class="dmg-title">HULL CONDITION</div>
               <div class="dmg-body">
                  <svg class="plan" id="dPlan" viewBox="0 0 92 132" aria-hidden="true">
                     <polygon id="pl_PORT_BOW"      points="46,4 46,44 14,44 20,22"/>
@@ -86,16 +86,16 @@ export class UI {
                     <polygon id="pl_rudder" points="42,121 50,121 48,130 44,130"/>
                  </svg>
                  <div class="dmg-bars">
-                    <div class="dmg-row"><span class="dl">Rumpf</span>
+                    <div class="dmg-row"><span class="dl">Hull</span>
                        <div class="dmg-track"><div class="dmg-fill" id="dHull"></div></div>
                        <span class="dv" id="dHullV">100%</span></div>
-                    <div class="dmg-row"><span class="dl">Takelage</span>
+                    <div class="dmg-row"><span class="dl">Rigging</span>
                        <div class="dmg-track"><div class="dmg-fill" id="dRig"></div></div>
                        <span class="dv" id="dRigV">100%</span></div>
-                    <div class="dmg-row"><span class="dl">Ruder</span>
+                    <div class="dmg-row"><span class="dl">Rudder</span>
                        <div class="dmg-track"><div class="dmg-fill" id="dRud"></div></div>
                        <span class="dv" id="dRudV">100%</span></div>
-                    <div class="dmg-row"><span class="dl">Leck</span>
+                    <div class="dmg-row"><span class="dl">Leak</span>
                        <div class="dmg-track"><div class="dmg-fill flood" id="dFlood"></div></div>
                        <span class="dv" id="dFloodV">0%</span></div>
                     <div class="masts" id="dMasts"></div>
@@ -104,11 +104,11 @@ export class UI {
               <div class="small warn" id="dWarn"></div>
            </div>
            <div class="panel foes" id="foePanel" style="display:none">
-              <div class="foe-title">GEGNER</div>
+              <div class="foe-title">ENEMIES</div>
               <div id="foeList"></div>
            </div>
            <div class="panel gun" id="gunPanel" style="display:none">
-              <div class="gun-title">BATTERIE · <span id="gunCal">—</span></div>
+              <div class="gun-title">BATTERY · <span id="gunCal">—</span></div>
               <div class="ammo-row" id="ammoRow"></div>
               <div class="gun-row">
                  <span class="gun-side">Q ◄ BB</span>
@@ -120,13 +120,13 @@ export class UI {
                  <div class="gun-track"><div class="gun-fill" id="gunFillS"></div></div>
                  <span class="gun-state" id="gunStateS">KLAR</span>
               </div>
-              <div class="small" id="gunInfo">— Rohre je Seite · F = beide Seiten</div>
+              <div class="small" id="gunInfo">— guns per side · F = both sides</div>
            </div>
            <div class="msgwrap" id="msgwrap"></div>
            <div class="train panel" id="train" style="display:none">
               <div class="train-title" id="trainTitle">Training</div>
               <div class="train-desc" id="trainDesc"></div>
-              <div class="small" id="trainHint">Ziel</div>
+              <div class="small" id="trainHint">Goal</div>
               <div class="train-bar"><div class="train-fill" id="trainFill"></div></div>
            </div>
            `;
@@ -230,7 +230,7 @@ export class UI {
             "Leg " +
             (s.course.leg + 1) +
             " · " +
-            (s.course.legName || "Wendeboje") +
+            (s.course.legName || "Mark buoy") +
             " · " +
             Math.round(s.course.dist) +
             " m · Rgk " +
@@ -241,7 +241,7 @@ export class UI {
       } else {
          R.lap.textContent = "";
          R.time.textContent = "";
-         R.course.textContent = s.mode === "Training" ? "" : "Frei auf See";
+         R.course.textContent = s.mode === "Training" ? "" : "Open Sea";
          R.progress.style.visibility = "hidden";
       }
 
@@ -251,8 +251,8 @@ export class UI {
       R.beaufort.textContent = "Bft " + s.wind.bft;
       R.awaFrom.textContent = s.awa.from ? Math.round(s.awa.from) : "--";
       R.awaSpeed.textContent = s.awa.speed ? s.awa.speed.toFixed(1) : "--";
-      R.gust.textContent = "Gusts: " + (s.gusts ? "an" : "aus");
-      if (s.sea) R.seaState.textContent = "See: " + s.sea.name + " · " + s.sea.hs.toFixed(1) + " m";
+      R.gust.textContent = "Gusts: " + (s.gusts ? "on" : "off");
+      if (s.sea) R.seaState.textContent = "Sea: " + s.sea.name + " · " + s.sea.hs.toFixed(1) + " m";
 
       const sp = s.boat.speed.toFixed(1);
       R.hSpeed.textContent = sp;
@@ -269,7 +269,7 @@ export class UI {
 
       const rr = Math.max(-1, Math.min(1, s.boat.rudder || 0));
       R.rudderInd.style.left = ((rr + 1) / 2 * 100).toFixed(0) + "%";
-      R.camera.textContent = "KAMERA: " + s.camera;
+      R.camera.textContent = "CAM: " + s.camera;
       R.posText.textContent = s.pos;
       R.posDot.style.background = pointColor(s.boat.twa, s.boat.luffing, s.noGo || 32);
 
@@ -309,7 +309,7 @@ export class UI {
          if (nReady <= 0) {
             fill.style.width = "100%";
             fill.style.background = "linear-gradient(90deg,#5a2320,#8a3a30)";
-            state.textContent = "AUSGEFALLEN";
+            state.textContent = "KNOCKED OUT";
             state.style.color = "#ff7b7b";
             return;
          }
@@ -317,17 +317,17 @@ export class UI {
          fill.style.background = g.ready
             ? "linear-gradient(90deg,#ffb03d,#ff5d5d)"
             : "linear-gradient(90deg,#2d4f6b,#4b7fa6)";
-         state.textContent = g.ready ? "KLAR" : "LADEN " + pct + "%";
+         state.textContent = g.ready ? "READY" : "LOADING " + pct + "%";
          state.style.color = g.ready ? "#ffcf5d" : "rgba(210,230,250,0.6)";
       };
       set(R.gunFillP, R.gunStateP, s.guns.PORT, ready.PORT);
       set(R.gunFillS, R.gunStateS, s.guns.STBD, ready.STBD);
       R.gunInfo.textContent =
-         ready.PORT + "/" + ready.STBD + " von " + s.guns.guns + " Rohren · "
-         + s.guns.broadsides + " Breitseiten · " + s.guns.shots + " Schuss";
+         ready.PORT + "/" + ready.STBD + " of " + s.guns.guns + " guns · "
+         + s.guns.broadsides + " broadsides · " + s.guns.shots + " shots";
       if (s.guns.ammo && R.ammoRow) {
          const cur = s.guns.ammo.id;
-         const names = [["ball", "Kugel"], ["chain", "Kette"], ["grape", "Kartätsche"]];
+         const names = [["ball", "Shot"], ["chain", "Chain"], ["grape", "Grape"]];
          R.ammoRow.innerHTML = names.map(([id, n]) =>
             `<span class="ammo${id === cur ? " on" : ""}">${n}</span>`).join("")
             + `<span class="ammo-key">Z</span>`;
@@ -389,18 +389,18 @@ export class UI {
       }
       if (R.plan.rudder) R.plan.rudder.setAttribute("fill", damageColor(d.rudder));
 
-      const M = [["fore", "Fock"], ["main", "Groß"], ["mizzen", "Kreuz"]];
+      const M = [['fore', 'Fore'], ['main', 'Main'], ['mizzen', 'Mizzen']];
       R.dMasts.innerHTML = M.map(([k, n]) => {
          const st = d.masts[k];
          const cls = st.state === "gone" ? "gone" : st.state === "wounded" ? "hurt" : "ok";
-         const val = st.state === "gone" ? "weg" : Math.round(st.integrity * 100) + "%";
+         const val = st.state === "gone" ? "gone" : Math.round(st.integrity * 100) + "%";
          return `<span class="mast ${cls}" title="${n}mast">${n}<b>${val}</b></span>`;
       }).join("");
 
       const warn = [];
-      if (d.afire > 0.05) warn.push("FEUER AN BORD");
-      if (s.wreck) warn.push("Wrack im Schlepp — X kappen");
-      if (d.flooding > 0.25) warn.push("Wasser im Schiff");
+      if (d.afire > 0.05) warn.push("FIRE ON BOARD");
+      if (s.wreck) warn.push("Wreck in tow — X to cut");
+      if (d.flooding > 0.25) warn.push("Water in the ship");
       if (s.depth !== null && s.depth !== undefined && s.depth < 12) {
          warn.push("FLACHWASSER " + s.depth.toFixed(1) + " m");
       }
@@ -441,7 +441,7 @@ export class UI {
       }
       R.foePanel.style.display = "block";
       R.foeList.innerHTML = s.enemies.map((e) => {
-         const st = e.sunk ? "gesunken" : e.struck ? "gestrichen" : Math.round(e.dist) + " m";
+         const st = e.sunk ? "sunk" : e.struck ? "struck" : Math.round(e.dist) + " m";
          const cls = e.sunk ? "out" : e.struck ? "struck" : "";
          const bar = Math.max(0, Math.round(e.hull * 100));
          return `<div class="foe ${cls}">
@@ -606,8 +606,8 @@ export class UI {
          .join("");
       const shipHtml = VESSELS.map((v) => {
          const guns = v.guns
-            ? `<span class="sb-g">${gunCount(v)} Rohre · ${broadsideWeight(v)} lb Breitseite</span>`
-            : `<span class="sb-g">ohne Bewaffnung</span>`;
+            ? `<span class="sb-g">${gunCount(v)} guns · ${broadsideWeight(v)} lb broadside</span>`
+            : `<span class="sb-g">unarmed</span>`;
          return `<button class="ship-btn${m.vesselId === v.id ? " active" : ""}" data-vessel="${v.id}">
                   <div class="sb-head">
                      <span class="sb-name">${vesselLabel(v)}</span>
@@ -616,7 +616,7 @@ export class UI {
                   <div class="sb-rate">${v.rate}</div>
                   <div class="sb-desc">${v.desc}</div>
                   <div class="sb-stats">
-                     <span>${v.hull.loa.toFixed(0)} m LüA</span>
+                     <span>${v.hull.loa.toFixed(0)} m LOA</span>
                      <span>${v.crew} Mann</span>
                      <span>Am Wind ${v.sail.noGo}°</span>
                   </div>
@@ -625,14 +625,14 @@ export class UI {
       }).join("");
       const selected = VESSELS.find((v) => v.id === m.vesselId) || VESSELS[0];
 
-      // Gefechtslage nur zeigen, wenn auch gekaempft wird
+      // Battle nur zeigen, wenn auch gekaempft wird
       let scenarioHtml = "";
       if (m.mode === "Gefecht" && m.scenarios.length) {
          const unarmed = !selected.guns;
          const cards = m.scenarios.map((sc) => {
             const force = (sc.forces[m.vesselId] || []);
             const label = unarmed || !force.length
-               ? "kein Gegner für dieses Schiff"
+               ? "no opponent for this ship"
                : force.length + (force.length === 1 ? " Gegner" : " Gegner");
             return `<button class="sc-btn${m.scenarioId === sc.id ? " active" : ""}${unarmed ? " off" : ""}" data-sc="${sc.id}">
                   <div class="sc-title">${sc.title}</div>
@@ -640,39 +640,39 @@ export class UI {
                   <div class="sc-force">${label}</div>
                </button>`;
          }).join("");
-         scenarioHtml = `<div class="sec-label">Gefechtslage</div>
+         scenarioHtml = `<div class="sec-label">Battle</div>
             <div class="sc-grid">${cards}</div>`
-            + (unarmed ? `<div class="sc-hint">Die ${selected.name} führt keine Geschütze — wähle ein Kriegsschiff.</div>` : "");
+            + (unarmed ? `<div class="sc-hint">${selected.name} has no guns — choose a warship.</div>` : "");
       }
 
       this.menuEl.innerHTML =
           `<div class="menu-card">
-            <h1>Segel-Simulator 3D</h1>
-            <p class="subm">Wende · Krause · Raumschot — semi-realistische Physik</p>
-            <div class="sec-label">Schiff</div>
+            <h1>Age of Sail Simulator</h1>
+            <p class="subm">Close-hauled · Luffing · Beam Reach — semi-realistic physics</p>
+            <div class="sec-label">Ship</div>
             <div class="ship-grid">${shipHtml}</div>
-            <div class="sec-label">Spielmodus</div>
+            <div class="sec-label">Game Mode</div>
             <div class="mode-grid m4">${modeHtml}</div>
             ${scenarioHtml}
             <div class="menu-controls">
                <label class="ctrl">
-                  <span>Windrichtung</span>
+                  <span>Wind direction</span>
                   <input type="range" id="menuDir" min="0" max="359" value="${m.windDir}" step="5" />
                   <span class="val" id="menuDirVal">${m.windDir}°</span>
                </label>
                <label class="ctrl">
-                  <span>Windstärke (Bft <b id="menuBft"></b>)</span>
+                  <span>Wind speed (Bft <b id="menuBft"></b>)</span>
                   <input type="range" id="menuSpeed" min="1" max="35" value="${m.windSpeed}" step="1" />
                   <span class="val" id="menuSpeedVal">${m.windSpeed} kn</span>
                </label>
                <label class="ctrl toggle">
                   <input type="checkbox" id="menuGusts" ${m.gusts ? "checked" : ""} />
-                  <span>Gusts / Veer (Wind-Schwankungen)</span>
+                  <span>Gusts / Veer (wind fluctuations)</span>
                </label>
             </div>
             <div class="menu-btns">
                <button class="primary" id="menuStart">${m.mode} · ${vesselLabel(selected)}</button>
-               <button id="menuHelp">Hilfe</button>
+               <button id="menuHelp">Help</button>
             </div>
          </div>`;
       this.menuEl.style.display = "flex";

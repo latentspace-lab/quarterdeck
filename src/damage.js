@@ -1,21 +1,18 @@
-// damage.js - Strukturmodell eines Schiffs: was kaputtgeht und was das kostet.
+// damage.js - Structural model: what breaks and what it costs.
 //
-// Das Modell ist absichtlich nach Baugruppen getrennt, weil genau daraus die
-// taktischen Entscheidungen entstehen, die eine Seeschlacht dieser Zeit
-// ausmachten:
+// The model is intentionally separated into assemblies because those are what
+// drives the tactical decisions of a sea battle of this era:
 //
-//   Rumpf   -> Franzosen schossen auf den Rumpf? Nein, umgekehrt: die Royal
-//              Navy schoss auf den Rumpf (Schiff versenken / Bedienungen
-//              ausschalten), die Franzosen bevorzugt in die Takelage
-//              (Gegner manoevrierunfaehig machen und entkommen).
-//   Masten  -> gehen ueber Bord, nehmen ihre Segelflaeche mit und schleppen
-//              als Wrack laengsseit, bis man sie kappt.
-//   Ruder   -> ohne Ruder keine Kurskontrolle.
-//   Batterie-> ausgeschlagene Rohre verkleinern die eigene Breitseite.
-//   Leck    -> Wasser im Schiff kostet Fahrt, legt das Schiff auf die Seite
-//              und versenkt es am Ende.
+//   Hull    -> The French shot at the hull? No — the Royal Navy shot at the
+//              hull (to sink / knock out crews), while the French preferred the
+//              rigging (to cripple and escape).
+//   Masts   -> go overboard, taking their sail area with them and dragging
+//              alongside as wreck until cut away.
+//   Rudder  -> without rudder there is no course control.
+//   Battery -> knocked-out guns reduce the broadside.
+//   Leak    -> water in the ship costs speed, lists the ship, and sinks it.
 //
-// Einheiten: Schaeden sind normiert (0 = heil, 1 = zerstoert).
+// Units: damage is normalised (0 = intact, 1 = destroyed).
 
 import { clamp, lerp } from "./utils.js";
 
@@ -27,9 +24,9 @@ export const MASTS = ["fore", "main", "mizzen"];
 export const AMMO = {
    ball: {
       id: "ball",
-      name: "Vollkugel",
-      short: "Kugel",
-      desc: "Durchschlaegt die Bordwand, schlaegt Rohre aus, schiesst Lecks.",
+      name: "Round Shot",
+      short: "Shot",
+      desc: "Penetrates the hull, knocks out guns, bores leaks.",
       hull: 1.0, rig: 0.25, gun: 1.0, crew: 0.50,
       elevation: 1.0,      // Grad ueber der Waagerechten
       spreadDeg: 0.9,
@@ -40,9 +37,9 @@ export const AMMO = {
    },
    chain: {
       id: "chain",
-      name: "Kettenkugel",
-      short: "Kette",
-      desc: "Zwei verbundene Halbkugeln - maeht Takelage und Segel nieder.",
+      name: "Chain Shot",
+      short: "Chain",
+      desc: "Two linked hemispheres — devastates rigging and sails.",
       hull: 0.18, rig: 1.4, gun: 0.25, crew: 0.30,
       elevation: 2.2,      // hoch gerichtet, in die Takelage
       spreadDeg: 2.4,
@@ -53,9 +50,9 @@ export const AMMO = {
    },
    grape: {
       id: "grape",
-      name: "Kartaetsche",
-      short: "Kartätsche",
-      desc: "Schwarm kleiner Kugeln - fegt das Deck, ohne den Rumpf zu oeffnen.",
+      name: "Grape Shot",
+      short: "Grape",
+      desc: "A swarm of small balls — sweeps the deck without breaching the hull.",
       hull: 0.12, rig: 0.40, gun: 1.7, crew: 0.35,  // je Schrotkugel!
       elevation: 1.1,
       spreadDeg: 5.5,
@@ -78,9 +75,9 @@ export class DamageModel {
    constructor(vessel, opts = {}) {
       this.vessel = vessel;
       const st = vessel.structure || {};
-      this.scantling = st.scantling ?? 1;        // Staerke der Bordwand
-      this.mastStrength = st.mastStrength ?? 1;  // Staerke der Rundhoelzer
-      this.reserve = st.reserve ?? 1;            // Reserveauftrieb (Zeit bis Sinken)
+      this.scantling = st.scantling ?? 1;        // hull strength
+      this.mastStrength = st.mastStrength ?? 1;  // mast strength
+      this.reserve = st.reserve ?? 1;            // reserve buoyancy (time until sinking)
       this.isPlayer = !!opts.isPlayer;
 
       this.hull = {};
@@ -172,14 +169,14 @@ export class DamageModel {
          crew: { n: 0, where: "bord" },
       };
 
-      // --- Mannschaftsverluste --------------------------------------------
-      // Nicht die Kugel toetet, sondern der Splitterhagel, den sie aus der
-      // Bordwand reisst - und auf kurze Distanz die Kartaetsche.
+      // --- Crew losses ---------------------------------------------------
+      // Not the ball that kills, but the splinter cloud it tears from the
+      // hull — and at close range, grape shot.
       const isRigHit = (hit.y ?? 0) > FB * 1.25;
       res.crew.n = Math.round(power * a.crew * (1.2 + Math.random() * 2.2));
       res.crew.where = isRigHit ? "rigg" : (a.id === "grape" ? "deck" : "bord");
 
-      // --- Rumpf ---------------------------------------------------------
+      // --- Hull ----------------------------------------------------------
       if (!isRigHit) {
          const dmg = power * a.hull * 0.055 / this.scantling;
          const key = side + "_" + sec;
@@ -188,9 +185,8 @@ export class DamageModel {
 
          if (a.hull > 0.5 && dmg > 0.012) {
             res.holed = true;
-            // "zwischen Wind und Wasser": Treffer knapp ueber der Wasserlinie
-            // reissen beim Ueberholen des Schiffs unter Wasser - das sind die
-            // gefaehrlichen. Tiefe Treffer sind seltener, aber schlimm.
+            // "Between wind and water": hits just above the waterline tear open
+            // as the ship pitches — the dangerous ones. Deep hits are rarer.
             const low = (hit.y ?? FB) < FB * 0.42;
             if (low && Math.random() < 0.55) {
                res.below = true;
@@ -222,7 +218,7 @@ export class DamageModel {
          }
       }
 
-      // --- Takelage ------------------------------------------------------
+      // --- Rigging --------------------------------------------------------
       if (a.rig > 0) {
          const rigDmg = power * a.rig * 0.030;
          this.rigging = clamp(this.rigging - rigDmg * 0.7, 0, 1);
@@ -273,11 +269,11 @@ export class DamageModel {
    // Von aussen: Mast durch Ueberlastung oder Kollision brechen lassen
    breakMast(key, cause = "force") { return this._breakMast(key, cause); }
 
-   // --------------------------------------------------------- Rammstoss
-   // Kollision: Energie aus Masse und Annaeherungsgeschwindigkeit.
+   // --------------------------------------------------------- Ram strike
+   // Collision: energy from mass and closing speed.
    applyRam({ closingKts, otherTons, ownTons, side, s }) {
       const v = Math.abs(closingKts) * 0.514444;
-      // spezifische Energie, normiert auf "eigene Masse"
+      // specific energy, normalised to own mass
       const e = 0.5 * v * v * clamp(otherTons / Math.max(ownTons, 1), 0.15, 4) / 120;
       const sec = sectionAt(clamp(s ?? 0.5, 0, 1));
       const key = (side === "PORT" ? "PORT" : "STBD") + "_" + sec;
@@ -289,7 +285,7 @@ export class DamageModel {
          res.below = true;
          this._event("holed", { side, sec, size: dmg * 0.8 });
       }
-      // Ein harter Stoss wirft Stengen ueber Bord
+      // A hard blow carries away topmasts
       if (dmg > 0.22) {
          const standing = MASTS.filter((k) => this.masts[k].state !== "gone");
          if (standing.length && Math.random() < 0.55) {
@@ -300,7 +296,7 @@ export class DamageModel {
       return res;
    }
 
-   // --------------------------------------------------------- Grundberuehrung
+   // --------------------------------------------------------- Grounding
    applyGrounding({ speedKts, draft, depth }) {
       const over = clamp((draft - depth) / Math.max(draft, 0.5), 0, 1);
       const dmg = clamp(over * (0.02 + speedKts * 0.020), 0, 0.55);
@@ -317,8 +313,8 @@ export class DamageModel {
       return dmg;
    }
 
-   // --------------------------------------------------- Ueberlastung im Sturm
-   // Zu viel Tuch bei zu viel Wind: die Stengen gehen ueber Bord. Genau dafuer
+   // --------------------------------------------------- Storm overpress
+   // Too much sail in too much wind: topmasts go overboard. Genau dafuer
    // gibt es die Reffen-Tasten.
    stressRig(dt, { windKts, sailSet, twa }) {
       // Staudruck ~ v^2; am Wind steht das Rigg schraeger und leidet mehr
@@ -330,7 +326,7 @@ export class DamageModel {
          m.stress = stress;
          if (m.state === "gone") continue;
          if (stress > 1) {
-            // geschwaechte Masten geben zuerst nach
+            // weakened masts give way first
             const weak = lerp(1.9, 0.7, m.integrity);
             m.integrity = clamp(m.integrity - (stress - 1) * 0.030 * weak * dt / this.mastStrength, 0, 1);
             if (m.integrity <= 0 && !broke) broke = this._breakMast(key, "overpress");
@@ -343,16 +339,16 @@ export class DamageModel {
       return broke;
    }
 
-   // ------------------------------------------------------------- Fortlauf
+   // ------------------------------------------------------------- Ongoing
    update(dt, ctx = {}) {
       if (this.sunk) return;
 
-      // Wassereinbruch: offene Lecks unter Wasser fuellen das Schiff.
-      // Die Pumpen halten kleine Lecks in Schach, grosse nicht.
+      // Flooding: open below-water leaks fill the ship.
+      // Pumps can handle small leaks, not large ones.
       let inflow = 0;
       for (const h of this.holes) if (h.below) inflow += h.size;
       const heelExtra = clamp((ctx.heel ?? 0) / 40, 0, 1) * 0.4;
-      // Die Pumpen laufen nur, solange Leute daran stehen
+      // Pumps only run while people are at them
       const pumps = (this.isPlayer ? 0.010 : 0.008) * clamp(ctx.pump ?? 1, 0, 1.3);
       const rate = (inflow * 0.032 * (1 + heelExtra)) / Math.max(this.reserve, 0.2);
       this.flooding = clamp(this.flooding + (rate - pumps) * dt, 0, 1);
@@ -361,7 +357,7 @@ export class DamageModel {
          this._event("sunk", {});
       }
 
-      // Brand: greift um sich, die Wache bekaempft ihn
+      // Fire: spreads, the watch fights it
       if (this.afire > 0) {
          this.afire = clamp(this.afire + (this.afire * 0.055 - 0.035) * dt, 0, 1);
          if (this.afire > 0.05) {
@@ -373,7 +369,7 @@ export class DamageModel {
          if (this.afire >= 0.98) { this.sunk = true; this._event("exploded", {}); }
       }
 
-      // Flagge streichen: ein geschlagenes Schiff kaempft nicht bis zum Untergang
+      // Struck colours: a beaten ship does not fight to the death
       if (!this.struck && !this.isPlayer && this.beaten()) {
          this.struck = true;
          this._event("struck", {});

@@ -102,7 +102,7 @@ export const VESSELS = [
       rate: "20-Kanonen-Rahsegler",
       rig: "square",
       era: "1803",
-      desc: "Kleinster Rahsegler mit eigenem Kommando — flink, wendig, dünnhäutig.",
+      desc: "Smallest square-rigged ship with its own command — fast, nimble, thinly armed.",
       crew: 95,
       hull: { loa: 28.0, beam: 8.2, draft: 3.6, displacement: 420 },
       sail: { noGo: 62, polar: POLAR_SLOOP_OF_WAR, tackAssist: 0.55 },
@@ -118,7 +118,7 @@ export const VESSELS = [
          leewayMax: 11,
       },
       guns: {
-         decks: [{ y: 0.60, count: 10, from: 0.20, to: 0.80, calibre: "9-Pfünder" }],
+         decks: [{ y: 0.60, count: 10, from: 0.20, to: 0.80, calibre: "9-pounder" }],
          reload: 9.0,          // Sekunden fuer eine gut gedrillte Bedienung
          spread: 0.28,         // Streuung der Einzelschuesse (s)
          recoil: 0.55,         // m Rohrrueckstoss
@@ -152,7 +152,7 @@ export const VESSELS = [
          leewayMax: 10,
       },
       guns: {
-         decks: [{ y: 0.58, count: 13, from: 0.16, to: 0.84, calibre: "18-Pfünder" }],
+         decks: [{ y: 0.58, count: 13, from: 0.16, to: 0.84, calibre: "18-pounder" }],
          reload: 10.5,
          spread: 0.34,
          recoil: 0.8,
@@ -170,7 +170,7 @@ export const VESSELS = [
       rate: "38/44-Kanonen-Fregatte",
       rig: "square",
       era: "1796",
-      desc: "Die Unermuedliche: beruehmt durch Admiral Pellew, eines der schnellsten Rahsegel-Kriegsschiffe. Leichter als die Lydia, schneller auf allen Kursen.",
+      desc: "The Undaunted: famous under Admiral Pellew, one of the fastest Royal Navy sailing warships. Lighter than Lydia, faster on all points of sail.",
       crew: 315,
       hull: { loa: 44.5, beam: 11.8, draft: 4.8, displacement: 820 },
       sail: { noGo: 63, polar: POLAR_INDEFATIGABLE, tackAssist: 0.52 },
@@ -187,8 +187,8 @@ export const VESSELS = [
       },
       guns: {
          decks: [
-            { y: 0.52, count: 12, from: 0.16, to: 0.84, calibre: "18-Pfünder" },
-            { y: 0.72, count: 10, from: 0.18, to: 0.82, calibre: "9-Pfünder" },
+            { y: 0.52, count: 12, from: 0.16, to: 0.84, calibre: "18-pounder" },
+            { y: 0.72, count: 10, from: 0.18, to: 0.82, calibre: "9-pounder" },
          ],
          reload: 11.0,
          spread: 0.32,
@@ -206,7 +206,7 @@ export const VESSELS = [
       rate: "74-Kanonen-Zweidecker",
       rig: "square",
       era: "1810",
-      desc: "Schwimmende Batterie: träge wie eine Kirche, aber zwei volle Decks Eisen.",
+      desc: "Floating battery: slow as a church, but two full gun decks.",
       crew: 590,
       hull: { loa: 52.0, beam: 14.6, draft: 6.2, displacement: 1750 },
       sail: { noGo: 68, polar: POLAR_THIRD_RATE, tackAssist: 0.42 },
@@ -223,8 +223,8 @@ export const VESSELS = [
       },
       guns: {
          decks: [
-            { y: 0.44, count: 14, from: 0.14, to: 0.86, calibre: "32-Pfünder" },
-            { y: 0.70, count: 14, from: 0.16, to: 0.84, calibre: "18-Pfünder" },
+            { y: 0.44, count: 14, from: 0.14, to: 0.86, calibre: "32-pounder" },
+            { y: 0.70, count: 14, from: 0.16, to: 0.84, calibre: "18-pounder" },
          ],
          reload: 13.0,
          spread: 0.45,
@@ -272,7 +272,7 @@ export const ENEMIES = [
       dyn: { turnRate: 13.5, rudderRef: 3.2, accelUp: 0.075, accelDown: 0.13,
              accelLuff: 0.34, maxHeel: 15, capsizeHeel: 46, heelScale: 0.72, leewayMax: 11 },
       guns: {
-         decks: [{ y: 0.60, count: 10, from: 0.20, to: 0.80, calibre: "8-Pfünder" }],
+         decks: [{ y: 0.60, count: 10, from: 0.20, to: 0.80, calibre: "8-pounder" }],
          reload: 11.5, spread: 0.32, recoil: 0.5, rollKick: 1.6, range: 400,
       },
       structure: { scantling: 0.54, mastStrength: 0.68, reserve: 0.62 },
@@ -295,7 +295,7 @@ export const ENEMIES = [
       dyn: { turnRate: 9.2, rudderRef: 3.6, accelUp: 0.050, accelDown: 0.090,
              accelLuff: 0.26, maxHeel: 14, capsizeHeel: 50, heelScale: 0.62, leewayMax: 10 },
       guns: {
-         decks: [{ y: 0.58, count: 14, from: 0.16, to: 0.84, calibre: "18-Pfünder" }],
+         decks: [{ y: 0.58, count: 14, from: 0.16, to: 0.84, calibre: "18-pounder" }],
          reload: 12.5, spread: 0.38, recoil: 0.8, rollKick: 2.4, range: 540,
       },
       structure: { scantling: 1.05, mastStrength: 1.00, reserve: 1.05 },
@@ -319,8 +319,8 @@ export const ENEMIES = [
              accelLuff: 0.20, maxHeel: 12, capsizeHeel: 55, heelScale: 0.52, leewayMax: 9 },
       guns: {
          decks: [
-            { y: 0.44, count: 14, from: 0.14, to: 0.86, calibre: "36-Pfünder" },
-            { y: 0.70, count: 14, from: 0.16, to: 0.84, calibre: "18-Pfünder" },
+            { y: 0.44, count: 14, from: 0.14, to: 0.86, calibre: "36-pounder" },
+            { y: 0.70, count: 14, from: 0.16, to: 0.84, calibre: "18-pounder" },
          ],
          reload: 14.5, spread: 0.48, recoil: 1.0, rollKick: 3.4, range: 600,
       },
@@ -347,7 +347,7 @@ export function gunCount(v) {
 }
 
 // Broadside-Gewicht in englischen Pfund (nur zur Anzeige)
-const BALL_LB = { "8-Pfünder": 8, "9-Pfünder": 9, "18-Pfünder": 18, "32-Pfünder": 32, "36-Pfünder": 36 };
+const BALL_LB = { "8-pounder": 8, "9-pounder": 9, "18-pounder": 18, "32-pounder": 32, "36-pounder": 36 };
 export function broadsideWeight(v) {
    if (!v.guns) return 0;
    return v.guns.decks.reduce((w, d) => w + d.count * (BALL_LB[d.calibre] || 12), 0);
