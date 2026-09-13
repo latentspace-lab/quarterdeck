@@ -50,6 +50,13 @@ export class BattleRoom extends Room<{ state: GameState }> {
       const state = new GameState();
       state.terrainSeed = this.sim.params.terrainSeed;
       this.setState(state);
+
+      if (Array.isArray(options.enemies)) {
+         const ids = options.enemies.filter((v) => typeof v === "string" && isKnownVessel(v)).slice(0, 6);
+         for (const ship of this.sim.spawnEnemies(ids)) {
+            this.state.ships.set(ship.id, new ShipSchema({ id: ship.id, vesselId: ship.vesselId, name: ship.name, ai: true }));
+         }
+      }
       this.syncState();
 
       // Patches at the tick rate; the simulation is what changes the state,
@@ -158,13 +165,16 @@ export class BattleRoom extends Room<{ state: GameState }> {
    }
 }
 
-function validVessel(id: unknown): string {
-   if (typeof id !== "string") return DEFAULT_VESSEL;
+function isKnownVessel(id: string): boolean {
    try {
-      return getVessel(id).id === id ? id : DEFAULT_VESSEL;
+      return getVessel(id).id === id;
    } catch {
-      return DEFAULT_VESSEL;
+      return false;
    }
+}
+
+function validVessel(id: unknown): string {
+   return typeof id === "string" && isKnownVessel(id) ? id : DEFAULT_VESSEL;
 }
 
 /** Boundary validation: clients are untrusted. */
@@ -174,6 +184,8 @@ function isInputCommand(m: unknown): m is InputCommand {
    if (!Number.isFinite(c.seq) || !Number.isFinite(c.rudder)) return false;
    if (c.sailSet !== undefined && !Number.isFinite(c.sailSet)) return false;
    if (c.cutWreck !== undefined && typeof c.cutWreck !== "boolean") return false;
+   if (c.fire !== undefined && c.fire !== "PORT" && c.fire !== "STBD" && c.fire !== "BOTH") return false;
+   if (c.ammo !== undefined && typeof c.ammo !== "string") return false;
    return true;
 }
 

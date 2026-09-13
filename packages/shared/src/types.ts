@@ -7,6 +7,7 @@
 
 import type { Tack } from "./physics.ts";
 import type { Side } from "./damage.ts";
+import type { XYZ } from "./ballistics.ts";
 
 /**
  * Zustand eines Schiffs, wie ihn der Server je Tick veroeffentlicht.
@@ -124,6 +125,8 @@ export interface RoomCreateOptions {
    windBaseDir?: number;
    windBaseSpeed?: number;
    windVariability?: number;
+   /** Vessel ids of AI-captained enemies spawned to windward at room creation. */
+   enemies?: string[];
 }
 
 /** What a client passes when joining. */
@@ -151,4 +154,56 @@ export type WorldEvent =
    | { type: "collision"; a: string; b: string; closing: number }
    | { type: "locked"; a: string; b: string };
 
-export type ServerEvent = ({ kind: "ship" } & ShipEvent) | ({ kind: "world" } & WorldEvent);
+/** A broadside was ordered: play the thunder and the flashes. */
+export interface SalvoEvent {
+   kind: "salvo";
+   shipId: string;
+   side: Side;
+   ammo: string;
+   /** guns that will fire */
+   count: number;
+}
+
+/**
+ * Projectiles that left their muzzles this tick, with the exact origin and
+ * velocity the server integrates. Clients replay the flight with the same
+ * stepProjectile() and draw the balls where the server has them - no local
+ * spread, no local hit test.
+ */
+export interface ShotsEvent {
+   kind: "shots";
+   shipId: string;
+   shots: Array<{ origin: XYZ; vel: XYZ; ammo: string; lb: number; drag: number }>;
+}
+
+/** A projectile struck a ship. Everything the client needs for the effects. */
+export interface HitEvent {
+   kind: "hit";
+   /** the ship that was hit */
+   shipId: string;
+   /** the ship that fired */
+   from: string;
+   side: Side;
+   /** 0 = bow .. 1 = stern */
+   s: number;
+   /** height above the waterline in the target's frame (m) */
+   y: number;
+   inRig: boolean;
+   world: XYZ;
+   dir: XYZ;
+   ammo: string;
+   lb: number;
+   range01: number;
+   splinters: number;
+   holed: boolean;
+   below: boolean;
+   mastBroken: string | null;
+   casualties: number;
+}
+
+export type ServerEvent =
+   | ({ kind: "ship" } & ShipEvent)
+   | ({ kind: "world" } & WorldEvent)
+   | SalvoEvent
+   | ShotsEvent
+   | HitEvent;

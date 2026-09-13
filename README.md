@@ -414,8 +414,10 @@ segel-simulator/
 │  │  ├─ src/index.ts        # startServer(): HTTP + WebSocket transport, room registry
 │  │  ├─ src/rooms/BattleRoom.ts  # clients -> ships, messages -> inputs, tick -> patches
 │  │  ├─ src/state/GameState.ts   # synchronised schema: ships, wind, sea, tick
-│  │  ├─ src/sim/Simulation.ts    # one room's world: wind, sea, ships, collisions, grounding
-│  │  ├─ src/sim/ServerShip.ts    # a ship without Three.js: dynamics, damage, crew, pose
+│  │  ├─ src/sim/Simulation.ts    # one room's world: wind, sea, ships, guns, collisions, grounding
+│  │  ├─ src/sim/ServerShip.ts    # a ship without Three.js: dynamics, damage, crew, guns, pose
+│  │  ├─ src/sim/ServerBattery.ts # the deciding half of a battery: salvo, flight, hit test
+│  │  ├─ src/sim/Captain.ts       # AI captain (port of the client's fleet.js)
 │  │  └─ src/headless.ts          # CLI: run a simulation headless and print timings
 │  │
 │  └─ client/            # @segel/client — Browser: Three.js, Eingabe, HUD
