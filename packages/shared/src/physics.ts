@@ -115,12 +115,13 @@ export function apparentWind(
    return { speed, from };
 }
 
-// TWA signed: <0 Wind von Backbord (Port), >0 von Steuerbord (Stbd)
+// TWA signed: >0 wind from port (the +x side of the ship frame), <0 from starboard
 export function twa(boatHeading: number, trueWindDeg: number): number {
    return diffDeg(boatHeading, trueWindDeg); // diffDeg(a,b) = b - a
 }
 export function tackFromTwa(twaSigned: number): Tack {
-   return twaSigned > 0 ? "STBD" : "PORT";
+   // Wind over the port side = port tack.
+   return twaSigned > 0 ? "PORT" : "STBD";
 }
 
 // ---- Segelkurse / Punkte von Sail ------------------------------------------

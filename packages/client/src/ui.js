@@ -43,17 +43,61 @@ export class UI {
            <div class="panel bc">
               <div class="pos" id="pos"><span class="dot"></span><span id="posText">Luffing</span></div>
               <div class="rudder">
-                 <span class="rr" style="opacity:.8">BB ←</span>
+                 <span class="rr" style="opacity:.8">PORT ←</span>
                  <div class="rudder-track"><div class="rudder-ind" id="rudderInd"></div></div>
-                 <span class="rr" style="opacity:.8">→ STB</span>
+                 <span class="rr" style="opacity:.8">→ STBD</span>
               </div>
               <div class="camera" id="camera">CAM: Follow</div>
               <div class="hint">Space: Right the boat after capsize · C: Camera</div>
            </div>
-           <div class="br small keys">
-              <div><b>Helm:</b> A / D &nbsp;|&nbsp; ← / → &nbsp;Rudder</div>
-              <div><b>Sail trim:</b> W in · S out &nbsp;|&nbsp; C / 1-4 Camera · H HUD · T Top</div>
-              <div><b>Menu:</b> M / Esc &nbsp;·&nbsp; R Restart (Course) &nbsp;·&nbsp; G Gusts</div>
+           <div class="panel cmd" id="cmdPanel">
+              <div class="cmd-title">CAPTAIN'S ORDERS</div>
+              <div class="cmd-group">
+                 <div class="cmd-label">Helm</div>
+                 <div class="cmd-row">
+                    <button type="button" class="cmd" data-hold="KeyA"><span class="l">◄ Port</span><kbd>A</kbd></button>
+                    <button type="button" class="cmd" data-hold="KeyD"><span class="l">Starboard ►</span><kbd>D</kbd></button>
+                 </div>
+              </div>
+              <div class="cmd-group">
+                 <div class="cmd-label">Sails</div>
+                 <div class="cmd-row">
+                    <button type="button" class="cmd" data-hold="KeyW" id="cmdSailIn"><span class="l">Set sail</span><kbd>W</kbd></button>
+                    <button type="button" class="cmd" data-hold="KeyS" id="cmdSailOut"><span class="l">Reef</span><kbd>S</kbd></button>
+                    <span class="cmd-state" id="cmdSailState"></span>
+                 </div>
+              </div>
+              <div class="cmd-group" id="cmdGuns">
+                 <div class="cmd-label">Gunnery</div>
+                 <div class="cmd-row">
+                    <button type="button" class="cmd" data-cmd="firePort" id="cmdFireP"><span class="l">Fire port</span><kbd>Q</kbd></button>
+                    <button type="button" class="cmd" data-cmd="fireStbd" id="cmdFireS"><span class="l">Fire stbd</span><kbd>E</kbd></button>
+                    <button type="button" class="cmd" data-cmd="fireBoth" id="cmdFireB"><span class="l">Both</span><kbd>F</kbd></button>
+                 </div>
+                 <div class="cmd-row">
+                    <span class="cmd-state" style="margin:0">Load</span>
+                    <button type="button" class="cmd small ammo-btn" data-cmd="ammo:ball"><span class="l">Shot</span></button>
+                    <button type="button" class="cmd small ammo-btn" data-cmd="ammo:chain"><span class="l">Chain</span></button>
+                    <button type="button" class="cmd small ammo-btn" data-cmd="ammo:grape"><span class="l">Grape</span></button>
+                    <kbd>Z</kbd>
+                 </div>
+              </div>
+              <div class="cmd-group">
+                 <div class="cmd-label">Damage control</div>
+                 <div class="cmd-row">
+                    <button type="button" class="cmd" data-cmd="cutWreck" id="cmdCut"><span class="l">Cut away wreck</span><kbd>X</kbd></button>
+                    <button type="button" class="cmd" data-cmd="capsizeRight" id="cmdRight"><span class="l">Right the ship</span><kbd>Space</kbd></button>
+                 </div>
+              </div>
+              <div class="cmd-group">
+                 <div class="cmd-label">Ship &amp; view</div>
+                 <div class="cmd-row">
+                    <button type="button" class="cmd small" data-cmd="cycleVessel" id="cmdVessel"><span class="l">Change ship</span><kbd>V</kbd></button>
+                    <button type="button" class="cmd small" data-cmd="cycleCamera"><span class="l">Camera</span><kbd>C</kbd></button>
+                    <button type="button" class="cmd small" data-cmd="toggleMenu"><span class="l">Menu</span><kbd>M</kbd></button>
+                 </div>
+              </div>
+              <div class="hint">H hides the HUD · T top-down · G gusts · R restart course</div>
            </div>
            <div class="panel crew" id="crewPanel" style="display:none">
               <div class="crew-title">CREW <span id="crewHead"></span></div>
@@ -111,12 +155,12 @@ export class UI {
               <div class="gun-title">BATTERY · <span id="gunCal">—</span></div>
               <div class="ammo-row" id="ammoRow"></div>
               <div class="gun-row">
-                 <span class="gun-side">Q ◄ BB</span>
+                 <span class="gun-side">Q ◄ PORT</span>
                  <div class="gun-track"><div class="gun-fill" id="gunFillP"></div></div>
                  <span class="gun-state" id="gunStateP">KLAR</span>
               </div>
               <div class="gun-row">
-                 <span class="gun-side">E ► STB</span>
+                 <span class="gun-side">E ► STBD</span>
                  <div class="gun-track"><div class="gun-fill" id="gunFillS"></div></div>
                  <span class="gun-state" id="gunStateS">KLAR</span>
               </div>
@@ -188,7 +232,20 @@ export class UI {
          trainDesc: this.root.querySelector("#trainDesc"),
          trainHint: this.root.querySelector("#trainHint"),
          trainFill: this.root.querySelector("#trainFill"),
+         cmdPanel: this.root.querySelector("#cmdPanel"),
+         cmdGuns: this.root.querySelector("#cmdGuns"),
+         cmdFireP: this.root.querySelector("#cmdFireP"),
+         cmdFireS: this.root.querySelector("#cmdFireS"),
+         cmdFireB: this.root.querySelector("#cmdFireB"),
+         cmdAmmo: Array.from(this.root.querySelectorAll(".ammo-btn")),
+         cmdSailIn: this.root.querySelector("#cmdSailIn .l"),
+         cmdSailOut: this.root.querySelector("#cmdSailOut .l"),
+         cmdSailState: this.root.querySelector("#cmdSailState"),
+         cmdCut: this.root.querySelector("#cmdCut"),
+         cmdRight: this.root.querySelector("#cmdRight"),
+         cmdVessel: this.root.querySelector("#cmdVessel"),
       };
+      this._bindCommands();
       for (const side of ["PORT", "STBD"]) {
          for (const sec of ["BOW", "MID", "QUARTER"]) {
             const k = side + "_" + sec;
@@ -199,6 +256,62 @@ export class UI {
          this._refs.plan.masts[m] = this.root.querySelector("#pl_mast_" + m);
          this._refs.plan.xs[m] = this.root.querySelector("#pl_x_" + m);
       }
+   }
+
+   /**
+    * The orders panel: every command the captain can give, as a button.
+    * Buttons with data-cmd push the same queue event the key would; buttons
+    * with data-hold act like holding the key down (helm, sails). The game
+    * plugs in onCommand(name) and onHold(code, down).
+    */
+   _bindCommands() {
+      this.onCommand = null;
+      this.onHold = null;
+      for (const b of this.root.querySelectorAll("button.cmd[data-cmd]")) {
+         b.addEventListener("click", () => {
+            b.blur();
+            if (this.onCommand) this.onCommand(b.dataset.cmd);
+         });
+      }
+      for (const b of this.root.querySelectorAll("button.cmd[data-hold]")) {
+         const code = b.dataset.hold;
+         const set = (down) => {
+            b.classList.toggle("held", down);
+            if (this.onHold) this.onHold(code, down);
+         };
+         b.addEventListener("pointerdown", (e) => { e.preventDefault(); set(true); });
+         for (const ev of ["pointerup", "pointercancel", "pointerleave"]) b.addEventListener(ev, () => set(false));
+         b.addEventListener("click", () => b.blur());
+      }
+   }
+
+   _updateCommands(s) {
+      const R = this._refs;
+      if (!R.cmdPanel) return;
+      const armed = !!(s.vessel && s.vessel.guns);
+      R.cmdGuns.style.display = armed ? "" : "none";
+      if (armed && s.guns) {
+         const ready = s.guns.gunsReady || { PORT: s.guns.guns, STBD: s.guns.guns };
+         const st = (btn, g, n) => {
+            const ok = !!(g && g.ready && n > 0);
+            btn.classList.toggle("ready", ok);
+            btn.disabled = !ok;
+         };
+         st(R.cmdFireP, s.guns.PORT, ready.PORT);
+         st(R.cmdFireS, s.guns.STBD, ready.STBD);
+         R.cmdFireB.disabled = R.cmdFireP.disabled && R.cmdFireS.disabled;
+         R.cmdFireB.classList.toggle("ready", !R.cmdFireB.disabled);
+         const cur = s.guns.ammo ? s.guns.ammo.id : "ball";
+         for (const b of R.cmdAmmo) b.classList.toggle("on", b.dataset.cmd === "ammo:" + cur);
+      }
+      const square = !!(s.vessel && s.vessel.rig === "square");
+      R.cmdSailIn.textContent = square ? "Set sail" : "Trim in";
+      R.cmdSailOut.textContent = square ? "Reef" : "Trim out";
+      R.cmdSailState.textContent = square && typeof s.sailSet === "number"
+         ? Math.round(s.sailSet * 100) + "% set" : "";
+      R.cmdCut.disabled = !s.wreck;
+      R.cmdRight.disabled = !(s.boat && s.boat.capsize);
+      R.cmdVessel.style.display = s.multiplayer ? "none" : "";
    }
 
    update(s) {
@@ -289,6 +402,7 @@ export class UI {
          this._showMessage(s.message);
       }
       this._last.message = s.message;
+      this._updateCommands(s);
       this.drawCompass(s);
    }
 

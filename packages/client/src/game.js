@@ -95,6 +95,9 @@ export class Simulator {
 
       // UI
       this.ui = new UI(this.dom, compassC, menuEl, document.body);
+      // The orders panel in the HUD speaks the same language as the keyboard.
+      this.ui.onCommand = (cmd) => this.controls.queue.push(cmd);
+      this.ui.onHold = (code, down) => { this.controls.keys[code] = !!down; };
       this.ui.compass.width = 160;
       this.ui.compass.height = 160;
 
@@ -360,7 +363,7 @@ export class Simulator {
            <p>The battery fires to the sides. <b>Q</b> fires the port broadside,
            <b>E</b> the starboard, <b>F</b> both. The crews fire in sequence, the ship gets a recoil-heel impulse, and the
            powder smoke drifts with the wind — standing to leeward you are quickly in
-           your own smoke. Reloading takes 9 to 13 seconds depending on the ship.</p>
+           your own smoke. Reloading takes 60 to 75 seconds depending on the ship, longer with a thinned crew.</p>
            <h3>Battle, Damage and Wreck</h3>
            <p>In <b>Battle</b> mode a French enemy stands to windward.
            <b>Z</b> changes the load: <i>Round shot</i> into the hull (leaks, guns,
@@ -370,20 +373,22 @@ export class Simulator {
            <p>A fallen mast takes its sail area with it and hangs in the
            standing rigging <b>alongside</b> — the ship slows and lists toward the
            wreck side. <b>X</b> cuts the shrouds and clears the wreck.
-           Below-water leaks can only be kept in check by the pumps;
-           too many, and she sinks. Too much sail in a storm carries away the topmasts,
+           Oak sides swallow many round shot, but a ball at or below the waterline
+           opens a leak. The pumps hold a few leaks; too many, and she sinks. Too much sail in a storm carries away the topmasts,
            and on a reef the keel breaks open.</p>
            <h3>Controls</h3>
            <ul style="margin:6px 0 0 18px">
              <li><b>A / D</b> or <b>← / →</b> : Rudder (Port / Starboard)</li>
              <li><b>W / S</b> : Trim sails (in / out) — for manual trimming</li>
              <li><b>C</b> / <b>1–4</b> : Camera (Follow, Cockpit, Top-Down, Orbit)</li>
-             <li><b>M</b> / <b>Esc</b> : Menu · <b>R</b> : Restart course/training · <b>G</b> : Gusts</li>
+             <li><b>M</b> / <b>Esc</b> : Menu · <b>H</b> : Hide / show the HUD · 
+             <b>R</b> : Restart course/training · <b>G</b> : Gusts</li>
              <li><b>Q / E / F</b> : Port / Starboard / Both broadsides</li>
              <li><b>Z</b> : Change load &nbsp;·&nbsp; <b>X</b> : Cut away wreck</li>
              <li><b>V</b> : Change ship &nbsp;·&nbsp; <b>W / S</b> : set / reef sails on square-riggers</li>
              <li><b>Space</b> : Right the boat after capsize</li>
              <li><b>Mouse wheel</b> : Zoom · <b>Drag</b> : Rotate view</li>
+             <li><b>Orders panel</b> (bottom right) : every command as a button — hold the helm and sail buttons.</li>
            </ul>
            <p style="margin-top:12px"><b class="prim">Tipp:</b> Halte dich an den Kompass.
            The red arrow = ship, the blue = wind (from where), the turquoise = apparent wind.</p>
@@ -768,6 +773,7 @@ export class Simulator {
    _handleQueue() {
       const q = this.controls.drain();
       for (const ev of q) {
+         if (typeof ev === "string" && ev.startsWith("ammo:")) { this._setAmmo(ev.slice(5)); continue; }
          switch (ev) {
             case "cycleCamera":
                this.cam.cycle();
@@ -855,6 +861,15 @@ export class Simulator {
                break;
          }
       }
+   }
+
+   /** Load a specific ammunition (orders panel); Z still cycles. */
+   _setAmmo(id) {
+      if (!this.vessel.guns || !AMMO[id]) return;
+      if (this.battery.ammo === id) return;
+      this.battery.setAmmo(id);
+      if (this.session) this.session.setAmmo(id);
+      this.ui.showMessage("Loaded: " + AMMO[id].name + " — " + AMMO[id].desc);
    }
 
    // Breitseite: nur bewaffnete Schiffe, nicht gekentert, nicht im Menue
@@ -1131,6 +1146,7 @@ export class Simulator {
          crew: this.player.crew.status(),
          wreck: this.debris.hasWreckage(this.player.id),
          wreckDrag: this.player.wreckDrag,
+         multiplayer: !!this.session,
          depth: this.terrain.visible ? this.terrain.depthAt(b.pos.x, b.pos.z) : null,
          enemies: this.session ? this.session.others(b.pos)
          : this.mode === "Gefecht" ? this.fleet.ships.map((sh) => {

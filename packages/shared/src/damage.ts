@@ -157,6 +157,32 @@ export const AMMO: Record<string, AmmoSpec> = {
 };
 export const AMMO_ORDER: string[] = ["ball", "chain", "grape"];
 
+// Balance constants for shot damage and flooding, tuned towards the
+// historical picture: oak sides swallow dozens of round shot before the
+// structure gives way, guns and men are lost long before that, and what
+// actually sinks a ship is water - shot holes at or below the waterline
+// that the pumps cannot keep up with.
+/** Hull damage per hit for an 18-pound ball at point-blank range, scantling 1. */
+export const HULL_DAMAGE_PER_HIT = 0.03;
+/** Hits up to this height above the nominal waterline (m) count as below water. */
+export const WATERLINE_ZONE_M = 0.25;
+/** Chance that a below-water hit opens a leak. */
+export const LEAK_CHANCE_BELOW = 0.85;
+/** Upper edge of the "between wind and water" band, as a fraction of freeboard. */
+export const WIND_AND_WATER_BAND = 0.30;
+/** Chance that a hit in that band leaks as the ship rolls; the leak is half size. */
+export const LEAK_CHANCE_BAND = 0.30;
+/** Hull section integrity below which further hits there may leak regardless of height. */
+export const BREACHED_BELOW = 0.35;
+/** Chance that a hit on such an opened-up section lets water in (half size). */
+export const LEAK_CHANCE_BREACHED = 0.25;
+/** Leak opened by an 18-pound ball at point-blank range through scantling 1. */
+export const LEAK_SIZE_PER_HIT = 0.12;
+/** Inflow per unit of open below-water hole size and second (before reserve). */
+export const FLOOD_RATE = 0.032;
+/** Share of one side's guns dismounted by an 18-pound ball at point-blank range (mean). */
+export const GUN_LOSS_PER_HIT = 0.025;
+
 // Sektion aus der Laengsposition (0 = Bug, 1 = Spiegel)
 export function sectionAt(s: number): Section {
    if (s < 0.33) return "BOW";
@@ -297,19 +323,34 @@ export class DamageModel {
 
       // --- Hull ----------------------------------------------------------
       if (!isRigHit) {
-         const dmg = power * a.hull * 0.055 / this.scantling;
+         // Structural damage is slow: an 18-pounder at point-blank range takes
+         // ~3 % off a section, so a side needs dozens of hits before it is
+         // beaten. Water is the faster killer, see the leak rules below.
+         const dmg = power * a.hull * HULL_DAMAGE_PER_HIT / this.scantling;
          const key = side + "_" + sec;
+         const breached = this.hull[key] < BREACHED_BELOW;
          this.hull[key] = clamp(this.hull[key] - dmg, 0, 1);
-         res.splinters = Math.round(clamp(dmg * 190 * a.hull, 2, 26));
+         res.splinters = Math.round(clamp(power * a.hull * 9, 2, 26));
 
-         if (a.hull > 0.5 && dmg > 0.012) {
+         // Does the ball go through the side at all? Chain barely, grape not,
+         // a spent ball at long range lodges in the timber.
+         if (a.hull > 0.5 && power * a.hull / this.scantling > 0.22) {
             res.holed = true;
-            // "Between wind and water": hits just above the waterline tear open
-            // as the ship pitches — the dangerous ones. Deep hits are rarer.
-            const low = (hit.y ?? FB) < FB * 0.42;
-            if (low && this.rng() < 0.55) {
+            // Where the ball went in decides whether water follows:
+            //  - at or below the waterline: almost always a leak;
+            //  - "between wind and water", the strip the roll exposes: sometimes;
+            //  - higher up: only once the section is shot through and the
+            //    planking is working loose.
+            const y = hit.y ?? FB * 0.5;
+            const belowWater = y < WATERLINE_ZONE_M;
+            const inBand = !belowWater && y < FB * WIND_AND_WATER_BAND;
+            let leak = 0;
+            if (belowWater) { if (this.rng() < LEAK_CHANCE_BELOW) leak = 1; }
+            else if (inBand) { if (this.rng() < LEAK_CHANCE_BAND) leak = 0.5; }
+            else if (breached) { if (this.rng() < LEAK_CHANCE_BREACHED) leak = 0.5; }
+            if (leak > 0) {
                res.below = true;
-               const size = dmg * (0.6 + this.rng() * 0.8);
+               const size = leak * LEAK_SIZE_PER_HIT * power / this.scantling * (0.7 + this.rng() * 0.6);
                this.holes.push({ side, sec, below: true, size });
                this._event("holed", { side, sec, size });
             } else {
@@ -319,7 +360,7 @@ export class DamageModel {
 
          // Rohre ausgeschlagen
          if (a.gun > 0 && sec !== "QUARTER") {
-            const loss = power * a.gun * 0.045 * (0.5 + this.rng());
+            const loss = power * a.gun * GUN_LOSS_PER_HIT * (0.5 + this.rng());
             const before = this.guns[side];
             this.guns[side] = clamp(this.guns[side] - loss, 0, 1);
             res.gunsLost = before - this.guns[side];
@@ -470,7 +511,7 @@ export class DamageModel {
       const heelExtra = clamp((ctx.heel ?? 0) / 40, 0, 1) * 0.4;
       // Pumps only run while people are at them
       const pumps = (this.isPlayer ? 0.010 : 0.008) * clamp(ctx.pump ?? 1, 0, 1.3);
-      const rate = (inflow * 0.032 * (1 + heelExtra)) / Math.max(this.reserve, 0.2);
+      const rate = (inflow * FLOOD_RATE * (1 + heelExtra)) / Math.max(this.reserve, 0.2);
       this.flooding = clamp(this.flooding + (rate - pumps) * dt, 0, 1);
       if (this.flooding >= 1 && !this.sunk) {
          this.sunk = true;

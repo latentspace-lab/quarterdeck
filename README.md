@@ -192,7 +192,7 @@ Die luvseitige Rahnock geht dabei nach achtern, das Tuch wölbt sich nach Lee.
 - Der Rauch **treibt mit dem Wind ab**: zu Lee steht man schnell im eigenen Qualm.
 - Der Rückstoß gibt einen kurzen **Krängungsstoß** zur Gegenseite, die Rohre
   fahren zurück und werden wieder ausgerannt.
-- **Nachladen** dauert 9 s (Sloop) bis 13 s (Linienschiff), je Seite getrennt.
+- **Nachladen** dauert 60 s (Sloop, Fregatte) bis 75 s (Linienschiff), je Seite getrennt; französische Bedienungen brauchen 80 bis 100 s.
   Der Balken im HUD zeigt den Fortschritt.
 
 ---
