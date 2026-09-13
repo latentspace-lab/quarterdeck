@@ -32,6 +32,15 @@ export const POLAR_FRIGATE = [
    [170, 7.6], [180, 7.2],
 ];
 
+// 38/44-Kanonen-Fregatte: Indefatigable (1784) — eines der schnellsten Rahsegel-
+// schiffe der Royal Navy. Bekannt durch Admiral Sir Edward Pellew. Leichter
+// als die Lydia auf allen Kursen.
+export const POLAR_INDEFATIGABLE = [
+   [0, 0.0], [45, 0.0], [58, 0.5], [66, 2.3], [72, 4.0], [80, 5.2], [90, 6.6],
+   [100, 7.6], [115, 8.6], [130, 9.2], [140, 9.5], [150, 9.2], [160, 8.6],
+   [170, 8.0], [180, 7.6],
+];
+
 // 74-Kanonen-Linienschiff: schwer, traege, kreuzt schlecht - dafuer
 // unerschuetterlich und mit doppelter Batterie.
 export const POLAR_THIRD_RATE = [
@@ -154,7 +163,43 @@ export const VESSELS = [
       cam: { dist: 88, height: 31, cockpitZ: -16.5, cockpitY: 9.6, lead: 17, targetY: 13 },
    },
    {
-      id: "sutherland",
+      id: "indefatigable",
+      name: "Indefatigable",
+      prefix: "HMS",
+      klass: "Fregatte 4. Ranges",
+      rate: "38/44-Kanonen-Fregatte",
+      rig: "square",
+      era: "1796",
+      desc: "Die Unermuedliche: beruehmt durch Admiral Pellew, eines der schnellsten Rahsegel-Kriegsschiffe. Leichter als die Lydia, schneller auf allen Kursen.",
+      crew: 315,
+      hull: { loa: 44.5, beam: 11.8, draft: 4.8, displacement: 820 },
+      sail: { noGo: 63, polar: POLAR_INDEFATIGABLE, tackAssist: 0.52 },
+      dyn: {
+         turnRate: 9.0,
+         rudderRef: 3.5,
+         accelUp: 0.055,      // ~18 s: etwas lebhafter als die Lydia
+         accelDown: 0.100,
+         accelLuff: 0.28,
+         maxHeel: 14,
+         capsizeHeel: 50,
+         heelScale: 0.64,
+         leewayMax: 10,
+      },
+      guns: {
+         decks: [
+            { y: 0.52, count: 12, from: 0.16, to: 0.84, calibre: "18-Pfünder" },
+            { y: 0.72, count: 10, from: 0.18, to: 0.82, calibre: "9-Pfünder" },
+         ],
+         reload: 11.0,
+         spread: 0.32,
+         recoil: 0.72,
+         rollKick: 2.0,
+         range: 520,
+      },
+      structure: { scantling: 0.82, mastStrength: 0.88, reserve: 0.82 },
+      cam: { dist: 82, height: 29, cockpitZ: -15.5, cockpitY: 9.0, lead: 16, targetY: 12 },
+   },
+   {
       name: "Sutherland",
       prefix: "HMS",
       klass: "Linienschiff 3. Ranges",
