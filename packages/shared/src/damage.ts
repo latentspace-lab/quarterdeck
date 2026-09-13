@@ -258,7 +258,8 @@ export class DamageModel {
       return this.integrity() < 0.32 || this.mastsStanding() <= 1 || this.flooding > 0.5;
    }
    drainEvents(): DamageEvent[] { const e = this._events; this._events = []; return e; }
-   private _event(type: string, data: Record<string, unknown>): void { this._events.push({ type, ...data }); }
+   /** Queue an event. Public because seamanship and the ship classes report through the same queue. */
+   _event(type: string, data: Record<string, unknown>): void { this._events.push({ type, ...data }); }
 
    // ------------------------------------------------------------ Treffer
    // hit: { side, s (0..1 Bug->Heck), y (Hoehe ueber Wasserlinie, m),

@@ -29,7 +29,8 @@ Danach im Browser öffnen: **http://localhost:5173/**
 npm run build     # Produktions-Build → packages/client/dist
 npm run preview   # Build testen → http://localhost:4173/
 npm run typecheck # TypeScript in shared/ und server/ prüfen
-npm run server    # Headless-Simulation ohne Browser (Phase-0-Nachweis)
+npm run server    # game server (Colyseus) on ws://0.0.0.0:2567 — PORT/HOST override
+npm run server:headless  # run a simulation without browser or socket, print timings
 npm test          # alle Testebenen
 ```
 
@@ -409,8 +410,13 @@ segel-simulator/
 │  │     ├─ vessels.ts       # Schiffskatalog: Masse, Polarkurven, Dynamik, Batterien
 │  │     └─ factions.ts      # Parteien: Doktrin, Ausbildungsstand, Flagge
 │  │
-│  ├─ server/            # @segel/server — headless. Phase 1 bringt hier Colyseus ein.
-│  │  └─ src/headless.ts     # HeadlessRoom/HeadlessShip: ein Raum ohne Browser
+│  ├─ server/            # @segel/server — the game server (Colyseus 0.18)
+│  │  ├─ src/index.ts        # startServer(): HTTP + WebSocket transport, room registry
+│  │  ├─ src/rooms/BattleRoom.ts  # clients -> ships, messages -> inputs, tick -> patches
+│  │  ├─ src/state/GameState.ts   # synchronised schema: ships, wind, sea, tick
+│  │  ├─ src/sim/Simulation.ts    # one room's world: wind, sea, ships, collisions, grounding
+│  │  ├─ src/sim/ServerShip.ts    # a ship without Three.js: dynamics, damage, crew, pose
+│  │  └─ src/headless.ts          # CLI: run a simulation headless and print timings
 │  │
 │  └─ client/            # @segel/client — Browser: Three.js, Eingabe, HUD
 │     ├─ index.html
