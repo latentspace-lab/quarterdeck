@@ -29,9 +29,36 @@ Danach im Browser öffnen: **http://localhost:5173/**
 npm run build     # Produktions-Build → packages/client/dist
 npm run preview   # Build testen → http://localhost:4173/
 npm run typecheck # TypeScript in shared/ und server/ prüfen
-npm run server    # Headless-Simulation ohne Browser (Phase-0-Nachweis)
+npm run server    # game server (Colyseus) on ws://0.0.0.0:2567 — PORT/HOST override
+npm run server:headless  # run a simulation without browser or socket, print timings
 npm test          # alle Testebenen
 ```
+
+### Multiplayer
+
+```bash
+npm run server   # terminal 1: game server on ws://0.0.0.0:2567
+npm run dev      # terminal 2: client on http://localhost:5173/sailing/
+```
+
+In the menu choose **Multiplayer**: the open rooms on the server are listed
+(name, players, AI enemies, wind) with a Join button each. Or pick a ship and
+press Join to enter any open room — or create one, with the room name, wind
+and the AI enemies from the scenario cards. **Regatta** rooms race the
+windward-leeward course: the server judges the line, the marks and the laps
+for every boat. **Practice** creates a private one-seat room against the AI
+on the server. Deep link:
+`http://localhost:5173/sailing/?mp=1&server=ws://localhost:2567&vessel=lydia&name=Hornblower&enemies=amelie&roomName=Trafalgar`
+(`&mode=practice` for a practice room, `&room=<id>` to join a specific one).
+
+What is shared: ships, wind, sea, damage, masts, collisions, grounding and
+gunnery come from the server. Q/E/F order a broadside; the server fires it,
+every client plays the salvo, the balls (with the server's exact ballistics)
+and the hits. The helm is predicted: your ship answers the rudder at once,
+and every acknowledged server state is replayed with the inputs the server
+has not seen yet - the two agree to the centimetre unless something the
+server alone knows (a collision, the ground) intervened, and then the
+picture eases onto the corrected place instead of jumping.
 
 > **Wichtig:** Befehle immer **ohne** angehängten Kommentar ausführen.
 > In zsh ist `#` interaktiv standardmäßig *kein* Kommentar — `npm run dev  # → ...`
@@ -409,8 +436,15 @@ segel-simulator/
 │  │     ├─ vessels.ts       # Schiffskatalog: Masse, Polarkurven, Dynamik, Batterien
 │  │     └─ factions.ts      # Parteien: Doktrin, Ausbildungsstand, Flagge
 │  │
-│  ├─ server/            # @segel/server — headless. Phase 1 bringt hier Colyseus ein.
-│  │  └─ src/headless.ts     # HeadlessRoom/HeadlessShip: ein Raum ohne Browser
+│  ├─ server/            # @segel/server — the game server (Colyseus 0.18)
+│  │  ├─ src/index.ts        # startServer(): HTTP + WebSocket transport, room registry
+│  │  ├─ src/rooms/BattleRoom.ts  # clients -> ships, messages -> inputs, tick -> patches
+│  │  ├─ src/state/GameState.ts   # synchronised schema: ships, wind, sea, tick
+│  │  ├─ src/sim/Simulation.ts    # one room's world: wind, sea, ships, guns, collisions, grounding
+│  │  ├─ src/sim/ServerShip.ts    # a ship without Three.js: dynamics, damage, crew, guns, pose
+│  │  ├─ src/sim/ServerBattery.ts # the deciding half of a battery: salvo, flight, hit test
+│  │  ├─ src/sim/Captain.ts       # AI captain (port of the client's fleet.js)
+│  │  └─ src/headless.ts          # CLI: run a simulation headless and print timings
 │  │
 │  └─ client/            # @segel/client — Browser: Three.js, Eingabe, HUD
 │     ├─ index.html

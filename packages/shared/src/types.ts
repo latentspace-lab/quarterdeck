@@ -7,6 +7,7 @@
 
 import type { Tack } from "./physics.ts";
 import type { Side } from "./damage.ts";
+import type { XYZ } from "./ballistics.ts";
 
 /**
  * Zustand eines Schiffs, wie ihn der Server je Tick veroeffentlicht.
@@ -30,6 +31,8 @@ export interface ShipState {
    twa: number;
    tack: Tack;
    luffing: boolean;
+   /** leeway angle (deg) - part of the dynamics state the client re-simulates from */
+   leeway: number;
    isCapsized: boolean;
    alive: boolean;
 
@@ -41,10 +44,35 @@ export interface ShipState {
    struck: boolean;
    sunk: boolean;
 
+   // --- Damage detail (for the HUD plan and the remote models; changes rarely) ---
+   hullPortBow: number;
+   hullPortMid: number;
+   hullPortQuarter: number;
+   hullStbdBow: number;
+   hullStbdMid: number;
+   hullStbdQuarter: number;
+   rigging: number;
+   sails: number;
+   rudderState: number;
+   gunsPort: number;
+   gunsStbd: number;
+   /** mast integrity 0..1 */
+   mastFore: number;
+   mastMain: number;
+   mastMizzen: number;
+   /** 0 sound, 1 wounded, 2 gone */
+   mastForeState: number;
+   mastMainState: number;
+   mastMizzenState: number;
+
    // --- Batterie ---
    reloadPort: number;
    reloadStbd: number;
+   /** seconds a full reload takes (crew-dependent) */
+   reloadTime: number;
    ammo: string;
+   /** guns per side */
+   guns: number;
 
    // --- Server-seitige Eingaben in BoatDynamics.step() ---
    driveMul: number;
@@ -57,6 +85,18 @@ export interface ShipState {
 
    /** Letztes vom Server angewandtes InputCommand (Bestaetigung der Vorhersage) */
    lastSeq: number;
+
+   // --- Race (regatta rooms; zero elsewhere) ---
+   /** current leg index into the course's legs */
+   raceLeg: number;
+   /** laps completed */
+   raceLap: number;
+   /** 0..1 along the lap */
+   raceProgress: number;
+   /** seconds into the current lap */
+   raceTime: number;
+   /** best lap in seconds, -1 = none yet */
+   raceBest: number;
 }
 
 /**
@@ -98,3 +138,137 @@ export interface WorldSnapshot {
    sea: SeaSync;
    ships: ShipState[];
 }
+
+// ---------------------------------------------------------------------------
+// Room protocol (Phase 1)
+//
+// State flows through the Colyseus schema (GameState in the server package);
+// everything that is an occurrence rather than a value goes through the
+// messages below.
+// ---------------------------------------------------------------------------
+
+/** Message names on the wire. */
+export const MSG = {
+   /** client -> server: one InputCommand */
+   input: "input",
+   /** server -> client, once after joining */
+   welcome: "welcome",
+   /** server -> all clients: a ServerEvent */
+   event: "event",
+} as const;
+
+/** What the first client passes when creating a room. Anything omitted is seeded. */
+export interface RoomCreateOptions {
+   terrainSeed?: number;
+   rngSeed?: number;
+   windBaseDir?: number;
+   windBaseSpeed?: number;
+   windVariability?: number;
+   /** Vessel ids of AI-captained enemies spawned to windward at room creation. */
+   enemies?: string[];
+   /** Shown in the lobby list. */
+   roomName?: string;
+}
+
+/** Room names as registered on the server. */
+export const ROOMS = {
+   /** 2..8 players, AI enemies optional, listed in the lobby */
+   battle: "battle",
+   /** one player against AI, private */
+   practice: "practice",
+   /** 2..8 players racing the windward-leeward course, listed in the lobby */
+   regatta: "regatta",
+} as const;
+
+/** What a room publishes for the lobby list (Colyseus metadata). */
+export interface RoomMeta {
+   name: string;
+   mode: "battle" | "practice" | "regatta";
+   enemies: string[];
+   windBaseDir: number;
+   windBaseSpeed: number;
+   createdAt: number;
+}
+
+/** What a client passes when joining. */
+export interface JoinOptions {
+   vesselId?: string;
+   name?: string;
+}
+
+export interface WelcomeMessage {
+   /** The ship this client controls; equals the Colyseus session id */
+   shipId: string;
+   params: WorldParams;
+   tick: number;
+   /** the room's kind */
+   mode: "battle" | "practice" | "regatta";
+   /** the course, in a regatta room */
+   course?: { origin: { x: number; z: number } };
+}
+
+/** Something that happened to one ship (mast lost, holed, sunk, struck, aground, swamped, cutAway ...). */
+export interface ShipEvent {
+   type: string;
+   shipId: string;
+   [key: string]: unknown;
+}
+
+/** Something that happened between ships. */
+export type WorldEvent =
+   | { type: "collision"; a: string; b: string; closing: number }
+   | { type: "locked"; a: string; b: string };
+
+/** A broadside was ordered: play the thunder and the flashes. */
+export interface SalvoEvent {
+   kind: "salvo";
+   shipId: string;
+   side: Side;
+   ammo: string;
+   /** guns that will fire */
+   count: number;
+}
+
+/**
+ * Projectiles that left their muzzles this tick, with the exact origin and
+ * velocity the server integrates. Clients replay the flight with the same
+ * stepProjectile() and draw the balls where the server has them - no local
+ * spread, no local hit test.
+ */
+export interface ShotsEvent {
+   kind: "shots";
+   shipId: string;
+   shots: Array<{ origin: XYZ; vel: XYZ; ammo: string; lb: number; drag: number }>;
+}
+
+/** A projectile struck a ship. Everything the client needs for the effects. */
+export interface HitEvent {
+   kind: "hit";
+   /** the ship that was hit */
+   shipId: string;
+   /** the ship that fired */
+   from: string;
+   side: Side;
+   /** 0 = bow .. 1 = stern */
+   s: number;
+   /** height above the waterline in the target's frame (m) */
+   y: number;
+   inRig: boolean;
+   world: XYZ;
+   dir: XYZ;
+   ammo: string;
+   lb: number;
+   range01: number;
+   splinters: number;
+   holed: boolean;
+   below: boolean;
+   mastBroken: string | null;
+   casualties: number;
+}
+
+export type ServerEvent =
+   | ({ kind: "ship" } & ShipEvent)
+   | ({ kind: "world" } & WorldEvent)
+   | SalvoEvent
+   | ShotsEvent
+   | HitEvent;
