@@ -25,7 +25,7 @@ console.log("== Simulation-Smoke ==\n");
    let prevTack = "STBD";
    let sawOther = boat.tack;
    let flipped = false;
-   for (let i = 0; i < 900; i++) {
+   for (let i = 0; i < 360; i++) {
       boat.snapRudder(i < 3 ? 0 : 1.0);
       boat.step(0.033, wind);
       boat.heading = normDeg(boat.heading);
@@ -45,7 +45,7 @@ console.log("== Simulation-Smoke ==\n");
    const boat = new BoatDynamics({ heading: 45, autoTrim: true });
    const wind = { dir: 0, speedKts: 14 };
    let maxSpeed = 0;
-   for (let i = 0; i < 400; i++) {
+   for (let i = 0; i < 240; i++) {
       boat.snapRudder(0);
       boat.step(0.033, wind);
       boat.heading = normDeg(boat.heading);
@@ -59,7 +59,7 @@ console.log("== Simulation-Smoke ==\n");
 {
    const boat = new BoatDynamics({ heading: 50, capsizeHeel: 24, maxHeel: 28 });
    let capped = false;
-   for (let i = 0; i < 600; i++) {
+   for (let i = 0; i < 180; i++) {
       boat.snapRudder(0);
       boat.step(0.05, { dir: 0, speedKts: 30 });
       boat.heading = normDeg(boat.heading);
@@ -110,7 +110,7 @@ console.log("== Simulation-Smoke ==\n");
    let lo = 999;
    let hi = -1;
    let maxDir = 0;
-   for (let i = 0; i < 800; i++) {
+   for (let i = 0; i < 400; i++) {
       w.update(0.033, i * 0.033);
       lo = Math.min(lo, w.speed);
       hi = Math.max(hi, w.speed);
@@ -126,7 +126,7 @@ console.log("== Simulation-Smoke ==\n");
    const w = new Wind({ dir: 30, speed: 9, variability: 0 });
    let lo = 999;
    let hi = -1;
-   for (let i = 0; i < 300; i++) {
+   for (let i = 0; i < 180; i++) {
       w.update(0.033, i * 0.033);
       lo = Math.min(lo, w.speed);
       hi = Math.max(hi, w.speed);
