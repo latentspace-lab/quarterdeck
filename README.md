@@ -34,6 +34,24 @@ npm run server:headless  # run a simulation without browser or socket, print tim
 npm test          # alle Testebenen
 ```
 
+### Multiplayer
+
+```bash
+npm run server   # terminal 1: game server on ws://0.0.0.0:2567
+npm run dev      # terminal 2: client on http://localhost:5173/sailing/
+```
+
+In the menu choose **Multiplayer**, enter the server (defaults to port 2567 on
+the page's host), a name and optionally a room id, pick a ship and join. An
+empty room id joins any open room or creates one; wind and the AI enemies from
+the scenario cards apply to the room you create. Deep link:
+`http://localhost:5173/sailing/?mp=1&server=ws://localhost:2567&vessel=lydia&name=Hornblower&enemies=amelie`.
+
+What is shared today: ships, wind, sea, damage, masts, collisions and
+grounding come from the server; the helm is local for responsiveness and is
+pulled gently onto the server's copy (proper prediction is Phase 3). Gunnery
+over the wire follows in the next PR.
+
 > **Wichtig:** Befehle immer **ohne** angehängten Kommentar ausführen.
 > In zsh ist `#` interaktiv standardmäßig *kein* Kommentar — `npm run dev  # → ...`
 > übergibt `#`, `→`, `http://...` als Argumente an vite und der Start bricht mit

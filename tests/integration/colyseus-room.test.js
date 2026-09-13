@@ -43,6 +43,12 @@ async function run() {
       eq(welcome.shipId, room.sessionId, "the welcome names our ship (= session id)");
       ok(Number.isInteger(welcome.params.terrainSeed), "and carries the world parameters", "seed " + welcome.params.terrainSeed);
       eq(welcome.params.tickRate, SIM_HZ, "at the shared tick rate");
+      // A room created without options must still hand out complete
+      // parameters - a client that seeds its wind from `undefined` sails NaN.
+      ok(Number.isFinite(welcome.params.windBaseDir) && welcome.params.windBaseSpeed > 0
+         && Number.isFinite(welcome.params.windVariability),
+         "wind parameters are complete even when the room was created without any",
+         `${welcome.params.windBaseDir}° ${welcome.params.windBaseSpeed} kn var ${welcome.params.windVariability}`);
 
       await waitFor(() => room.state && room.state.tick > 5 && !!shipOf(room, room.sessionId), 5000, "first patches");
       const me = shipOf(room, room.sessionId);

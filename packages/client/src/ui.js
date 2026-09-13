@@ -584,6 +584,9 @@ export class UI {
          onVesselChange: opts.onVesselChange || (() => {}),
          onStart: opts.onStart,
          onHelp: opts.onHelp,
+         mp: { url: "", name: "", roomId: "", connected: false, ...(opts.multiplayer || {}) },
+         onJoin: opts.onJoin || (() => {}),
+         onResume: opts.onResume || null,
       };
       this.renderMenu(m);
    }
@@ -594,7 +597,9 @@ export class UI {
          ["Gefecht", "Seegefecht gegen die Franzosen"],
          ["Regatta", "Runden-Kurs mit Wendebojen"],
          ["Training", "Segeltechnische Übungen"],
+         ["Multiplayer", "Join a battle on a server"],
       ];
+      const isMp = m.mode === "Multiplayer";
       const modeHtml = modes
          .map(
             ([k, d]) =>
@@ -627,7 +632,7 @@ export class UI {
 
       // Battle nur zeigen, wenn auch gekaempft wird
       let scenarioHtml = "";
-      if (m.mode === "Gefecht" && m.scenarios.length) {
+      if ((m.mode === "Gefecht" || isMp) && m.scenarios.length) {
          const unarmed = !selected.guns;
          const cards = m.scenarios.map((sc) => {
             const force = (sc.forces[m.vesselId] || []);
@@ -640,10 +645,35 @@ export class UI {
                   <div class="sc-force">${label}</div>
                </button>`;
          }).join("");
-         scenarioHtml = `<div class="sec-label">Battle</div>
+         scenarioHtml = `<div class="sec-label">${isMp ? "AI enemies (when creating a room)" : "Battle"}</div>
             <div class="sc-grid">${cards}</div>`
-            + (unarmed ? `<div class="sc-hint">${selected.name} has no guns — choose a warship.</div>` : "");
+            + (unarmed && !isMp ? `<div class="sc-hint">${selected.name} has no guns — choose a warship.</div>` : "");
       }
+
+      const mpHtml = !isMp ? "" : `
+            <div class="sec-label">Server</div>
+            <div class="menu-controls">
+               <label class="ctrl">
+                  <span>Server</span>
+                  <input type="text" id="mpUrl" value="${escapeAttr(m.mp.url)}" spellcheck="false" />
+               </label>
+               <label class="ctrl">
+                  <span>Your name</span>
+                  <input type="text" id="mpName" value="${escapeAttr(m.mp.name)}" maxlength="24" />
+               </label>
+               <label class="ctrl">
+                  <span>Room id (empty: join any open room, or create one)</span>
+                  <input type="text" id="mpRoom" value="${escapeAttr(m.mp.roomId)}" spellcheck="false" />
+               </label>
+            </div>
+            <div class="sc-hint">Wind and enemies below apply when your join creates the room.</div>`;
+
+      const startLabel = isMp
+         ? "Join · " + vesselLabel(selected)
+         : `${m.mode} · ${vesselLabel(selected)}`;
+      const resumeHtml = m.mp.connected && m.onResume
+         ? `<button id="menuResume">Back to the battle</button>`
+         : "";
 
       this.menuEl.innerHTML =
           `<div class="menu-card">
@@ -653,6 +683,7 @@ export class UI {
             <div class="ship-grid">${shipHtml}</div>
             <div class="sec-label">Game Mode</div>
             <div class="mode-grid m4">${modeHtml}</div>
+            ${mpHtml}
             ${scenarioHtml}
             <div class="menu-controls">
                <label class="ctrl">
@@ -671,7 +702,8 @@ export class UI {
                </label>
             </div>
             <div class="menu-btns">
-               <button class="primary" id="menuStart">${m.mode} · ${vesselLabel(selected)}</button>
+               <button class="primary" id="menuStart">${startLabel}</button>
+               ${resumeHtml}
                <button id="menuHelp">Help</button>
             </div>
          </div>`;
@@ -721,8 +753,32 @@ export class UI {
          m.gusts = gusts.checked;
          m.onWindChange(m.windDir, m.windSpeed, m.gusts);
       };
-      this.menuEl.querySelector("#menuStart").onclick = () =>
+      for (const [id, key] of [["#mpUrl", "url"], ["#mpName", "name"], ["#mpRoom", "roomId"]]) {
+         const el = this.menuEl.querySelector(id);
+         if (el) el.oninput = () => { m.mp[key] = el.value.trim(); };
+      }
+      this.menuEl.querySelector("#menuStart").onclick = () => {
+         if (isMp) {
+            const sc = m.scenarios.find((s) => s.id === m.scenarioId);
+            const enemies = sc ? (sc.forces[m.vesselId] || []) : [];
+            m.onJoin({
+               url: m.mp.url,
+               name: m.mp.name,
+               roomId: m.mp.roomId || undefined,
+               vesselId: m.vesselId,
+               create: {
+                  enemies,
+                  windBaseDir: m.windDir,
+                  windBaseSpeed: m.windSpeed,
+                  windVariability: m.gusts ? 1 : 0,
+               },
+            });
+            return;
+         }
          m.onStart(m.mode, m.windDir, m.windSpeed, m.gusts, m.vesselId, m.scenarioId);
+      };
+      const resume = this.menuEl.querySelector("#menuResume");
+      if (resume) resume.onclick = () => m.onResume();
       this.menuEl.querySelector("#menuHelp").onclick = () => m.onHelp(m);
    }
 
@@ -778,6 +834,10 @@ function damageColor(v) {
       }
    }
    return "rgb(46,122,72)";
+}
+
+function escapeAttr(s) {
+   return String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
 }
 
 function pointColor(twa, luffing, noGo = 32) {
