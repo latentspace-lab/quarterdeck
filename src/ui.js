@@ -1,6 +1,7 @@
 // ui.js - 2D-HUD + 2D-Kompass + Menue + Training-Panel
 import { normDeg } from "./utils.js";
-import { VESSELS, vesselLabel, broadsideWeight, gunCount } from "./vessels.js";
+import { VESSELS, vesselLabel, broadsideWeight, gunCount, shipsOfFaction, getVessel } from "./vessels.js";
+import { FACTIONS, getFaction, enemyFactionFor } from "./factions.js";
 
 export class UI {
    constructor(rootHud, compassCanvas, menuEl, bodyEl) {
@@ -214,7 +215,8 @@ export class UI {
 
       if (s.vessel) {
          R.ship.textContent = vesselLabel(s.vessel);
-         R.shipRate.textContent = s.vessel.rate;
+         R.shipRate.textContent = s.vessel.rate
+            + (s.faction ? " · " + s.faction.name : "");
       }
       this._updateGuns(s);
       this._updateDamage(s);
@@ -577,9 +579,12 @@ export class UI {
          windDir: opts.windDir,
          windSpeed: opts.windSpeed,
          gusts: opts.gusts,
+         factionId: opts.factionId || "gb",
+         onFactionChange: opts.onFactionChange || (() => {}),
          scenarioId: opts.scenarioId || "single",
          scenarios: opts.scenarios || [],
          onScenarioChange: opts.onScenarioChange || (() => {}),
+         forcesFor: opts.forcesFor || null,
          onWindChange: opts.onWindChange,
          onVesselChange: opts.onVesselChange || (() => {}),
          onStart: opts.onStart,
@@ -591,7 +596,7 @@ export class UI {
    renderMenu(m) {
       const modes = [
          ["Freeride", "Frei auf See, Windspielen"],
-         ["Gefecht", "Seegefecht gegen die Franzosen"],
+         ["Gefecht", "Seegefecht unter eigener Flagge"],
          ["Regatta", "Runden-Kurs mit Wendebojen"],
          ["Training", "Segeltechnische Übungen"],
       ];
@@ -604,7 +609,18 @@ export class UI {
                </button>`
             )
          .join("");
-      const shipHtml = VESSELS.map((v) => {
+      const faction = getFaction(m.factionId);
+      const factionHtml = FACTIONS.map((f) => `
+         <button class="fac-btn${m.factionId === f.id ? " active" : ""}" data-fac="${f.id}"
+                 style="--fac:${f.color}">
+            <div class="fac-name">${f.name}</div>
+            <div class="fac-land">${f.country}</div>
+            <div class="fac-desc">${f.desc}</div>
+         </button>`).join("");
+
+      // Die Yacht bleibt als Übungsboot in jeder Partei wählbar
+      const roster = shipsOfFaction(m.factionId).concat([getVessel("yacht")]);
+      const shipHtml = roster.map((v) => {
          const guns = v.guns
             ? `<span class="sb-g">${gunCount(v)} Rohre · ${broadsideWeight(v)} lb Breitseite</span>`
             : `<span class="sb-g">ohne Bewaffnung</span>`;
@@ -623,24 +639,26 @@ export class UI {
                   <div class="sb-foot">${guns}</div>
                </button>`;
       }).join("");
-      const selected = VESSELS.find((v) => v.id === m.vesselId) || VESSELS[0];
+      const selected = roster.find((v) => v.id === m.vesselId) || roster[0];
+      m.vesselId = selected.id;
 
       // Gefechtslage nur zeigen, wenn auch gekaempft wird
       let scenarioHtml = "";
       if (m.mode === "Gefecht" && m.scenarios.length) {
          const unarmed = !selected.guns;
+         const foe = enemyFactionFor(m.factionId);
          const cards = m.scenarios.map((sc) => {
-            const force = (sc.forces[m.vesselId] || []);
+            const force = unarmed ? [] : (m.forcesFor ? m.forcesFor(sc.id, selected, foe) : []);
             const label = unarmed || !force.length
                ? "kein Gegner für dieses Schiff"
-               : force.length + (force.length === 1 ? " Gegner" : " Gegner");
+               : force.map((f) => f.name).join(" + ");
             return `<button class="sc-btn${m.scenarioId === sc.id ? " active" : ""}${unarmed ? " off" : ""}" data-sc="${sc.id}">
                   <div class="sc-title">${sc.title}</div>
                   <div class="sc-desc">${sc.desc}</div>
                   <div class="sc-force">${label}</div>
                </button>`;
          }).join("");
-         scenarioHtml = `<div class="sec-label">Gefechtslage</div>
+         scenarioHtml = `<div class="sec-label">Gefechtslage — Gegner: ${foe.name}</div>
             <div class="sc-grid">${cards}</div>`
             + (unarmed ? `<div class="sc-hint">Die ${selected.name} führt keine Geschütze — wähle ein Kriegsschiff.</div>` : "");
       }
@@ -649,7 +667,9 @@ export class UI {
           `<div class="menu-card">
             <h1>Segel-Simulator 3D</h1>
             <p class="subm">Wende · Krause · Raumschot — semi-realistische Physik</p>
-            <div class="sec-label">Schiff</div>
+            <div class="sec-label">Partei</div>
+            <div class="fac-grid">${factionHtml}</div>
+            <div class="sec-label">Schiff · ${faction.name}</div>
             <div class="ship-grid">${shipHtml}</div>
             <div class="sec-label">Spielmodus</div>
             <div class="mode-grid m4">${modeHtml}</div>
@@ -683,6 +703,18 @@ export class UI {
          b.onclick = () => {
              m.mode = b.dataset.mode;
              this.renderMenu(m);
+         };
+      });
+      this.menuEl.querySelectorAll(".fac-btn").forEach((b) => {
+         b.onclick = () => {
+            m.factionId = b.dataset.fac;
+            // Schiff auf das erste der neuen Partei umstellen
+            const list = shipsOfFaction(m.factionId);
+            if (list.length && !list.some((v) => v.id === m.vesselId) && m.vesselId !== "yacht") {
+               m.vesselId = list[0].id;
+            }
+            m.onFactionChange(m.factionId, m.vesselId);
+            this.renderMenu(m);
          };
       });
       this.menuEl.querySelectorAll(".sc-btn").forEach((b) => {
@@ -722,7 +754,7 @@ export class UI {
          m.onWindChange(m.windDir, m.windSpeed, m.gusts);
       };
       this.menuEl.querySelector("#menuStart").onclick = () =>
-         m.onStart(m.mode, m.windDir, m.windSpeed, m.gusts, m.vesselId, m.scenarioId);
+         m.onStart(m.mode, m.windDir, m.windSpeed, m.gusts, m.vesselId, m.scenarioId, m.factionId);
       this.menuEl.querySelector("#menuHelp").onclick = () => m.onHelp(m);
    }
 
