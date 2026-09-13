@@ -54,6 +54,9 @@ async function run() {
       const me = shipOf(room, room.sessionId);
       eq(me.vesselId, "lydia", "our ship is the vessel we asked for");
       eq(me.name, "Hornblower", "with the name we gave");
+      eq(me.guns, 13, "the state carries the guns per side");
+      ok(me.hullPortBow === 1 && me.mastMainState === 0 && me.reloadTime > 5,
+         "and the damage detail for the HUD", `hull ${me.hullPortBow}, main mast ${me.mastMainState}, reload ${me.reloadTime.toFixed(1)} s`);
       eq(room.state.terrainSeed, welcome.params.terrainSeed, "the state repeats the seed");
       ok(room.state.seaWind > 0 && room.state.phaseT > 0, "the sea state is synced",
          room.state.seaWind.toFixed(1) + " kn, phase " + room.state.phaseT.toFixed(2));

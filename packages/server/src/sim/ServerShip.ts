@@ -63,6 +63,8 @@ export interface ServerShipOptions {
  * the client for the vessels in the catalogue.
  */
 const MAST_MASS_SHARE: Record<MastKey, number> = { fore: 0.85, main: 1.0, mizzen: 0.55 };
+/** Mast state on the wire: 0 sound, 1 wounded, 2 gone. */
+const MAST_STATE: Record<string, number> = { sound: 0, wounded: 1, gone: 2 };
 export function wreckLoadFor(vessel: Vessel, mast: MastKey): number {
    const tons = vessel.hull.displacement || 100;
    const massKg = clamp(tons * 9, 500, 14000) * MAST_MASS_SHARE[mast];
@@ -375,9 +377,28 @@ export class ServerShip implements CollidableShip {
          afire: this.dmg.afire,
          struck: this.dmg.struck,
          sunk: this.dmg.sunk,
+         hullPortBow: this.dmg.hull.PORT_BOW,
+         hullPortMid: this.dmg.hull.PORT_MID,
+         hullPortQuarter: this.dmg.hull.PORT_QUARTER,
+         hullStbdBow: this.dmg.hull.STBD_BOW,
+         hullStbdMid: this.dmg.hull.STBD_MID,
+         hullStbdQuarter: this.dmg.hull.STBD_QUARTER,
+         rigging: this.dmg.rigging,
+         sails: this.dmg.sails,
+         rudderState: this.dmg.rudder,
+         gunsPort: this.dmg.guns.PORT,
+         gunsStbd: this.dmg.guns.STBD,
+         mastFore: this.dmg.masts.fore.integrity,
+         mastMain: this.dmg.masts.main.integrity,
+         mastMizzen: this.dmg.masts.mizzen.integrity,
+         mastForeState: MAST_STATE[this.dmg.masts.fore.state],
+         mastMainState: MAST_STATE[this.dmg.masts.main.state],
+         mastMizzenState: MAST_STATE[this.dmg.masts.mizzen.state],
          reloadPort: this.battery.reload.PORT,
          reloadStbd: this.battery.reload.STBD,
+         reloadTime: this.battery.reloadTime,
          ammo: this.battery.ammo,
+         guns: this.battery.gunsPerSide(),
          driveMul: d.driveMul,
          rudderMul: d.rudderMul,
          dragMul: d.dragMul,

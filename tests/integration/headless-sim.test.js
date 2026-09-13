@@ -64,7 +64,10 @@ suite.section("The snapshot is complete");
       "id", "vesselId", "x", "z", "heading", "speed", "heel", "sailSet", "rudder",
       "twa", "tack", "luffing", "isCapsized", "alive",
       "hullIntegrity", "mastsStanding", "flooding", "afire", "struck", "sunk",
-      "reloadPort", "reloadStbd", "ammo",
+      "hullPortBow", "hullPortMid", "hullPortQuarter", "hullStbdBow", "hullStbdMid", "hullStbdQuarter",
+      "rigging", "sails", "rudderState", "gunsPort", "gunsStbd",
+      "mastFore", "mastMain", "mastMizzen", "mastForeState", "mastMainState", "mastMizzenState",
+      "reloadPort", "reloadStbd", "reloadTime", "ammo", "guns",
       "driveMul", "rudderMul", "dragMul", "turnBias", "heelBias", "stopped", "wreckDrag",
       "lastSeq",
    ]) {

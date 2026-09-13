@@ -42,10 +42,35 @@ export interface ShipState {
    struck: boolean;
    sunk: boolean;
 
+   // --- Damage detail (for the HUD plan and the remote models; changes rarely) ---
+   hullPortBow: number;
+   hullPortMid: number;
+   hullPortQuarter: number;
+   hullStbdBow: number;
+   hullStbdMid: number;
+   hullStbdQuarter: number;
+   rigging: number;
+   sails: number;
+   rudderState: number;
+   gunsPort: number;
+   gunsStbd: number;
+   /** mast integrity 0..1 */
+   mastFore: number;
+   mastMain: number;
+   mastMizzen: number;
+   /** 0 sound, 1 wounded, 2 gone */
+   mastForeState: number;
+   mastMainState: number;
+   mastMizzenState: number;
+
    // --- Batterie ---
    reloadPort: number;
    reloadStbd: number;
+   /** seconds a full reload takes (crew-dependent) */
+   reloadTime: number;
    ammo: string;
+   /** guns per side */
+   guns: number;
 
    // --- Server-seitige Eingaben in BoatDynamics.step() ---
    driveMul: number;

@@ -149,6 +149,65 @@ async function run() {
       ok(others.every((o) => Number.isFinite(o.dist) && o.masts >= 2), "with distance and mast count");
       ok(others.some((o) => o.masts === 2), "one of them shows the lost mast");
 
+      suite.section("A broadside between players, seen from a third");
+      // Server-side: put B abeam of C at pistol shot, then B fires at C.
+      // Player C's session must show B's salvo and balls on B's remote ship,
+      // and the hits on C's own ship - with the damage detail in the state.
+      const sB = room.sim.ships.get(B.shipId);
+      const sC = room.sim.ships.get(session.shipId);
+      sB.dyn.pos.x = 0; sB.dyn.pos.z = 0; sB.dyn.heading = 0; sB.dyn.speed = 2;
+      sC.dyn.pos.x = 130; sC.dyn.pos.z = 0; sC.dyn.heading = 0; sC.dyn.speed = 2;
+      sim.boat.pos.x = 130; sim.boat.pos.z = 0; sim.boat.heading = 0;
+      const remoteB = session.remotes.get(B.shipId);
+      const gunCtx = { windDir: 30, windSpeed: 14, seaHeight: () => 0 };
+      const stepSession = async (n, rudder = 0) => {
+         for (let i = 0; i < n; i++) {
+            sim.sea.step(SIM_DT, sim.wind.speed, sim.wind.dir);
+            sim.boat.setRudder(rudder);
+            sim.boat.step(SIM_DT, wind);
+            session.stepFixed(SIM_DT, { rudder });
+            session.stepBatteries(SIM_DT, gunCtx);
+            sim.player.battery.update(SIM_DT, gunCtx);
+            await sleep(1000 / SIM_HZ);
+         }
+      };
+      await stepSession(10);
+      session.drainEvents();
+      B.send({ seq: ++seq, rudder: 0, fire: "STBD", ammo: "ball" });
+      await stepSession(SIM_HZ * 3);
+      const got = session.drainEvents();
+      const salvo = got.find((e) => e.kind === "salvo" && e.shipId === B.shipId);
+      ok(salvo, "C hears B's broadside", salvo && salvo.count + " guns");
+      eq(remoteB.ship.battery.broadsides, 1, "B's remote ship recoiled (playSalvo)");
+      const balls = got.filter((e) => e.kind === "shots" && e.shipId === B.shipId).reduce((n, e) => n + e.shots.length, 0);
+      ok(balls > 0, "and its balls were replayed on B's remote ship", balls + " balls");
+      ok(remoteB.ship.battery.shotsFired >= balls, "the remote battery counts them", remoteB.ship.battery.shotsFired);
+      const hits = got.filter((e) => e.kind === "hit" && e.shipId === session.shipId);
+      ok(hits.length > 0, "some of them hit C", hits.length + " hits");
+      ok(hits.every((h) => h.from === B.shipId && h.side === "PORT"), "on C's port side, from B");
+      ok(sim.debris.count() > 0, "splinters fly on C's ship (showHit)", sim.debris.count() + " pieces");
+      const D = sim.player.dmg;
+      ok(D.hull.PORT_BOW < 1 || D.hull.PORT_MID < 1 || D.hull.PORT_QUARTER < 1,
+         "C's local damage plan shows the port side hurt (applyDamageState)",
+         [D.hull.PORT_BOW, D.hull.PORT_MID, D.hull.PORT_QUARTER].map((v) => v.toFixed(2)).join("/"));
+      near(D.hull.STBD_MID, 1, 1e-6, "and the starboard side untouched");
+
+      suite.section("C fires back and the HUD follows the server");
+      session.fire("PORT");
+      await stepSession(SIM_HZ * 2);
+      const mine = session.drainEvents();
+      const mySalvo = mine.find((e) => e.kind === "salvo" && e.shipId === session.shipId);
+      ok(mySalvo, "the fire order went out and came back as a salvo", mySalvo && mySalvo.count + " guns");
+      eq(sim.player.battery.broadsides, 1, "our own battery played it");
+      ok(sim.player.battery.shotsFired > 0, "and replayed our balls", sim.player.battery.shotsFired);
+      const g = session.gunStatus();
+      eq(g.guns, 13, "gun status from the state: 13 per side on a frigate");
+      eq(g.PORT.ready, false, "port side reloading");
+      ok(g.PORT.progress > 0 && g.PORT.progress < 1, "with progress from the server's timer", g.PORT.progress.toFixed(2));
+      eq(g.STBD.ready, true, "starboard still ready");
+      const hitB = mine.filter((e) => e.kind === "hit" && e.shipId === B.shipId);
+      suite.note(hitB.length + " hits on B" + (hitB.length ? "; her remote model shows " + [remoteB.ship.dmg.hull.STBD_BOW, remoteB.ship.dmg.hull.STBD_MID].map((v) => v.toFixed(2)).join("/") : ""));
+
       suite.section("Leaving");
       await B.leave();
       await waitFor(() => removed.includes(B.shipId), 3000, "B removed at A");

@@ -41,9 +41,29 @@ export const ShipSchema = schema(
       struck: t.boolean().default(false),
       sunk: t.boolean().default(false),
 
+      hullPortBow: t.float32().default(1),
+      hullPortMid: t.float32().default(1),
+      hullPortQuarter: t.float32().default(1),
+      hullStbdBow: t.float32().default(1),
+      hullStbdMid: t.float32().default(1),
+      hullStbdQuarter: t.float32().default(1),
+      rigging: t.float32().default(1),
+      sails: t.float32().default(1),
+      rudderState: t.float32().default(1),
+      gunsPort: t.float32().default(1),
+      gunsStbd: t.float32().default(1),
+      mastFore: t.float32().default(1),
+      mastMain: t.float32().default(1),
+      mastMizzen: t.float32().default(1),
+      mastForeState: t.uint8().default(0),
+      mastMainState: t.uint8().default(0),
+      mastMizzenState: t.uint8().default(0),
+
       reloadPort: t.float32().default(0),
       reloadStbd: t.float32().default(0),
+      reloadTime: t.float32().default(10),
       ammo: t.string().default("ball"),
+      guns: t.uint8().default(0),
 
       // Server-side inputs to BoatDynamics.step(): the client re-simulates
       // from an acknowledged state, so they travel with it.
@@ -64,7 +84,14 @@ export const ShipSchema = schema(
          this.luffing = s.luffing; this.isCapsized = s.isCapsized; this.alive = s.alive;
          this.hullIntegrity = s.hullIntegrity; this.mastsStanding = s.mastsStanding;
          this.flooding = s.flooding; this.afire = s.afire; this.struck = s.struck; this.sunk = s.sunk;
-         this.reloadPort = s.reloadPort; this.reloadStbd = s.reloadStbd; this.ammo = s.ammo;
+         this.hullPortBow = s.hullPortBow; this.hullPortMid = s.hullPortMid; this.hullPortQuarter = s.hullPortQuarter;
+         this.hullStbdBow = s.hullStbdBow; this.hullStbdMid = s.hullStbdMid; this.hullStbdQuarter = s.hullStbdQuarter;
+         this.rigging = s.rigging; this.sails = s.sails; this.rudderState = s.rudderState;
+         this.gunsPort = s.gunsPort; this.gunsStbd = s.gunsStbd;
+         this.mastFore = s.mastFore; this.mastMain = s.mastMain; this.mastMizzen = s.mastMizzen;
+         this.mastForeState = s.mastForeState; this.mastMainState = s.mastMainState; this.mastMizzenState = s.mastMizzenState;
+         this.reloadPort = s.reloadPort; this.reloadStbd = s.reloadStbd; this.reloadTime = s.reloadTime;
+         this.ammo = s.ammo; this.guns = s.guns;
          this.driveMul = s.driveMul; this.rudderMul = s.rudderMul; this.dragMul = s.dragMul;
          this.turnBias = s.turnBias; this.heelBias = s.heelBias; this.stopped = s.stopped;
          this.wreckDrag = s.wreckDrag; this.lastSeq = s.lastSeq;
