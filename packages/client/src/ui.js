@@ -694,6 +694,8 @@ export class UI {
          scenarioId: opts.scenarioId || "single",
          scenarios: opts.scenarios || [],
          onScenarioChange: opts.onScenarioChange || (() => {}),
+         randomStart: opts.randomStart !== false,
+         onRandomChange: opts.onRandomChange || (() => {}),
          onWindChange: opts.onWindChange,
          onVesselChange: opts.onVesselChange || (() => {}),
          onStart: opts.onStart,
@@ -825,7 +827,11 @@ export class UI {
          }).join("");
          scenarioHtml = `<div class="sec-label">${isMp ? "AI enemies (when creating a room)" : "Battle"}</div>
             <div class="sc-grid">${cards}</div>`
-            + (unarmed && !isMp ? `<div class="sc-hint">${selected.name} has no guns — choose a warship.</div>` : "");
+            + (unarmed && !isMp ? `<div class="sc-hint">${selected.name} has no guns — choose a warship.</div>` : "")
+            + (isMp ? "" : `<label class="ctrl toggle">
+                  <input type="checkbox" id="menuRandom" ${m.randomStart ? "checked" : ""} />
+                  <span>Random wind and enemy bearing each battle (off: classic start dead to windward)</span>
+               </label>`);
       }
 
       const mpHtml = !isMp ? "" : `
@@ -925,6 +931,8 @@ export class UI {
             this.renderMenu(m);
          };
       });
+      const rnd = this.menuEl.querySelector("#menuRandom");
+      if (rnd) rnd.onchange = () => { m.randomStart = rnd.checked; m.onRandomChange(m.randomStart); };
       const dir = this.menuEl.querySelector("#menuDir");
       const dirVal = this.menuEl.querySelector("#menuDirVal");
       const sp = this.menuEl.querySelector("#menuSpeed");
