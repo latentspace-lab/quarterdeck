@@ -220,8 +220,8 @@ export const SCENARIOS = [
    },
    {
       id: "outnumbered",
-      title: "Übermacht",
-      desc: "Zwei Gegner. Halte sie auseinander, sonst nehmen sie dich in die Zange.",
+      title: "Overwhelming Force",
+      desc: "Two enemies. Keep them apart or they will take you in a crossfire.",
       forces: {
          yacht: [], hotspur: ["hirondelle", "hirondelle"],
          lydia: ["amelie", "hirondelle"], sutherland: ["vengeur", "amelie"],
