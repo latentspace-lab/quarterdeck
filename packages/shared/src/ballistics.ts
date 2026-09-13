@@ -333,6 +333,25 @@ const _inv = new Matrix4();
 const _p0 = new Vector3();
 const _p1 = new Vector3();
 const _hitLocal = new Vector3();
+const _rot = new Matrix4();
+
+/**
+ * World matrix of a ship's "heeler" frame from its pose - the same matrix the
+ * client's Three.js hierarchy produces (ship: position + yaw; heeler child:
+ * pitch about X, roll about Z, Euler order XYZ). The server builds target
+ * boxes from this; a parity test pins it to the real scene graph.
+ */
+export function poseMatrix(
+   pos: { x: number; z: number },
+   pose: { y: number; yawY: number; pitchX: number; rollZ: number },
+   out: Matrix4 = new Matrix4(),
+): Matrix4 {
+   out.makeRotationY(pose.yawY);
+   out.multiply(_rot.makeRotationX(pose.pitchX));
+   out.multiply(_rot.makeRotationZ(pose.rollZ));
+   out.setPosition(pos.x, pose.y, pos.z);
+   return out;
+}
 
 /**
  * Trefferpruefung: Strecke prev -> pos gegen die Huellkoerper der Ziele.

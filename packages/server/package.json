@@ -3,15 +3,20 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "description": "Headless-Simulation. Phase 0: beweist, dass @segel/shared ohne Browser laeuft. Colyseus folgt in Phase 1.",
-  "main": "./dist/headless.js",
+  "description": "Game server: Colyseus rooms around the shared simulation.",
+  "main": "./dist/index.js",
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "start": "node --experimental-strip-types src/headless.ts"
+    "start": "node --experimental-strip-types src/index.ts",
+    "start:headless": "node --experimental-strip-types src/headless.ts"
   },
   "dependencies": {
-    "@segel/shared": "*"
+    "@colyseus/core": "^0.18.13",
+    "@colyseus/schema": "^5.0.31",
+    "@colyseus/ws-transport": "^0.18.2",
+    "@segel/shared": "*",
+    "colyseus": "^0.18.5"
   },
   "devDependencies": {
     "@types/node": "^22.10.0"

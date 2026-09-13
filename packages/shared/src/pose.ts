@@ -21,6 +21,18 @@ export interface PoseHull {
    draft: number;
 }
 
+/**
+ * Freeboard to the top of the bulwark, measured amidships (m).
+ *
+ * A square-rigger of the period carried its gun deck a good two metres above
+ * the water and the bulwark as high again - otherwise the sea would stand in
+ * the battery in any seaway. The client's warship builder and the server's
+ * swamp check must agree on this number, so it lives here.
+ */
+export function freeboardOf(hull: PoseHull): number {
+   return hull.draft * 0.8 + hull.beam * 0.11;
+}
+
 export interface PoseInput {
    pos: Vec2;
    /** Kurs (Grad) */
