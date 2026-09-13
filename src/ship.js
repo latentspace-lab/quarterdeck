@@ -43,7 +43,12 @@ export class Ship {
       });
 
       // --- Schaden ---
-      this.dmg = new DamageModel(this.vessel, { isPlayer: this.isPlayer });
+      this.faction = opts.faction || null;   // Eintrag aus factions.js
+      this.gunnery = this.faction ? this.faction.gunnery : 1;
+      this.dmg = new DamageModel(this.vessel, {
+         isPlayer: this.isPlayer,
+         neverStrikes: !!(this.faction && this.faction.neverStrikes),
+      });
 
       // --- Mannschaft ---
       this.crew = new Crew(this.vessel, { isPlayer: this.isPlayer });
@@ -347,7 +352,8 @@ export class Ship {
          if (broke) this._dropMast(broke.mast, "overpress");
       }
       // Eine ausgeblutete Besatzung kaempft nicht weiter
-      if (!this.isPlayer && !D.struck && this.crew.morale() < 0.12 && this.crew.losses > 8) {
+      if (!this.isPlayer && !D.struck && !D.neverStrikes
+            && this.crew.morale() < 0.12 && this.crew.losses > 8) {
          D.struck = true;
          D._event("struck", {});
       }

@@ -78,11 +78,42 @@ npm run preview   # Build testen → http://localhost:4173/
 
 ---
 
+## Die Parteien
+
+Zuerst wird die **Flagge** gewählt, dann das Schiff. Die Partei bestimmt, welche
+Schiffe zur Verfügung stehen, wie sie aussehen, wie gut die Bedienungen sind —
+und wer einem gegenübersteht.
+
+| Partei | Schiffe | Eigenart |
+|--------|---------|----------|
+| **Royal Navy** | Hotspur · Lydia · Sutherland | Beste Geschützausbildung der Welt. Schießt in den **Rumpf** und nimmt den Gegner. |
+| **Marine Impériale** | Hirondelle · Amélie · Vengeur | Größer und schneller gebaut. Schießt in die **Takelage**, um sich abzusetzen. |
+| **Armada Española** | Descubierta · El Gamo · San Juan Nepomuceno | Spanten wie Kathedralenpfeiler — steckt am meisten weg, feuert am langsamsten. |
+| **Piraten** | Seeteufel · Rache · Schwarze Krone | Alles erbeutet: dünnhäutig, schnell, riesige Enterbesatzung, miserable Kanoniere. **Streichen nie die Flagge.** |
+
+Jede Partei stellt ein Schiff in drei Größenklassen: Korvette/Sloop, Fregatte,
+Linienschiff. Die Gefechtslagen sind über diese Klassen definiert, nicht über
+feste Schiffe — deshalb funktioniert jede Lage mit jeder Paarung. Wer als
+Spanier ins Einzelgefecht geht, bekommt einen gleich großen Briten vor den Bug.
+
+Die Yacht *Nordwind* steht in jeder Partei als Übungsboot zur Verfügung.
+
+Jede Partei führt ihre eigene Flagge (White Ensign, Tricolore, die spanische
+Rot-Gelb-Rot, den Totenkopf) und ihren eigenen Anstrich — das Nelson-Schachbrett
+in Ocker, den französischen roten Strake, spanisches Dunkelrot mit Gelb, und bei
+den Piraten verwittertes Schwarz mit dem Rest dessen, was der Vorbesitzer
+aufgemalt hatte. Im Pulverdampf erkennt man Freund und Feind daran auf einen Blick.
+
+---
+
 ## Die Schiffe
 
-Im Startmenü (und im Spiel mit **V**) wird das Schiff gewählt. Jedes hat eine
+Im Startmenü (und im Spiel mit **V**, innerhalb der eigenen Partei) wird das
+Schiff gewählt. Jedes hat eine
 eigene Polarkurve, No-Go-Zone, Drehrate, Trägheit und Krängungsneigung — die
 Unterschiede sind spürbar, nicht kosmetisch.
+
+Beispiel Royal Navy (die anderen Parteien entsprechend):
 
 | Schiff | Rate | LüA | Am Wind | Breitseite | Charakter |
 |--------|------|-----|---------|-----------|-----------|
@@ -363,6 +394,7 @@ segel-simulator/
 │  ├─ ocean.js           # Gerstner-Wellenmeer, windabhängig (JS ↔ GLSL identisch)
 │  ├─ scene.js           # Szene: Himmel, Sonne, Lichter, Wolken
 │  ├─ boat.js            # 3D-Yacht: gelofteter Rumpf, Rigg, windgetriebene Segel
+│  ├─ factions.js        # Parteien: Schiffe, Doktrin, Ausbildungsstand, Flagge
 │  ├─ vessels.js         # Schiffskatalog: Masse, Polarkurven, Dynamik, Batterien
 │  ├─ warship.js         # 3D-Rahsegler: Rumpf mit Stückpforten, Masten, Rahsegel
 │  ├─ guns.js            # Breitseiten: Ballistik, Richtlösung, Trefferprüfung
@@ -386,7 +418,7 @@ segel-simulator/
    ├─ sim.smoke.js       # 10 Integrationssimulationen (Wenden/Gieren/Kenter/Gusts)
    ├─ visual.test.js     # 40 Checks: Wellen/Seegang, Segel, Baum, Rumpf (headless)
    ├─ vessels.test.js    # 72 Checks: Katalog, Rahsegler-Physik, Brassen, Batterie
-   └─ damage.test.js     # 78 Checks: Schäden, Wrackphysik, Ballistik, Gefecht
+   └─ damage.test.js     # 105 Checks: Schäden, Wrack, Ballistik, Parteien, Gefecht
 ```
 
 ---
@@ -394,14 +426,14 @@ segel-simulator/
 ## Tests
 
 ```bash
-npm test                     # alle fünf Suiten, 220 Checks
+npm test                     # alle fünf Suiten, 248 Checks
 
 # oder einzeln:
 node tests/physics.test.js   # 20/20
 node tests/sim.smoke.js      # 10/10
 node tests/visual.test.js    # 40/40 (Seegang + Segel-3D, headless)
 node tests/vessels.test.js   # 72/72 (Schiffe, Brassen, Geschütze, headless)
-node tests/damage.test.js    # 78/78 (Schäden, Wrack, Ballistik, Gefecht, headless)
+node tests/damage.test.js    # 105/105 (Schäden, Wrack, Ballistik, Parteien, headless)
 ```
 
 Die Tests brauchen **kein npm-Installation** (reines Node, nur für `physics`/`wind`/`trainer`):

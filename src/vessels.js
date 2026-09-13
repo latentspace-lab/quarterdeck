@@ -58,6 +58,8 @@ const NELSON = {
 export const VESSELS = [
    {
       id: "yacht",
+      faction: null,
+      tier: 0,
       name: "Nordwind",
       prefix: "",
       klass: "Moderne Segelyacht",
@@ -87,6 +89,9 @@ export const VESSELS = [
    },
    {
       id: "hotspur",
+      faction: "gb",
+      paint: NELSON,
+      tier: 1,
       name: "Hotspur",
       prefix: "HMS",
       klass: "Sloop-of-War",
@@ -121,6 +126,9 @@ export const VESSELS = [
    },
    {
       id: "lydia",
+      faction: "gb",
+      paint: NELSON,
+      tier: 2,
       name: "Lydia",
       prefix: "HMS",
       klass: "Fregatte 5. Ranges",
@@ -155,6 +163,9 @@ export const VESSELS = [
    },
    {
       id: "sutherland",
+      faction: "gb",
+      paint: NELSON,
+      tier: 3,
       name: "Sutherland",
       prefix: "HMS",
       klass: "Linienschiff 3. Ranges",
@@ -206,15 +217,38 @@ const FRENCH = {
    trim: 0x9a7a3a,
 };
 
+// Spanisch: dunkelrote Bordwand mit gelbem Strake - die Schiffe der Armada
+// waren beruehmt fuer ihre schweren Spanten.
+const SPANISH = {
+   copper: [0.45, 0.26, 0.15],
+   boot: [0.10, 0.08, 0.08],
+   band: [0.84, 0.68, 0.22],
+   dark: [0.29, 0.10, 0.10],
+   deck: 0xd4c49e,
+   trim: 0x9c7c34,
+};
+
+// Piraten: alles erbeutet, nichts gepflegt - verwittertes Schwarz mit einem
+// Rest von dem, was der Vorbesitzer aufgemalt hatte.
+const PIRATE = {
+   copper: [0.36, 0.25, 0.18],
+   boot: [0.07, 0.07, 0.07],
+   band: [0.43, 0.36, 0.26],
+   dark: [0.11, 0.11, 0.10],
+   deck: 0xb9ab8c,
+   trim: 0x6d5b32,
+};
+
 // ---------------------------------------------------------------------------
 // Gegner (nicht im Schiffsmenue waehlbar, nur als Feind im Gefecht)
 // ---------------------------------------------------------------------------
 export const ENEMIES = [
    {
       id: "hirondelle",
+      faction: "fr",
+      tier: 1,
       name: "Hirondelle",
       prefix: "",
-      nation: "FR",
       paint: FRENCH,
       klass: "Corvette",
       rate: "20-Kanonen-Korvette",
@@ -235,9 +269,10 @@ export const ENEMIES = [
    },
    {
       id: "amelie",
+      faction: "fr",
+      tier: 2,
       name: "Amélie",
       prefix: "",
-      nation: "FR",
       paint: FRENCH,
       klass: "Fregatte",
       rate: "40-Kanonen-Fregatte",
@@ -258,9 +293,10 @@ export const ENEMIES = [
    },
    {
       id: "vengeur",
+      faction: "fr",
+      tier: 3,
       name: "Vengeur",
       prefix: "",
-      nation: "FR",
       paint: FRENCH,
       klass: "Linienschiff 3. Ranges",
       rate: "74-Kanonen-Zweidecker",
@@ -284,7 +320,181 @@ export const ENEMIES = [
    },
 ];
 
-export const ALL_VESSELS = VESSELS.concat(ENEMIES);
+// ---------------------------------------------------------------------------
+// Armada Española - schwer gebaut, langsam im Feuer, knapp besetzt
+// ---------------------------------------------------------------------------
+export const SPANISH_SHIPS = [
+   {
+      id: "descubierta",
+      faction: "es",
+      tier: 1,
+      name: "Descubierta",
+      prefix: "",
+      paint: SPANISH,
+      klass: "Corbeta",
+      rate: "20-Kanonen-Korvette",
+      rig: "square",
+      era: "1804",
+      desc: "Leichte Korvette der Armada — gebaut für Depeschen und Küstenwache.",
+      crew: 98,
+      hull: { loa: 28.5, beam: 8.6, draft: 3.8, displacement: 450 },
+      sail: { noGo: 63, polar: POLAR_SLOOP_OF_WAR, tackAssist: 0.52 },
+      dyn: { turnRate: 12.2, rudderRef: 3.3, accelUp: 0.064, accelDown: 0.118,
+             accelLuff: 0.32, maxHeel: 15, capsizeHeel: 47, heelScale: 0.70, leewayMax: 11 },
+      guns: {
+         decks: [{ y: 0.60, count: 10, from: 0.20, to: 0.80, calibre: "8-Pfünder" }],
+         reload: 13.5, spread: 0.34, recoil: 0.5, rollKick: 1.6, range: 400,
+      },
+      structure: { scantling: 0.66, mastStrength: 0.72, reserve: 0.70 },
+      cam: { dist: 58, height: 21, cockpitZ: -10.5, cockpitY: 7.0, lead: 12, targetY: 9 },
+   },
+   {
+      id: "gamo",
+      faction: "es",
+      tier: 2,
+      name: "El Gamo",
+      prefix: "",
+      paint: SPANISH,
+      klass: "Fragata",
+      rate: "32-Kanonen-Fregatte",
+      rig: "square",
+      era: "1801",
+      desc: "Die Fregatte, die Cochrane mit einer winzigen Brigg nahm — schwer, aber unterbesetzt.",
+      crew: 319,
+      hull: { loa: 41.0, beam: 11.4, draft: 4.5, displacement: 950 },
+      sail: { noGo: 66, polar: POLAR_FRIGATE, tackAssist: 0.46 },
+      dyn: { turnRate: 8.8, rudderRef: 3.7, accelUp: 0.044, accelDown: 0.082,
+             accelLuff: 0.24, maxHeel: 13, capsizeHeel: 51, heelScale: 0.60, leewayMax: 10 },
+      guns: {
+         decks: [{ y: 0.58, count: 12, from: 0.16, to: 0.84, calibre: "12-Pfünder" }],
+         reload: 15.0, spread: 0.42, recoil: 0.7, rollKick: 2.1, range: 500,
+      },
+      structure: { scantling: 1.18, mastStrength: 1.02, reserve: 1.10 },
+      cam: { dist: 86, height: 30, cockpitZ: -16, cockpitY: 9.4, lead: 17, targetY: 13 },
+   },
+   {
+      id: "nepomuceno",
+      faction: "es",
+      tier: 3,
+      name: "San Juan Nepomuceno",
+      prefix: "",
+      paint: SPANISH,
+      klass: "Navío de línea",
+      rate: "74-Kanonen-Zweidecker",
+      rig: "square",
+      era: "1805",
+      desc: "Spanische Spanten wie Kathedralenpfeiler. Nimmt mehr Eisen auf als jeder andere Vierundsiebziger.",
+      crew: 530,
+      hull: { loa: 52.5, beam: 14.5, draft: 6.3, displacement: 1800 },
+      sail: { noGo: 69, polar: POLAR_THIRD_RATE, tackAssist: 0.40 },
+      dyn: { turnRate: 5.9, rudderRef: 4.3, accelUp: 0.027, accelDown: 0.056,
+             accelLuff: 0.19, maxHeel: 12, capsizeHeel: 56, heelScale: 0.50, leewayMax: 9 },
+      guns: {
+         decks: [
+            { y: 0.44, count: 14, from: 0.14, to: 0.86, calibre: "24-Pfünder" },
+            { y: 0.70, count: 14, from: 0.16, to: 0.84, calibre: "18-Pfünder" },
+         ],
+         reload: 16.5, spread: 0.52, recoil: 0.95, rollKick: 3.2, range: 580,
+      },
+      structure: { scantling: 2.20, mastStrength: 1.60, reserve: 1.90 },
+      cam: { dist: 106, height: 38, cockpitZ: -20.5, cockpitY: 11.8, lead: 21, targetY: 16 },
+   },
+];
+
+// ---------------------------------------------------------------------------
+// Piraten - erbeutet, dünnhäutig, schnell, voller Enterleute
+// ---------------------------------------------------------------------------
+export const PIRATE_SHIPS = [
+   {
+      id: "seeteufel",
+      faction: "pirate",
+      tier: 1,
+      name: "Seeteufel",
+      prefix: "",
+      paint: PIRATE,
+      klass: "Kaperschiff",
+      rate: "16-Kanonen-Kaperfahrer",
+      rig: "square",
+      era: "—",
+      desc: "Aufgeschossener Schnellsegler. Läuft jedem davon und ist beim ersten Treffer Kleinholz.",
+      crew: 125,
+      hull: { loa: 26.0, beam: 7.4, draft: 3.2, displacement: 330 },
+      sail: { noGo: 59, polar: POLAR_SLOOP_OF_WAR, tackAssist: 0.62 },
+      dyn: { turnRate: 15.5, rudderRef: 2.9, accelUp: 0.095, accelDown: 0.150,
+             accelLuff: 0.38, maxHeel: 17, capsizeHeel: 43, heelScale: 0.82, leewayMax: 12 },
+      guns: {
+         decks: [{ y: 0.60, count: 8, from: 0.22, to: 0.78, calibre: "6-Pfünder" }],
+         reload: 14.0, spread: 0.40, recoil: 0.4, rollKick: 1.3, range: 340,
+      },
+      structure: { scantling: 0.40, mastStrength: 0.60, reserve: 0.48 },
+      cam: { dist: 54, height: 19, cockpitZ: -9.5, cockpitY: 6.6, lead: 11, targetY: 8 },
+   },
+   {
+      id: "rache",
+      faction: "pirate",
+      tier: 2,
+      name: "Rache",
+      prefix: "",
+      paint: PIRATE,
+      klass: "genommene Fregatte",
+      rate: "28-Kanonen-Fregatte",
+      rig: "square",
+      era: "—",
+      desc: "Vor zwei Jahren einer Marine abgenommen. Seitdem nichts repariert, alles überladen.",
+      crew: 230,
+      hull: { loa: 38.0, beam: 10.4, draft: 4.2, displacement: 760 },
+      sail: { noGo: 63, polar: POLAR_FRIGATE, tackAssist: 0.54 },
+      dyn: { turnRate: 10.4, rudderRef: 3.4, accelUp: 0.058, accelDown: 0.098,
+             accelLuff: 0.28, maxHeel: 15, capsizeHeel: 48, heelScale: 0.68, leewayMax: 11 },
+      guns: {
+         decks: [{ y: 0.58, count: 11, from: 0.16, to: 0.84, calibre: "9-Pfünder" }],
+         reload: 13.0, spread: 0.44, recoil: 0.6, rollKick: 1.9, range: 430,
+      },
+      structure: { scantling: 0.72, mastStrength: 0.80, reserve: 0.72 },
+      cam: { dist: 78, height: 27, cockpitZ: -14.5, cockpitY: 8.8, lead: 15, targetY: 12 },
+   },
+   {
+      id: "schwarzekrone",
+      faction: "pirate",
+      tier: 3,
+      name: "Schwarze Krone",
+      prefix: "",
+      paint: PIRATE,
+      klass: "umgebauter Ostindienfahrer",
+      rate: "44-Kanonen-Ostindienfahrer",
+      rig: "square",
+      era: "—",
+      desc: "Ein Handelsriese, in den man zwei Decks Beutegeschütze gestellt hat. Viel Eisen, dünne Haut.",
+      crew: 340,
+      hull: { loa: 48.0, beam: 13.6, draft: 5.6, displacement: 1400 },
+      sail: { noGo: 70, polar: POLAR_THIRD_RATE, tackAssist: 0.40 },
+      dyn: { turnRate: 6.8, rudderRef: 4.0, accelUp: 0.034, accelDown: 0.066,
+             accelLuff: 0.21, maxHeel: 14, capsizeHeel: 50, heelScale: 0.58, leewayMax: 10 },
+      guns: {
+         decks: [
+            { y: 0.46, count: 11, from: 0.16, to: 0.84, calibre: "18-Pfünder" },
+            { y: 0.72, count: 11, from: 0.18, to: 0.82, calibre: "9-Pfünder" },
+         ],
+         reload: 15.5, spread: 0.50, recoil: 0.8, rollKick: 2.6, range: 480,
+      },
+      structure: { scantling: 0.95, mastStrength: 1.05, reserve: 1.00 },
+      cam: { dist: 98, height: 35, cockpitZ: -18.5, cockpitY: 10.8, lead: 19, targetY: 15 },
+   },
+];
+
+export const ALL_VESSELS = VESSELS.concat(ENEMIES, SPANISH_SHIPS, PIRATE_SHIPS);
+
+// Alle Kriegsschiffe einer Partei, nach Groesse sortiert
+export function shipsOfFaction(factionId) {
+   return ALL_VESSELS.filter((v) => v.faction === factionId).sort((a, b) => a.tier - b.tier);
+}
+// Das Schiff einer Partei in einer bestimmten Groessenklasse
+export function shipOfTier(factionId, tier) {
+   const list = shipsOfFaction(factionId);
+   if (!list.length) return null;
+   const t = Math.max(1, Math.min(3, tier));
+   return list.find((v) => v.tier === t) || list[list.length - 1];
+}
 export const VESSEL_COLORS = NELSON;
 
 export function getVessel(id) {
@@ -302,10 +512,12 @@ export function gunCount(v) {
 }
 
 // Broadside-Gewicht in englischen Pfund (nur zur Anzeige)
-const BALL_LB = { "8-Pfünder": 8, "9-Pfünder": 9, "18-Pfünder": 18, "32-Pfünder": 32, "36-Pfünder": 36 };
+const BALL_LB = { "6-Pfünder": 6, "8-Pfünder": 8, "9-Pfünder": 9, "12-Pfünder": 12,
+   "18-Pfünder": 18, "24-Pfünder": 24, "32-Pfünder": 32, "36-Pfünder": 36 };
 export function broadsideWeight(v) {
    if (!v.guns) return 0;
    return v.guns.decks.reduce((w, d) => w + d.count * (BALL_LB[d.calibre] || 12), 0);
 }
 
-export default { VESSELS, ENEMIES, ALL_VESSELS, getVessel, vesselLabel, gunCount, broadsideWeight };
+export default { VESSELS, ENEMIES, SPANISH_SHIPS, PIRATE_SHIPS, ALL_VESSELS,
+   getVessel, vesselLabel, gunCount, broadsideWeight, shipsOfFaction, shipOfTier };

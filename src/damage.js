@@ -82,6 +82,8 @@ export class DamageModel {
       this.mastStrength = st.mastStrength ?? 1;  // Staerke der Rundhoelzer
       this.reserve = st.reserve ?? 1;            // Reserveauftrieb (Zeit bis Sinken)
       this.isPlayer = !!opts.isPlayer;
+      // Piraten streichen nicht - am Galgen wartet nichts Besseres.
+      this.neverStrikes = !!opts.neverStrikes;
 
       this.hull = {};
       for (const side of SIDES) {
@@ -374,7 +376,7 @@ export class DamageModel {
       }
 
       // Flagge streichen: ein geschlagenes Schiff kaempft nicht bis zum Untergang
-      if (!this.struck && !this.isPlayer && this.beaten()) {
+      if (!this.struck && !this.isPlayer && !this.neverStrikes && this.beaten()) {
          this.struck = true;
          this._event("struck", {});
       }
