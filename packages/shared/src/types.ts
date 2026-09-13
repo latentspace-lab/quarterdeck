@@ -31,6 +31,8 @@ export interface ShipState {
    twa: number;
    tack: Tack;
    luffing: boolean;
+   /** leeway angle (deg) - part of the dynamics state the client re-simulates from */
+   leeway: number;
    isCapsized: boolean;
    alive: boolean;
 

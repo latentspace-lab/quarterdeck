@@ -31,6 +31,7 @@ export const ShipSchema = schema(
       twa: t.float32().default(0),
       tack: t.string().default("PORT"),
       luffing: t.boolean().default(false),
+      leeway: t.float32().default(0),
       isCapsized: t.boolean().default(false),
       alive: t.boolean().default(true),
 
@@ -81,7 +82,7 @@ export const ShipSchema = schema(
       sync(s: ShipState): void {
          this.x = s.x; this.z = s.z; this.heading = s.heading; this.speed = s.speed; this.heel = s.heel;
          this.sailSet = s.sailSet; this.rudder = s.rudder; this.twa = s.twa; this.tack = s.tack;
-         this.luffing = s.luffing; this.isCapsized = s.isCapsized; this.alive = s.alive;
+         this.luffing = s.luffing; this.leeway = s.leeway; this.isCapsized = s.isCapsized; this.alive = s.alive;
          this.hullIntegrity = s.hullIntegrity; this.mastsStanding = s.mastsStanding;
          this.flooding = s.flooding; this.afire = s.afire; this.struck = s.struck; this.sunk = s.sunk;
          this.hullPortBow = s.hullPortBow; this.hullPortMid = s.hullPortMid; this.hullPortQuarter = s.hullPortQuarter;

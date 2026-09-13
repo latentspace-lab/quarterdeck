@@ -50,8 +50,11 @@ the scenario cards apply to the room you create. Deep link:
 What is shared: ships, wind, sea, damage, masts, collisions, grounding and
 gunnery come from the server. Q/E/F order a broadside; the server fires it,
 every client plays the salvo, the balls (with the server's exact ballistics)
-and the hits. The helm is local for responsiveness and is pulled gently onto
-the server's copy (proper prediction is Phase 3).
+and the hits. The helm is predicted: your ship answers the rudder at once,
+and every acknowledged server state is replayed with the inputs the server
+has not seen yet - the two agree to the centimetre unless something the
+server alone knows (a collision, the ground) intervened, and then the
+picture eases onto the corrected place instead of jumping.
 
 > **Wichtig:** Befehle immer **ohne** angehängten Kommentar ausführen.
 > In zsh ist `#` interaktiv standardmäßig *kein* Kommentar — `npm run dev  # → ...`

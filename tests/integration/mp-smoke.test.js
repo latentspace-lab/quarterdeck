@@ -69,10 +69,14 @@ async function run() {
          speed: window.__sim.boat.speed, x: window.__sim.boat.pos.x, z: window.__sim.boat.pos.z,
          hud: !!document.querySelector("#foePanel") && getComputedStyle(document.querySelector("#foePanel")).display !== "none",
          draw: window.__sim.renderer.info.render.calls,
+         corr: window.__sim.session.correction,
+         pending: window.__sim.session.predictor.pending,
       }));
       ok(local.speed > 0.5, "the page's ship sails", local.speed.toFixed(2) + " kn");
-      ok(Math.hypot(local.x - mine.x, local.z - mine.z) < 20, "and stays near the server's copy",
+      ok(Math.hypot(local.x - mine.x, local.z - mine.z) < 8, "and is within a round trip of the server's copy",
          Math.hypot(local.x - mine.x, local.z - mine.z).toFixed(1) + " m");
+      ok(local.corr && local.corr.dist < 0.5, "prediction reconciles with a tiny correction",
+         local.corr && local.corr.dist.toFixed(3) + " m, " + local.pending + " pending");
       ok(local.hud, "the HUD lists the other ships");
       ok(local.draw > 0, "it draws", local.draw + " calls");
       eq(errors.length, 0, "no errors while sailing", errors.slice(0, 3).join(" | "));
