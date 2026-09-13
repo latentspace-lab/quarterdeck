@@ -76,6 +76,7 @@ export class Battery {
       // Ziele liefert der Aufrufer; jedes Ziel beschreibt sein Trefferwerk
       this.targets = opts.targets || (() => []);
       this.onHit = opts.onHit || null;
+      this.onReloadDone = opts.onReloadDone || null;
       // Anteil einsatzfaehiger Rohre je Seite (aus dem Schadensmodell)
       this.effectiveness = { PORT: 1, STBD: 1 };
 
@@ -424,7 +425,13 @@ export class Battery {
 
       // Nachladen
       for (const side of SIDES) {
-         if (this.reload[side] > 0) this.reload[side] = Math.max(0, this.reload[side] - dt);
+         if (this.reload[side] > 0) {
+            const wasReloading = this.reload[side] > dt;
+            this.reload[side] = Math.max(0, this.reload[side] - dt);
+            if (wasReloading && this.reload[side] === 0 && this.onReloadDone) {
+               this.onReloadDone(side);
+            }
+         }
       }
       // Krengungsstoss klingt ab
       if (this.rollKick > 0.001) this.rollKick = Math.max(0, this.rollKick - dt * 4.2);
