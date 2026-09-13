@@ -24,7 +24,7 @@ const LY = getVessel("lydia");
 
 suite.section("1) Wirkt eine Breitseite stark genug?");
 {
-   // Rumpfschaden je Treffer: dmg = (lb/18) * reach * ammo.hull * 0.055 / scantling
+   // Rumpfschaden je Treffer: dmg = (lb/18) * reach * ammo.hull * 0.03 / scantling
    // Fuer die Lydia (scantling 0.82) sind das exakt 0.015625 Gefechtskraft je
    // Vollkugel auf 0.25 Reichweite - unabhaengig vom Zufall.
    const pound = (n) => {

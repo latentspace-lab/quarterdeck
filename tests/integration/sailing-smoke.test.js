@@ -79,7 +79,7 @@ console.log("== Simulation-Smoke ==\n");
       const st = {
          boat: {
             twa: 45,
-            twaSigned: tack === "STBD" ? 45 : -45,
+            twaSigned: tack === "STBD" ? -45 : 45,
             tack,
             luffing: false,
             speed: 5,

@@ -110,12 +110,12 @@ suite.section("dischargeShots() und Flugbahn");
 {
    const rng = makeRng(42);
    const shots = dischargeShots({
-      origin: { x: 0, y: 3, z: 0 }, flat: { x: 1, y: 0, z: 0 },
+      origin: { x: 0, y: 3, z: 0 }, flat: { x: -1, y: 0, z: 0 }, // -x = starboard
       ammo: "ball", aimElev: 2, aimTrain: 0, lb: 18,
    }, rng);
    eq(shots.length, 1, "eine Vollkugel je Rohr");
    const b = shots[0];
-   ok(b.vel.x > 200, "sie geht nach Steuerbord hinaus", b.vel.x.toFixed(0) + " m/s");
+   ok(b.vel.x < -200, "sie geht nach Steuerbord hinaus", b.vel.x.toFixed(0) + " m/s");
    ok(b.vel.y > 0, "und leicht nach oben");
    near(Math.hypot(b.vel.x, b.vel.y, b.vel.z), BALL.v0, BALL.v0 * 0.06, "Muendungsgeschwindigkeit");
 
@@ -129,7 +129,7 @@ suite.section("dischargeShots() und Flugbahn");
    while (b.pos.y > 0 && flightT < 30) { stepProjectile(b, SIM_DT); apex = Math.max(apex, b.pos.y); flightT += SIM_DT; }
    ok(apex > 3, "sie steigt ueber die Muendungshoehe", apex.toFixed(1) + " m");
    ok(flightT > 0.5 && flightT < 30, "und kommt wieder herunter", flightT.toFixed(1) + " s");
-   ok(b.pos.x > 100, "und fliegt dabei weit", b.pos.x.toFixed(0) + " m");
+   ok(b.pos.x < -100, "und fliegt dabei weit", (-b.pos.x).toFixed(0) + " m");
    // prev/pos spannen den Streckenabschnitt auf, den die Trefferpruefung testet.
    ok(b.prev.x !== b.pos.x, "prev und pos unterscheiden sich nach dem Schritt");
 
@@ -216,18 +216,18 @@ suite.section("Trefferpruefung");
 
 suite.section("rangeToTarget(): was in der Breitseite steht");
 {
-   const own = new Matrix4(); // Eigenes Schiff im Ursprung, Bug nach +Z
+   const own = new Matrix4(); // Eigenes Schiff im Ursprung, Bug nach +Z, Steuerbord = -X
    const at = (x, z) => ({
       id: "t" + x + "_" + z, matrixWorld: new Matrix4().makeTranslation(x, 0, z),
       LOA: 40, BEAM: 10, DRAFT: 4, FB: 5,
    });
-   near(rangeToTarget(own, "STBD", [at(200, 0)], 500, "me"), 200, 1e-6, "querab Steuerbord: 200 m");
-   eq(rangeToTarget(own, "PORT", [at(200, 0)], 500, "me"), 0, "auf der falschen Seite: nichts");
-   near(rangeToTarget(own, "PORT", [at(-150, 0)], 500, "me"), 150, 1e-6, "querab Backbord: 150 m");
-   eq(rangeToTarget(own, "STBD", [at(20, 400)], 500, "me"), 0,
+   near(rangeToTarget(own, "STBD", [at(-200, 0)], 500, "me"), 200, 1e-6, "querab Steuerbord: 200 m");
+   eq(rangeToTarget(own, "PORT", [at(-200, 0)], 500, "me"), 0, "auf der falschen Seite: nichts");
+   near(rangeToTarget(own, "PORT", [at(150, 0)], 500, "me"), 150, 1e-6, "querab Backbord: 150 m");
+   eq(rangeToTarget(own, "STBD", [at(-20, 400)], 500, "me"), 0,
       "fast genau voraus laesst sich mit der Breitseite nicht fassen");
-   eq(rangeToTarget(own, "STBD", [at(2000, 0)], 500, "me"), 0, "weit ausser Reichweite zaehlt nicht");
-   near(rangeToTarget(own, "STBD", [at(400, 0), at(180, 0)], 500, "me"), 180, 1e-6,
+   eq(rangeToTarget(own, "STBD", [at(-2000, 0)], 500, "me"), 0, "weit ausser Reichweite zaehlt nicht");
+   near(rangeToTarget(own, "STBD", [at(-400, 0), at(-180, 0)], 500, "me"), 180, 1e-6,
       "das naechste Ziel gewinnt");
    eq(rangeToTarget(own, "STBD", [], 500, "me"), 0, "leere Liste: 0");
 }

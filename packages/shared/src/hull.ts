@@ -152,7 +152,8 @@ export function muzzlePositions(vessel: Vessel): { PORT: Array<{ x: number; y: n
    const barrelLen = barrelLengthOf(vessel);
    const out = { PORT: [] as Array<{ x: number; y: number; z: number }>, STBD: [] as Array<{ x: number; y: number; z: number }> };
    for (const p of gunLayout(vessel)) {
-      const sx = p.side === "STBD" ? 1 : -1;
+      // Bow at +z, up at +y: starboard is the -x side (right-handed frame).
+      const sx = p.side === "STBD" ? -1 : 1;
       out[p.side].push({ x: sx * (p.hb + barrelLen * 0.85), y: p.y, z: p.z });
    }
    return out;

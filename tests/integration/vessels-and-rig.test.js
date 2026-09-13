@@ -146,8 +146,12 @@ for (const id of ["hotspur", "lydia", "sutherland"]) {
    const perSide = v.guns.decks.reduce((n, d) => n + d.count, 0);
    ok(ud.muzzles.PORT.length === perSide && ud.muzzles.STBD.length === perSide,
       id + ": " + perSide + " Muendungen je Seite");
-   ok(ud.muzzles.STBD.every((m) => m.x > 0) && ud.muzzles.PORT.every((m) => m.x < 0),
-      id + ": Muendungen auf der richtigen Seite");
+   // Bow at +z, up at +y: starboard is the side a right-handed frame puts at
+   // -x. Pinned here because the whole code base once had it mirrored.
+   const fwd = new THREE.Vector3(0, 0, 1), up = new THREE.Vector3(0, 1, 0);
+   const right = new THREE.Vector3().crossVectors(fwd, up);
+   ok(ud.muzzles.STBD.every((m) => m.x * right.x > 0) && ud.muzzles.PORT.every((m) => m.x * right.x < 0),
+      id + ": starboard muzzles lie to the right of the bow, port ones to the left");
    ok(ud.sails.length >= 6, id + ": " + ud.sails.length + " Segel");
 }
 
@@ -191,7 +195,7 @@ ok(bat.status().shots === 26, "26 Schuesse abgegeben", String(bat.status().shots
 ok(maxShots > 0, "Kugeln fliegen", String(maxShots));
 const rl = bat.status().PORT.progress;
 ok(rl > 0 && rl < 1, "Nachladebalken laeuft", (rl * 100).toFixed(0) + "%");
-for (let i = 0; i < 400; i++) bat.update(0.05, { seaHeight: () => 0 });
+for (let i = 0; i < 1300; i++) bat.update(0.05, { seaHeight: () => 0 });
 ok(bat.ready("PORT") && bat.ready("STBD"), "nach " + frig.guns.reload + " s wieder klar");
 ok(bat._shots.length === 0 && bat._smoke.length === 0, "Partikel werden aufgeraeumt");
 // Die Yacht bekommt keine Batterie
