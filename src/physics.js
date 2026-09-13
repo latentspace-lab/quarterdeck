@@ -280,7 +280,7 @@ export class BoatDynamics {
       const rauth = rudderAuthority(this.speed, P.rudderRef);
       const turnRate = this.rudder * P.turnRate * rauth * clamp(this.rudderMul, 0, 1)
          + this.turnBias * rauth; // deg/s
-      this.heading = normDeg(this.heading + turnRate * dt);
+      this.heading = normDeg(this.heading - turnRate * dt);
 
       // 7. Leeway + Bodengang
       const leeFrac = clamp(this.heel / this.config.capsizeHeel, 0, 1);
