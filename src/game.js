@@ -201,6 +201,7 @@ export class Simulator {
    openMenu() {
       this.menuOpen = true;
       this.paused = true;
+      voiceAnnounce(TRIGGER.ahoi);
       this.ui.openMenu({
          mode: this.mode,
          vesselId: this.vesselId,
@@ -436,7 +437,10 @@ export class Simulator {
       this.boat.setRudder(inp.rudder);
       if (this.vessel.rig === "square") {
          // W / S setzen bzw. reffen die Segel (mehr Tuch = mehr Fahrt und Krengung)
-         if (inp.trimIn) this.boat.sailSet = clamp(this.boat.sailSet + dt * 0.45, 0.25, 1);
+         if (inp.trimIn) {
+            this.boat.sailSet = clamp(this.boat.sailSet + dt * 0.45, 0.25, 1);
+            voiceAnnounce(TRIGGER.makesail);
+         }
          if (inp.trimOut) this.boat.sailSet = clamp(this.boat.sailSet - dt * 0.45, 0.25, 1);
       } else if (!this.manualTrim) {
          if (inp.trimIn) this.boat.trim = clamp(this.boat.trim + dt * 0.4, 0, 1);
