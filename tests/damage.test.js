@@ -270,9 +270,11 @@ console.log("\n== Parteien ==");
 ok(FACTIONS.length === 4, "vier Parteien", FACTIONS.map((f) => f.short).join(" "));
 for (const f of FACTIONS) {
    const list = shipsOfFaction(f.id);
-   ok(list.length === 3, f.name + ": drei Schiffe", list.map((v) => v.name).join(", "));
-   ok(list.map((v) => v.tier).join() === "1,2,3",
-      f.name + ": je ein Schiff pro Groessenklasse");
+   ok(list.length >= 3, f.name + ": mindestens drei Schiffe", list.map((v) => v.name).join(", "));
+   // shipOfTier() braucht jede Groessenklasse besetzt. Mehrere Schiffe in
+   // derselben Klasse sind erlaubt - als Gegner zieht es davon das erste.
+   ok([1, 2, 3].every((t) => list.some((v) => v.tier === t)),
+      f.name + ": jede Groessenklasse besetzt", list.map((v) => v.tier).join());
    ok(list.every((v) => v.guns && v.paint && v.rig === "square"),
       f.name + ": alle bewaffnet, eigener Anstrich");
 }
@@ -297,6 +299,10 @@ for (const f of FACTIONS) {
 ok(bad === 0, "jede Kombination aus Partei, Schiff und Lage ergibt Gegner",
    combos + " Kombinationen geprueft");
 ok(shipOfTier("es", 3).name === "San Juan Nepomuceno", "Groessenklasse 3 der Armada");
+// Die Indefatigable teilt sich die zweite Klasse mit der Lydia. Gegner bleibt
+// die Lydia - sonst haette ein fahrbares Schiff die Gegnerliste verschoben.
+ok(shipOfTier("gb", 2).name === "Lydia", "britischer Zweier bleibt die Lydia",
+   shipOfTier("gb", 2).name);
 
 // Piraten streichen nie die Flagge
 {
