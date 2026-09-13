@@ -154,6 +154,26 @@ export interface RoomCreateOptions {
    windVariability?: number;
    /** Vessel ids of AI-captained enemies spawned to windward at room creation. */
    enemies?: string[];
+   /** Shown in the lobby list. */
+   roomName?: string;
+}
+
+/** Room names as registered on the server. */
+export const ROOMS = {
+   /** 2..8 players, AI enemies optional, listed in the lobby */
+   battle: "battle",
+   /** one player against AI, private */
+   practice: "practice",
+} as const;
+
+/** What a room publishes for the lobby list (Colyseus metadata). */
+export interface RoomMeta {
+   name: string;
+   mode: "battle" | "practice";
+   enemies: string[];
+   windBaseDir: number;
+   windBaseSpeed: number;
+   createdAt: number;
 }
 
 /** What a client passes when joining. */

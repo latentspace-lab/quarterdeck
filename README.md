@@ -41,11 +41,13 @@ npm run server   # terminal 1: game server on ws://0.0.0.0:2567
 npm run dev      # terminal 2: client on http://localhost:5173/sailing/
 ```
 
-In the menu choose **Multiplayer**, enter the server (defaults to port 2567 on
-the page's host), a name and optionally a room id, pick a ship and join. An
-empty room id joins any open room or creates one; wind and the AI enemies from
-the scenario cards apply to the room you create. Deep link:
-`http://localhost:5173/sailing/?mp=1&server=ws://localhost:2567&vessel=lydia&name=Hornblower&enemies=amelie`.
+In the menu choose **Multiplayer**: the open rooms on the server are listed
+(name, players, AI enemies, wind) with a Join button each. Or pick a ship and
+press Join to enter any open room — or create one, with the room name, wind
+and the AI enemies from the scenario cards. **Practice** creates a private
+one-seat room against the AI on the server. Deep link:
+`http://localhost:5173/sailing/?mp=1&server=ws://localhost:2567&vessel=lydia&name=Hornblower&enemies=amelie&roomName=Trafalgar`
+(`&mode=practice` for a practice room, `&room=<id>` to join a specific one).
 
 What is shared: ships, wind, sea, damage, masts, collisions, grounding and
 gunnery come from the server. Q/E/F order a broadside; the server fires it,

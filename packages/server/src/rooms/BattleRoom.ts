@@ -14,6 +14,7 @@ import {
    type InputCommand,
    type JoinOptions,
    type RoomCreateOptions,
+   type RoomMeta,
    type WelcomeMessage,
 } from "@segel/shared";
 import { Simulation } from "../sim/Simulation.ts";
@@ -34,6 +35,8 @@ function seedFromClock(): number {
 export class BattleRoom extends Room<{ state: GameState }> {
    maxClients = 8;
    sim!: Simulation;
+   /** Which kind of room this is, for the lobby metadata. */
+   protected mode: RoomMeta["mode"] = "battle";
 
    /** Per-ship input queue, drained at the next tick. (`Room.inputs` is Colyseus' own.) */
    private inputQueues = new Map<string, InputCommand[]>();
@@ -52,13 +55,24 @@ export class BattleRoom extends Room<{ state: GameState }> {
       state.terrainSeed = this.sim.params.terrainSeed;
       this.setState(state);
 
-      if (Array.isArray(options.enemies)) {
-         const ids = options.enemies.filter((v) => typeof v === "string" && isKnownVessel(v)).slice(0, 6);
-         for (const ship of this.sim.spawnEnemies(ids)) {
-            this.state.ships.set(ship.id, new ShipSchema({ id: ship.id, vesselId: ship.vesselId, name: ship.name, ai: true }));
-         }
+      const enemies = Array.isArray(options.enemies)
+         ? options.enemies.filter((v) => typeof v === "string" && isKnownVessel(v)).slice(0, 6)
+         : [];
+      for (const ship of this.sim.spawnEnemies(enemies)) {
+         this.state.ships.set(ship.id, new ShipSchema({ id: ship.id, vesselId: ship.vesselId, name: ship.name, ai: true }));
       }
       this.syncState();
+
+      // What the lobby shows about this room.
+      const meta: RoomMeta = {
+         name: roomName(options.roomName),
+         mode: this.mode,
+         enemies,
+         windBaseDir: this.sim.params.windBaseDir,
+         windBaseSpeed: this.sim.params.windBaseSpeed,
+         createdAt: Date.now(),
+      };
+      this.setMetadata(meta);
 
       // Patches at the tick rate; the simulation is what changes the state,
       // so there is nothing to send more often than that.
@@ -168,6 +182,12 @@ export class BattleRoom extends Room<{ state: GameState }> {
    onDispose() {
       this.inputQueues.clear();
    }
+}
+
+const ROOM_NAMES = ["Trafalgar", "Cape St Vincent", "The Nile", "Camperdown", "Copenhagen", "The Saintes", "Ushant", "Quiberon Bay"];
+function roomName(given: unknown): string {
+   if (typeof given === "string" && given.trim()) return given.trim().slice(0, 32);
+   return ROOM_NAMES[Math.floor(Math.random() * ROOM_NAMES.length)];
 }
 
 function isKnownVessel(id: string): boolean {

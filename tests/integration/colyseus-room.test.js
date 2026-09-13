@@ -6,6 +6,7 @@
 import { Client } from "@colyseus/sdk";
 import { matchMaker } from "@colyseus/core";
 import { startServer, ROOM_BATTLE } from "../../packages/server/src/index.ts";
+import { listRooms, httpUrlOf } from "../../packages/client/src/net/NetClient.js";
 import { MSG, SIM_HZ } from "@segel/shared";
 import { createSuite } from "../lib/harness.js";
 
@@ -154,6 +155,49 @@ async function run() {
       eq(ai && ai.vesselId, "hirondelle", "the known vessel was spawned, the bogus one dropped");
       ok(ai && Math.hypot(ai.x, ai.z) > 600, "to windward, well off", ai && Math.hypot(ai.x, ai.z).toFixed(0) + " m");
       await room3.leave(true);
+
+      suite.section("The lobby list");
+      const raw = await fetch(httpUrlOf(srv.url) + "/rooms");
+      eq(raw.status, 200, "GET /rooms answers");
+      eq(raw.headers.get("access-control-allow-origin"), "*", "with CORS for the browser");
+      ok((await raw.json()).length >= 1, "and a JSON array of rooms");
+      const listed = await listRooms(srv.url);
+      const mineListed = listed.find((r) => r.roomId === room.roomId);
+      ok(mineListed, "our battle room is listed", listed.length + " rooms");
+      if (mineListed) {
+         eq(mineListed.clients, 2, "with its player count");
+         eq(mineListed.maxClients, 8, "and its seats");
+         ok(typeof mineListed.metadata.name === "string" && mineListed.metadata.name.length > 0,
+            "it got a name although none was given", mineListed.metadata.name);
+         eq(mineListed.metadata.mode, "battle", "and says what it is");
+         ok(Number.isFinite(mineListed.metadata.windBaseSpeed), "and its wind", mineListed.metadata.windBaseSpeed + " kn");
+      }
+      const named = await client.create(ROOM_BATTLE, { vesselId: "lydia", roomName: "  Trafalgar  ", enemies: ["amelie"] });
+      named.onMessage(MSG.welcome, () => {});
+      named.onMessage(MSG.event, () => {});
+      const listed2 = await listRooms(srv.url);
+      const tr = listed2.find((r) => r.roomId === named.roomId);
+      eq(tr && tr.metadata.name, "Trafalgar", "a given room name is listed, trimmed");
+      eq(tr && tr.metadata.enemies.join(), "amelie", "with its AI enemies");
+      await named.leave(true);
+
+      suite.section("A practice room is private and has one seat");
+      const solo = await client.create("practice", { vesselId: "hotspur", enemies: ["hirondelle"] });
+      solo.onMessage(MSG.welcome, () => {});
+      solo.onMessage(MSG.event, () => {});
+      await waitFor(() => shipCount(solo) === 2, 5000, "player + enemy in practice");
+      eq(shipCount(solo), 2, "the player and the AI enemy are in it");
+      const listed3 = await listRooms(srv.url);
+      ok(!listed3.some((r) => r.roomId === solo.roomId), "it is not in the battle list");
+      let rejected = false;
+      try {
+         const intruder = await new Client(srv.url).joinById(solo.roomId, { vesselId: "lydia" });
+         await intruder.leave(true);
+      } catch {
+         rejected = true;
+      }
+      eq(rejected, true, "a second player cannot join it");
+      await solo.leave(true);
 
       suite.section("Leaving");
       await room2.leave(true);

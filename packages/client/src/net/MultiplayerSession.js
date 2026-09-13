@@ -55,7 +55,7 @@ export class MultiplayerSession {
     * Connect and join. Resolves once the world parameters are known and the
     * Simulator has been set up for them.
     */
-   async start({ url, vesselId, name, roomId, create }) {
+   async start({ url, vesselId, name, roomId, mode, create }) {
       const sim = this.sim;
       this.net = new NetClient(url);
       this.net.onShipAdd((id, ship) => this._shipAdded(id, ship));
@@ -64,7 +64,8 @@ export class MultiplayerSession {
          this.closed = true;
          this.closeCode = code;
       });
-      this.welcome = await this.net.join({ vesselId, name, roomId, create });
+      this.mode = mode || "battle";
+      this.welcome = await this.net.join({ vesselId, name, roomId, mode: this.mode, create });
 
       // The world the server plays on. Every parameter is checked: a NaN in
       // the wind would run through sea, pose and flooding into the dynamics.
