@@ -71,9 +71,9 @@ export function whitecapsForWind(kts) {
 
 // Seezustand nach Douglas-Skala (fuer die Anzeige)
 const SEA_NAMES = [
-   [0.0, "spiegelglatt"], [0.1, "ruhig"], [0.5, "schwach bewegt"],
-   [1.25, "leicht bewegt"], [2.5, "mäßig bewegt"], [4.0, "grob"],
-   [6.0, "sehr grob"], [9.0, "hoch"], [14.0, "sehr hoch"],
+   [0.0, "calm"], [0.1, "smooth"], [0.5, "slight"],
+   [1.25, "moderate"], [2.5, "rough"], [4.0, "very rough"],
+   [6.0, "high"], [9.0, "very high"], [14.0, "phenomenal"],
 ];
 export function seaStateName(kts) {
    const h = waveHeightForWind(kts);

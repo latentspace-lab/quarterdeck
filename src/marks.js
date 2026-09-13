@@ -164,7 +164,7 @@ export class Course {
           if (this._crossedLineN(boatPos)) {
             this._completeLap(now);
             advanced = true;
-             return this._result("🏁 Runde " + this.lap + " in " + this._lapTime + " s");
+             return this._result("🏁 Lap " + this.lap + " in " + this._lapTime + " s");
            }
           this.nextTarget = { x: this.origin.x, z: this.lineZ, radius: 0 };
         } else if (leg.type === "turn") {
@@ -239,7 +239,7 @@ export class Course {
       this.progress = 0;
       this.legName = this.legs[0].name;
       this.nextTarget = { x: this.origin.x, z: this.lineZ, radius: 0 };
-      this.message = "🏁 Runde " + this.lap + " geschafft (" + lapTime.toFixed(1) + " s)";
+      this.message = "🏁 Lap " + this.lap + " done (" + lapTime.toFixed(1) + " s)";
       this.messageT = 4;
      }
 
