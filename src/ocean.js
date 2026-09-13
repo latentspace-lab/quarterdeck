@@ -18,19 +18,80 @@ export const WAVES = [
    { a: 0.08, L: 6.4, off:  74, q: 0.66, ph: 0.7 },
 ];
 
-// Amplitude aus Windstaerke (Knoten) -> Seezustand
+// ---------------------------------------------------------------------------
+// Seegang aus Windstaerke
+//
+// Voll entwickelte See nach Pierson-Moskowitz: die signifikante Wellenhoehe
+// waechst mit dem QUADRAT der Windgeschwindigkeit,
+//
+//     Hs = 0.21 * U^2 / g        (U in m/s)
+//
+// Das ist der Grund, warum aus 12 kn (knapp 1 m) bei 30 kn ueber 5 m werden.
+// Gleichzeitig werden die Wellen LAENGER - eine Sturmsee ist keine vergroesserte
+// Kabbelwelle, sondern langer, schwerer Seegang. Deshalb skaliert neben der
+// Amplitude auch die Wellenlaenge mit dem Wind.
+// ---------------------------------------------------------------------------
+
+// Signifikante Hoehe, die sich aus der Wellentabelle bei Amplitudenfaktor 1
+// ergibt: Hs = 4 * sigma, sigma^2 = Summe(a_i^2)/2
+const H_PER_AMP = (() => {
+   let v = 0;
+   for (const w of WAVES) v += w.a * w.a;
+   return 4 * Math.sqrt(v / 2);
+})();
+
+const KN_TO_MS = 0.514444;
+const HS_MAX = 11.5;          // Deckel, damit aus einem Orkan kein Tsunami wird
+
+// Signifikante Wellenhoehe in Metern
+export function waveHeightForWind(kts) {
+   const U = Math.max(kts, 0) * KN_TO_MS;
+   return Math.min(0.21 * U * U / G, HS_MAX);
+}
+
+// Amplitudenfaktor fuer die Wellentabelle
 export function ampForWind(kts) {
-   return Math.min(0.013 * kts + 0.02, 0.40);
+   return waveHeightForWind(kts) / H_PER_AMP;
+}
+
+// Streckung der Wellenlaengen. Bezugspunkt sind die Tabellenwerte bei 12 kn.
+export function lambdaForWind(kts) {
+   // Die Wellenlaenge waechst langsamer als die Hoehe - sonst wird die See zwar
+   // hoch, aber so flach geneigt, dass sie wie eine glatte Duenung wirkt.
+   // Mit der Wurzel bleibt die Steilheit erhalten: eine Sturmsee ist steil.
+   const r = Math.max(kts, 1) / 12;
+   return Math.min(Math.max(Math.sqrt(r), 0.55), 1.75);
+}
+
+// Weisskappen: fangen bei Bft 4 an und bedecken die See mit zunehmendem Wind.
+// Genau das ist das Merkmal, an dem man eine Windstaerke erkennt.
+export function whitecapsForWind(kts) {
+   return Math.min(Math.max((kts - 7) / 26, 0), 1);
+}
+
+// Seezustand nach Douglas-Skala (fuer die Anzeige)
+const SEA_NAMES = [
+   [0.0, "spiegelglatt"], [0.1, "ruhig"], [0.5, "schwach bewegt"],
+   [1.25, "leicht bewegt"], [2.5, "mäßig bewegt"], [4.0, "grob"],
+   [6.0, "sehr grob"], [9.0, "hoch"], [14.0, "sehr hoch"],
+];
+export function seaStateName(kts) {
+   const h = waveHeightForWind(kts);
+   let name = SEA_NAMES[0][1];
+   for (const [lim, n] of SEA_NAMES) { if (h >= lim) name = n; }
+   return name;
 }
 
 // Gerstner-Summe an Flaechenparameter (px, pz), unskaliert:
 // h = Hoehe, dx/dz = horizontale Verschiebung
-function waveSum(px, pz, t, windRad) {
+function waveSum(px, pz, t, windRad, lambda = 1) {
    let h = 0, dx = 0, dz = 0;
+   const invSqrtL = 1 / Math.sqrt(lambda);
    for (let i = 0; i < WAVES.length; i++) {
       const w = WAVES[i];
-      const k = (2 * Math.PI) / w.L;
-      const om = Math.sqrt(G * k); // Tiefwasser: omega = sqrt(g*k)
+      const k = (2 * Math.PI) / (w.L * lambda);
+      // Tiefwasser: omega = sqrt(g*k). Gestreckte Wellen laufen langsamer.
+      const om = Math.sqrt(G * ((2 * Math.PI) / w.L)) * invSqrtL;
       const ang = windRad + w.off * (Math.PI / 180);
       const dX = Math.sin(ang);
       const dZ = Math.cos(ang);
@@ -47,14 +108,14 @@ function waveSum(px, pz, t, windRad) {
 // Wasserhoehe an Weltposition (x, z). Gerstner verschiebt die Flaeche auch
 // horizontal, daher wird der Flaechenparameter per Fixpunkt-Iteration
 // invertiert -> das Boot sitzt exakt auf der sichtbaren Welle.
-export function seaHeight(x, z, t, windRad = Math.PI, amp = 0.16) {
+export function seaHeight(x, z, t, windRad = Math.PI, amp = 0.16, lambda = 1) {
    let px = x, pz = z;
    for (let i = 0; i < 3; i++) {
-      const s = waveSum(px, pz, t, windRad);
+      const s = waveSum(px, pz, t, windRad, lambda);
       px = x - s.dx * amp;
       pz = z - s.dz * amp;
    }
-   return waveSum(px, pz, t, windRad).h * amp;
+   return waveSum(px, pz, t, windRad, lambda).h * amp;
 }
 
 // GLSL-Rumpf der Gerstner-Summe - aus demselben WAVES-Array generiert,
@@ -66,10 +127,12 @@ function glslGerstnerBody() {
       const om = Math.sqrt(G * ((2 * Math.PI) / w.L)).toFixed(6);
       const off = ((w.off * Math.PI) / 180).toFixed(6);
       const qa = (w.q * w.a).toFixed(6);
+      // k wird durch uLambda gestreckt; t ist bereits die aufsummierte
+      // Phasenzeit, in der die langsamere Laufgeschwindigkeit steckt.
       parts.push(
 `  {
     vec2 d = vec2(sin(uWindDir + ${off}), cos(uWindDir + ${off}));
-    float th = ${k} * dot(d, p) - ${om} * t + ${w.ph.toFixed(4)};
+    float th = (${k} / uLambda) * dot(d, p) - ${om} * t + ${w.ph.toFixed(4)};
     float c = cos(th);
     float s = sin(th);
     h += ${w.a.toFixed(4)} * s;
@@ -85,6 +148,7 @@ const VERT = `
 uniform float uTime;
 uniform vec2 uCenter;
 uniform float uAmp;
+uniform float uLambda;
 uniform float uWindDir;
 varying vec3 vWorld;
 varying vec3 vNormal;
@@ -134,6 +198,8 @@ uniform vec3 uSunDir;
 uniform vec3 uCamPos;
 uniform float uTime;
 uniform float uAmp;
+uniform float uWaveH;   // signifikante Wellenhoehe in Metern
+uniform float uWhite;   // Anteil Weisskappen (0..1)
 varying vec3 vWorld;
 varying vec3 vNormal;
 varying float vFoam;
@@ -147,11 +213,11 @@ void main() {
 
   // Basis-Wellennormale + hochfrequente Rippelstoerung (nur nah am Betrachter)
   vec3 N = normalize(vNormal);
-  float near = 1.0 / (1.0 + dist * 0.012);
+  float near = 1.0 / (1.0 + dist * 0.045);   // Rippeln nur dicht am Betrachter
   float r1 = sin(vWorld.x * 1.9 + vWorld.z * 1.3 + uTime * 2.2);
   float r2 = sin(-vWorld.x * 1.3 + vWorld.z * 2.1 + uTime * 2.9);
   float r3 = sin(vWorld.x * 3.7 - vWorld.z * 2.9 + uTime * 4.1);
-  float rippleAmp = near * (0.02 + uAmp * 0.35);
+  float rippleAmp = near * (0.02 + min(uAmp, 0.9) * 0.35);
   N = normalize(N + vec3((r1 * 0.6 + r3 * 0.4) * rippleAmp, 0.0,
                          (r2 * 0.6 - r3 * 0.4) * rippleAmp));
 
@@ -164,10 +230,13 @@ void main() {
                     clamp(R.y, 0.0, 1.0));
 
   // Wasserfarbe: Tiefblau, an Kaemmen heller + Streulicht (Licht durch die Welle)
-  vec3 deep = vec3(0.006, 0.043, 0.082);
-  vec3 crest = vec3(0.016, 0.150, 0.180);
-  float hMask = clamp(vHeight / max(uAmp * 2.2, 0.05), 0.0, 1.0);
-  vec3 base = mix(deep, crest, hMask);
+  vec3 deep = vec3(0.004, 0.032, 0.068);
+  vec3 crest = vec3(0.020, 0.170, 0.200);
+  // vorzeichenbehaftet: Taeler dunkel, Kaemme hell - auf die tatsaechliche
+  // Wellenhoehe bezogen, damit der Kontrast bei jeder Windstaerke sitzt.
+  float hSigned = clamp(vHeight / max(uWaveH * 0.55, 0.08), -1.0, 1.0);
+  float hMask = hSigned * 0.5 + 0.5;
+  vec3 base = mix(deep, crest, hMask * hMask);
   float sss = pow(clamp(dot(V, -L), 0.0, 1.0), 4.0) * hMask;
   base += vec3(0.03, 0.30, 0.26) * sss;
 
@@ -183,9 +252,23 @@ void main() {
   // Schaum: an gequetschten Kaemmen (Gerstner-Jakob), Weisskappen mit Wind
   float foamN = 0.65 + 0.35 * sin(vWorld.x * 2.7 + uTime * 1.4)
                        * sin(vWorld.z * 2.3 - uTime * 1.1);
-  float foamMask = smoothstep(0.55, 0.95, vFoam * foamN)
-                 * clamp(uAmp * 4.5, 0.0, 1.0);
-  col = mix(col, vec3(0.92, 0.95, 0.96), foamMask * 0.85);
+  float jacFoam = smoothstep(0.55, 0.95, vFoam * foamN)
+                * clamp(uAmp * 4.5, 0.0, 1.0);
+
+  // Weisskappen: brechende Kaemme. Sie sitzen auf den oberen Wellenteilen und
+  // werden mit dem Wind haeufiger - das ist die Eigenschaft, an der man eine
+  // Windstaerke auf den ersten Blick erkennt.
+  float n1 = sin(vWorld.x * 0.21 + vWorld.z * 0.17 + uTime * 0.9);
+  float n2 = sin(vWorld.x * 0.53 - vWorld.z * 0.37 - uTime * 1.3);
+  float n3 = sin(vWorld.x * 1.10 + vWorld.z * 0.90 + uTime * 2.1);
+  float capNoise = 0.45 + 0.30 * n1 + 0.18 * n2 + 0.10 * n3;
+  float capMask = smoothstep(0.42, 0.92, hSigned) * capNoise;
+  float caps = smoothstep(0.30, 0.75, capMask) * uWhite;
+  // an der Luvflanke der Kaemme bricht es zuerst
+  caps *= 0.55 + 0.45 * clamp(1.0 - N.y, 0.0, 1.0) * 3.0;
+
+  float foamMask = clamp(max(jacFoam, caps), 0.0, 1.0);
+  col = mix(col, vec3(0.93, 0.96, 0.97), foamMask * 0.88);
 
   // Horizont-Dunst
   float fog = smoothstep(450.0, 1400.0, dist);
@@ -205,6 +288,9 @@ export function createOcean({ sunDir = new THREE.Vector3(0.4, 0.6, 0.7) } = {}) 
       uTime: { value: 0 },
       uCenter: { value: new THREE.Vector2(0, 0) },
       uAmp: { value: ampForWind(12) },
+      uLambda: { value: lambdaForWind(12) },
+      uWaveH: { value: waveHeightForWind(12) },
+      uWhite: { value: whitecapsForWind(12) },
       uWindDir: { value: Math.PI }, // Ausbreitungsrichtung (Rad): PI = nach Sued
       uSunDir: { value: sunDir.clone().normalize() },
       uCamPos: { value: new THREE.Vector3() },
@@ -220,6 +306,13 @@ export function createOcean({ sunDir = new THREE.Vector3(0.4, 0.6, 0.7) } = {}) 
    mesh.frustumCulled = false;
 
    let kts = 12;
+   let lambda = lambdaForWind(12);
+   // Phasenzeit: laengere Wellen laufen langsamer (omega ~ 1/sqrt(lambda)).
+   // Damit sich das Wellenfeld beim Aendern der Wellenlaenge nicht sprunghaft
+   // verschiebt, wird die Phase aufsummiert statt aus der absoluten Zeit
+   // berechnet.
+   let phaseT = 0;
+   let lastTime = 0;
    const cell = SIZE / SEG;
 
    const api = {
@@ -236,15 +329,31 @@ export function createOcean({ sunDir = new THREE.Vector3(0.4, 0.6, 0.7) } = {}) 
       },
 
       update(time, camPos, boatX, boatZ, windKts, windRad) {
-         uniforms.uTime.value = time;
+         const dt = Math.max(0, Math.min(time - lastTime, 0.25));
+         lastTime = time;
          if (windKts !== undefined) kts = windKts;
+         lambda = lambdaForWind(kts);
+         phaseT += dt / Math.sqrt(lambda);
+         uniforms.uTime.value = phaseT;
          uniforms.uAmp.value = ampForWind(kts);
+         uniforms.uLambda.value = lambda;
+         uniforms.uWaveH.value = waveHeightForWind(kts);
+         uniforms.uWhite.value = whitecapsForWind(kts);
          if (windRad !== undefined) uniforms.uWindDir.value = windRad;
          if (camPos) uniforms.uCamPos.value.copy(camPos);
          this.recenter(boatX, boatZ);
       },
 
+      // Phasenzeit und Streckung - damit rechnen Boot, Wrack und Geschosse
+      // mit exakt derselben Wasseroberflaeche wie der Shader.
+      get waveTime() { return phaseT; },
+      get lambda() { return lambda; },
+      get amp() { return ampForWind(kts); },
+      get waveHeight() { return waveHeightForWind(kts); },
+
       setTime(t) {
+         phaseT = t;
+         lastTime = t;
          uniforms.uTime.value = t;
       },
 
@@ -253,7 +362,11 @@ export function createOcean({ sunDir = new THREE.Vector3(0.4, 0.6, 0.7) } = {}) 
       },
       set windKts(v) {
          kts = v;
+         lambda = lambdaForWind(kts);
          uniforms.uAmp.value = ampForWind(kts);
+         uniforms.uLambda.value = lambda;
+         uniforms.uWaveH.value = waveHeightForWind(kts);
+         uniforms.uWhite.value = whitecapsForWind(kts);
       },
    };
 

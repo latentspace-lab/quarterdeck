@@ -1,7 +1,7 @@
 // tests/visual.test.js - Headless-Pruefung der 3D-Wellen (Gerstner) und
 // der windabhaengigen Segel-/Baumlogik (boat.js). Laeuft ohne Browser.
 import * as THREE from "three";
-import { seaHeight, createOcean, ampForWind, WAVES } from "../src/ocean.js";
+import { seaHeight, createOcean, ampForWind, lambdaForWind, waveHeightForWind, WAVES } from "../src/ocean.js";
 import { buildSailboat } from "../src/boat.js";
 
 let pass = 0, fail = 0;
@@ -16,6 +16,39 @@ function ok(cond, name, extra = "") {
 }
 
 console.log("== Wellen (Gerstner) ==");
+
+// 0) Seegang haengt am Wind: Hoehe quadratisch, Wellenlaenge waechst mit
+{
+   const h = (k) => waveHeightForWind(k);
+   ok(h(24) > h(12) * 3.4 && h(24) < h(12) * 4.6,
+      "doppelter Wind -> rund vierfache Wellenhoehe (Hs ~ U^2)",
+      h(12).toFixed(2) + " m -> " + h(24).toFixed(2) + " m");
+   ok(h(30) > 4.5 && h(30) < 6,
+      "30 kn ergeben grobe See um 5 m", h(30).toFixed(1) + " m");
+   ok(h(5) < 0.25, "bei 5 kn ist die See fast glatt", h(5).toFixed(2) + " m");
+   ok(h(80) <= 11.6, "die Hoehe ist nach oben gedeckelt", h(80).toFixed(1) + " m");
+   ok(lambdaForWind(30) > lambdaForWind(12) * 1.4,
+      "Sturmsee hat laengere Wellen",
+      lambdaForWind(12).toFixed(2) + " -> " + lambdaForWind(30).toFixed(2));
+   ok(lambdaForWind(4) < 0.7, "leichter Wind macht kurze Kabbelwellen",
+      lambdaForWind(4).toFixed(2));
+   // Die Steilheit muss MIT dem Wind zunehmen, sonst wirkt die See glatt
+   const steep = (k) => ampForWind(k) / lambdaForWind(k);
+   ok(steep(25) > steep(12) * 2.2, "die See wird mit dem Wind auch steiler",
+      steep(12).toFixed(2) + " -> " + steep(25).toFixed(2));
+   // Die Steilheit darf nicht ausufern, sonst faltet sich die Gerstner-Flaeche
+   let worst = 0;
+   for (let k = 1; k <= 60; k++) {
+      let sum = 0;
+      for (const w of WAVES) sum += (2 * Math.PI / (w.L * lambdaForWind(k))) * w.q * w.a * ampForWind(k);
+      worst = Math.max(worst, sum);
+   }
+   ok(worst < 0.95, "die Wellen bleiben ueberall unter der Brechgrenze",
+      "max. Steilheit " + worst.toFixed(2));
+   // Bei 12 kn bleibt alles wie vorher abgestimmt
+   ok(Math.abs(ampForWind(12) - 0.176) < 0.01,
+      "bei 12 kn unveraendert zur bisherigen Abstimmung", ampForWind(12).toFixed(3));
+}
 
 // 1) Hoehe ueberall endlich
 let bad = false;
@@ -68,7 +101,12 @@ ok(invErr < 0.05, "Invertierung trifft die Flaeche", "Fehler " + invErr.toFixed(
 // 5) createOcean: Uniforms, Raster-Snap, Geometrie in XZ
 const oc = createOcean({});
 oc.update(12.5, new THREE.Vector3(0, 8, -18), 33.3, -47.9, 14, 2.2);
-ok(oc.uniforms.uTime.value === 12.5, "uTime gesetzt");
+// uTime ist jetzt die aufsummierte Phasenzeit: lange Wellen laufen langsamer,
+// also bleibt sie hinter der Uhrzeit zurueck.
+ok(oc.uniforms.uTime.value > 0 && oc.uniforms.uTime.value < 12.5,
+   "uTime ist die Phasenzeit (laeuft langsamer als die Uhr)",
+   oc.uniforms.uTime.value.toFixed(2) + " s bei 12.5 s Spielzeit");
+ok(Math.abs(oc.uniforms.uLambda.value - lambdaForWind(14)) < 1e-9, "uLambda = lambdaForWind");
 ok(Math.abs(oc.uniforms.uAmp.value - ampForWind(14)) < 1e-9, "uAmp = ampForWind");
 ok(oc.uniforms.uWindDir.value === 2.2, "uWindDir gesetzt");
 const seg = 3000 / 150;

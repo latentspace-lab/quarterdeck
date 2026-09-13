@@ -7,7 +7,11 @@ Polar-Kurve, VMG, Gier (Heel), Kenter, Backen (Luffing) — plus **drei Spielmod
 
 Gesegelt wird wahlweise eine moderne Yacht oder einer von **drei Rahseglern der
 Royal Navy** aus der Hornblower-Ära — bis hinauf zum 74-Kanonen-Linienschiff,
-inklusive **Breitseiten**.
+inklusive **Breitseiten**. Im Modus **Gefecht** steht ein französischer Gegner
+in Luv, und die Schiffe gehen dabei kaputt: Masten fallen über Bord und
+schleppen als Wrack längsseit, Lecks unter Wasser lassen sich nur begrenzt
+lenzen, und Holzsplitter, Rundhölzer und Segelfetzen treiben als richtige
+Starrkörper davon.
 
 > „3D Optik" im Sinne von 3D-Grafik: echte 3D-Szene mit WebGL, kein Karten-Top-Down.
 
@@ -44,7 +48,10 @@ npm run preview   # Build testen → http://localhost:4173/
 | **A / D** oder **← / →** | Ruder — Backbord / Steuerbord (Kurs ändern) |
 | **W / S** | Yacht: Segel trimmen · Rahsegler: Segel **setzen / reffen** |
 | **Q / E / F** | Breitseite **Backbord** / **Steuerbord** / **beide** |
+| **Z** | Ladung wechseln: Vollkugel · Kettenkugel · Kartätsche |
+| **X** | Wrack kappen (gefallenen Mast loswerden) |
 | **V** | Schiff wechseln (ohne Umweg übers Menü) |
+| **Mausrad / Ziehen** | Zoom / Ansicht — aus der Nähe sieht man die Besatzung arbeiten |
 | **C** oder **1–4** | Kamera: **1** Verfolger · **2** Cockpit · **3** Draufsicht · **4** Orbit |
 | **M / Esc** | Menü / Pause |
 | **R** | Kurs (Regatta) / Übung (Training) zurücksetzen |
@@ -129,6 +136,181 @@ Die luvseitige Rahnock geht dabei nach achtern, das Tuch wölbt sich nach Lee.
 
 ---
 
+## Gefecht und Schäden
+
+Im Modus **Gefecht** wählt man zusätzlich die Lage: Einzelgefecht, Übermacht
+(zwei Gegner) oder gegen ein Linienschiff. Der Gegner ist KI-geführt und kann
+nur, was der Spieler auch kann — er segelt nicht gegen den Wind und läuft nicht
+schneller als seine Polarkurve.
+
+### Munition (Taste **Z**)
+
+| Ladung | Wirkung | Reichweite |
+|--------|---------|-----------|
+| **Vollkugel** | Durchschlägt die Bordwand, schlägt Rohre aus, reißt Lecks | voll (~550 m) |
+| **Kettenkugel** | Mäht Takelage und Segel nieder, lässt den Rumpf heil | kurz (~300 m) |
+| **Kartätsche** | Schwarm kleiner Kugeln, fegt das Deck und die Bedienungen | sehr kurz (~150 m) |
+
+Die Royal Navy schoss auf den **Rumpf** (Gegner niederkämpfen), die französische
+Marine bevorzugt in die **Takelage** (manövrierunfähig machen und entkommen).
+Beide Doktrinen stecken in der KI und führen zu spürbar verschiedenen Gefechten.
+
+### Warum auf Distanz kaum etwas trifft
+
+Die Rohre werden auf eine **geschätzte** Entfernung gerichtet, und der
+Schätzfehler wächst mit der Distanz. Dazu kommt die Rollbewegung im Moment des
+Abfeuerns — ein Grad Rollen ist auf 400 m schon ein Schiff daneben. Darum wurde
+„auf der Rolle" geschossen, und darum sehen die Trefferquoten so aus:
+
+| Entfernung | Vollkugel | Kettenkugel | Kartätsche |
+|-----------:|----------:|------------:|-----------:|
+| 50 m | ~100 % | ~100 % | ~95 % |
+| 200 m | ~66 % | ~99 % | ~85 % |
+| 300 m | ~36 % | ~98 % | ~20 % |
+| 600 m | ~11 % | — | — |
+
+### Was kaputtgehen kann
+
+- **Rumpf** — sechs Abschnitte (Bug/Mitte/Achterschiff × Backbord/Steuerbord).
+  Ein Schiff ist erledigt, wenn *eine* Seite aufgerissen ist. Die Bordwandstärke
+  skaliert mit der Größe: was eine Sloop durchschlägt, prallt am Zweidecker ab.
+  Im HUD zeigt ein **Rumpfplan** jeden Abschnitt einzeln — ein Mittelwert über
+  den ganzen Rumpf verschweigt genau das, worauf es ankommt: *wo* sie getroffen
+  ist. Eine zerschossene Breitseite ist etwas anderes als gleichmäßiger
+  Verschleiß. Die drei Masten und das Ruder sitzen als eigene Marken im selben
+  Plan, mit Zustand in Prozent.
+- **Lecks unter Wasser** — die Pumpen halten wenige in Schach, viele nicht.
+  Wasser im Schiff kostet Fahrt, legt sie auf die Seite und versenkt sie am Ende.
+- **Masten** — **kippen** über Bord: der gebrochene Mast bleibt am Mastfuß im
+  stehenden Gut hängen, dreht sich um seine Spur über die Bordwand, schlägt ins
+  Wasser und legt sich dort flach. Danach hängt er als **12-Tonnen-Wrack
+  längsseit**: das Schiff wird langsam und zieht ständig zur Wrackseite, bis
+  **X** die Wanten kappt.
+- **Besatzung** — Verluste an den Geschützen, in der Takelage und an den Pumpen
+  (siehe oben). Sie ist die vierte Baugruppe neben Rumpf, Rigg und Ruder.
+  Nicht nur Beschuss kostet Leute: ein **über Bord gehender Mast** nimmt die
+  Toppsgasten in seinen Wanten mit, und herabstürzendes Rundholz fegt das Deck.
+  Ein Zusammenstoß und eine Grundberührung ebenso. Dazu kommt der **Schock** —
+  nach einem solchen Ereignis bricht die Moral ein und erholt sich erst langsam.
+- **Segel** — reißen erst und fliegen dann weg. Mit sinkendem Tuchzustand
+  **platzen einzelne Bahnen auf**: es entstehen echte Löcher im Tuch, die
+  Ränder sacken aus und schlagen. Ist genug weg, fliegt das Segel **aus den
+  Lieken** und treibt in mehreren flatternden Bahnen nach Lee davon. Die oberen
+  Segel gehen zuerst — dort steht der meiste Wind und dorthin geht die
+  Kettenkugel; die Untersegel halten am längsten.
+- **Ruder** — Treffer achtern kosten die Kurskontrolle.
+- **Batterie** — ausgeschlagene Rohre verkleinern die eigene Breitseite sichtbar
+  (sie verschwinden aus den Stückpforten).
+- **Brand** — greift um sich, frisst Tuch und Tauwerk; im Extremfall fliegt sie
+  in die Luft.
+- **Flagge streichen** — ein geschlagener Gegner kämpft nicht bis zum Untergang.
+
+### Nicht nur Kugeln: Kräfte
+
+- **Zu viel Tuch im Sturm.** Der Staudruck geht mit dem Quadrat der
+  Windgeschwindigkeit. Volles Zeug hält bis etwa 30 kn; bei 34 kn gehen die
+  Stengen nach ein paar Minuten über Bord, bei 42 kn in Sekunden. Gerefft hält
+  sie es aus — genau dafür gibt es **W / S**.
+- **Zusammenstöße.** Rümpfe werden als Kette von drei Kreisen genähert. Beim
+  Stoß werden Impuls und Schaden aus Annäherungsgeschwindigkeit und Verdrängung
+  berechnet; bei langsamer Berührung verhaken sich die Schiffe im Tauwerk.
+- **Grundberührung.** Der Meeresgrund ist eine analytische Funktion — dieselbe,
+  aus der das sichtbare Gelände gebaut wird. Man kann also nie auf etwas
+  auflaufen, das man nicht sieht. Die Brandung über den Riffen ist die Warnung.
+
+### Die Wrackteile
+
+`debris.js` ist eine kleine eigene Starrkörper-Simulation (kein Physik-Framework):
+
+- **Schwerkraft** greift im Schwerpunkt an — erzeugt also kein Drehmoment.
+- **Auftrieb** nach Archimedes, aber **verteilt über Stützpunkte längs des
+  Körpers**. Genau daraus entsteht das Drehmoment: solange ein Mast senkrecht
+  steht, sitzt sein Auftriebsschwerpunkt unter dem Massenschwerpunkt — ein
+  labiles Gleichgewicht. Er kippt um, bis er flach im Wasser liegt, ganz von
+  selbst. Mit einem einzigen Auftriebspunkt bliebe jeder Mast senkrecht stehen
+  wie eine Spierentonne; das war der erste Anlauf und sah entsprechend falsch aus.
+- Eiche (720 kg/m³) treibt auf, Kiefer schwimmt gut, ein Kanonenrohr sinkt sofort.
+- **Quadratischer Wasserwiderstand** an jedem Stützpunkt einzeln — bremst
+  dadurch auch die Kippbewegung.
+- **Freie Rotation** mit Quaternion-Integration; in der Luft bleibt der Drehimpuls
+  praktisch erhalten.
+- **Trossenzwang** für gefallene Masten: greift am Mastfuß an, mit korrekter
+  effektiver Masse am Angriffspunkt, damit sich der Zwang nicht aufschaukelt.
+
+---
+
+## Seegang
+
+Die See hängt am Wind, und zwar **quadratisch**. Nach Pierson-Moskowitz gilt
+für eine voll entwickelte See `Hs = 0.21 · U² / g` — doppelter Wind heißt also
+rund vierfache Wellenhöhe:
+
+| Wind | Signifikante Höhe | Seezustand |
+|-----:|------------------:|------------|
+| 5 kn | 0,1 m | ruhig |
+| 12 kn | 0,8 m | schwach bewegt |
+| 20 kn | 2,3 m | leicht bewegt |
+| 30 kn | 5,1 m | grob |
+| 35 kn | 6,9 m | sehr grob |
+
+Mit dem Wind wachsen auch die **Wellenlängen** — aber nur mit der Wurzel, nicht
+linear. Sonst wird die See zwar hoch, aber so flach geneigt, dass sie wie eine
+glatte Dünung wirkt. So bleibt sie steil: eine Sturmsee ist steil.
+
+Woran man die Windstärke aber wirklich erkennt, sind die **Weißkappen**. Sie
+setzen bei Bft 4 ein und bedecken die See mit zunehmendem Wind — bei Bft 6 ist
+sie flächig weiß gesprenkelt, bei Bft 8 durchgehend. Ohne sie wirkt selbst eine
+3,5-m-See flach, weil dem Auge der Maßstab fehlt.
+
+Zwei Details, die den Unterschied machen:
+
+- **Die See folgt dem Wind nur träge.** Sie baut sich über etwa eine Minute auf
+  und läuft langsamer wieder ab. Sonst würde jede Bö die Wellen pulsieren lassen.
+- **Shader und Physik rechnen mit derselben Oberfläche.** Die Wellenlängen-
+  streckung läuft über eine aufsummierte Phasenzeit statt über die Uhrzeit,
+  sonst würde das ganze Wellenfeld springen, sobald sich der Wind ändert.
+
+---
+
+## Die Besatzung
+
+Ein Schiff dieser Zeit ist nichts ohne seine Leute. Die Mannschaft ist deshalb
+kein Zahlenschmuck, sondern hängt an allen drei Systemen — Geschütze, Segel,
+Pumpen.
+
+| Rolle | Anteil | Wofür sie gebraucht wird |
+|-------|-------:|--------------------------|
+| Offiziere & Rudergänger | 7 % | Ruderwirkung, Befehlskette, Moral |
+| Geschützbedienungen | 49 % | wie viele Rohre bedient werden und wie schnell |
+| Toppsgasten | 22 % | Segel setzen und reffen |
+| Seesoldaten | 11 % | Musketenfeuer, Enterabwehr |
+| Zimmerleute & Pumpen | 6 % | Lecks stopfen, Wasser lenzen |
+| Pulverjungen | 5 % | Nachschub an die Batterie |
+
+**Verluste.** Der große Töter an Bord war nicht die Kugel selbst, sondern der
+Holzsplitterhagel, den sie aus der Bordwand riss — und auf kurze Distanz die
+Kartätsche. Wo ein Treffer einschlägt, entscheidet, wen es erwischt: Splitter
+an der Bordwand treffen die Geschützbedienungen, Kartätsche fegt das offene
+Deck, Kettenkugeln holen Toppsgasten aus der Takelage. Rund ein Drittel der
+Getroffenen fällt, der Rest geht verwundet nach unten und fällt trotzdem aus.
+Ein hart ausgefochtenes Fregattengefecht kostet so 5–20 % der Besatzung.
+
+**Folgen.** Fehlende Bedienungen heißt: weniger Rohre und langsameres Nachladen.
+Fehlende Toppsgasten heißt: träges Segelmanöver. Fehlende Zimmerleute heißt:
+die Pumpen kommen gegen das Wasser nicht mehr an. Und wenn Verluste und
+Führungsverlust zusammenkommen, bricht die **Moral** — ein ausgeblutetes Schiff
+streicht die Flagge, auch wenn der Rumpf noch steht.
+
+**An Deck** stehen sie auch wirklich: `crewview.js` besetzt die Stationen mit
+Figuren — Bedienungen an jedem Rohr, die im Takt des Nachladens ausrennen und
+zurücktreten, Toppsgasten in den Wanten, wenn Segel bedient werden, ein
+Rudergänger am Rad, Zimmerleute an den Pumpen (die umso schneller arbeiten, je
+mehr Wasser im Schiff steht), Pulverjungen, die zwischen Luke und Batterie hin
+und her laufen. Wer gefallen ist, steht nicht mehr da. Die ganze Besatzung
+kostet zwei Zeichenaufrufe (zwei InstancedMeshes).
+
+---
+
 ## Die Physik (semi-realistisch)
 
 Im Kern (siehe `src/physics.js`, voll testbar unter `tests/`):
@@ -183,7 +365,16 @@ segel-simulator/
 │  ├─ boat.js            # 3D-Yacht: gelofteter Rumpf, Rigg, windgetriebene Segel
 │  ├─ vessels.js         # Schiffskatalog: Masse, Polarkurven, Dynamik, Batterien
 │  ├─ warship.js         # 3D-Rahsegler: Rumpf mit Stückpforten, Masten, Rahsegel
-│  ├─ guns.js            # Breitseiten: Mündungsfeuer, Rauch, Kugeln, Nachladen
+│  ├─ guns.js            # Breitseiten: Ballistik, Richtlösung, Trefferprüfung
+│  ├─ damage.js          # Strukturmodell: Rumpf, Masten, Ruder, Lecks, Brand
+│  ├─ debris.js          # Starrkörper-Simulation der Wrackteile (Auftrieb, Drall)
+│  ├─ ship.js            # Schiff als Einheit: Modell + Fahrt + Schaden + Batterie
+│  ├─ fleet.js           # Gegner und ihre Kapitäne (Doktrin, Manöver, Feuer)
+│  ├─ collide.js         # Schiff gegen Schiff, Grundberührung
+│  ├─ terrain.js         # Insel, Riffe, Brandung, Wassertiefe
+│  ├─ crew.js            # Besatzung: Rollen, Verluste, Wirkung auf alle Systeme
+│  ├─ crewview.js        # die Leute an Deck (zwei InstancedMeshes, animiert)
+│  ├─ fx.js              # gemeinsame Effekt-Texturen (Rauch, Feuer, Löcher)
 │  ├─ camera.js          # Kamera-Regie (4 Modi + Maus-Orbit)
 │  ├─ controls.js        # Tastatur-/Maussteuerung
 │  ├─ marks.js           # Regatta-Kurs: Bojen, Start- & Ziellinie, Runden
@@ -193,8 +384,9 @@ segel-simulator/
 └─ tests/
    ├─ physics.test.js    # 20 Einzelfalltests (Knoten/Winkel/Polar/Kenter)
    ├─ sim.smoke.js       # 10 Integrationssimulationen (Wenden/Gieren/Kenter/Gusts)
-   ├─ visual.test.js     # 31 Checks: Gerstner-Wellen, Segel/Baum/Rumpf (headless)
-   └─ vessels.test.js    # 72 Checks: Katalog, Rahsegler-Physik, Brassen, Batterie
+   ├─ visual.test.js     # 40 Checks: Wellen/Seegang, Segel, Baum, Rumpf (headless)
+   ├─ vessels.test.js    # 72 Checks: Katalog, Rahsegler-Physik, Brassen, Batterie
+   └─ damage.test.js     # 78 Checks: Schäden, Wrackphysik, Ballistik, Gefecht
 ```
 
 ---
@@ -202,13 +394,14 @@ segel-simulator/
 ## Tests
 
 ```bash
-npm test                     # alle vier Suiten, 133 Checks
+npm test                     # alle fünf Suiten, 220 Checks
 
 # oder einzeln:
 node tests/physics.test.js   # 20/20
 node tests/sim.smoke.js      # 10/10
-node tests/visual.test.js    # 31/31 (Gerstner-Wellen + Segel-3D, headless)
+node tests/visual.test.js    # 40/40 (Seegang + Segel-3D, headless)
 node tests/vessels.test.js   # 72/72 (Schiffe, Brassen, Geschütze, headless)
+node tests/damage.test.js    # 78/78 (Schäden, Wrack, Ballistik, Gefecht, headless)
 ```
 
 Die Tests brauchen **kein npm-Installation** (reines Node, nur für `physics`/`wind`/`trainer`):
@@ -234,8 +427,13 @@ Die Tests brauchen **kein npm-Installation** (reines Node, nur für `physics`/`w
 ## Hinweise / Grenzen (semi-realistisch, bewusst vereinfacht)
 
 - Alle Schiffe sind geloftete 3D-Rümpfe aus Stationsquerschnitten (prozedural, kein importiertes Mesh).
-- Die Geschütze schießen ins Leere: es gibt (noch) kein Ziel und keinen Trefferschaden.
-  Fall of Shot wird gezeigt, getroffen wird nichts.
+- Wrackteile kollidieren nicht untereinander und nicht mit den Schiffen — sie
+  reagieren auf Wasser, Wind und Schwerkraft, nicht aufeinander. Für Splitter,
+  Planken und treibende Masten ist das ausreichend und spart sehr viel Rechenzeit.
+- Einschlaglöcher im **Rumpf** sind aufgesetzte Decals, keine echten Löcher in der
+  Geometrie. Die Risse im **Segeltuch** dagegen sind echt: dort werden die
+  betroffenen Dreiecke zusammengezogen.
+- Entern ist nicht implementiert — die Schiffe verhaken sich, mehr passiert nicht.
 - Leeweg (Drift) und Ruderautorität sind vereinfacht, aber die **Qualitative** des
   Verhaltens (Krausen, Wenden, Gieren, VMG, Kenter) ist realistisch.
 - Kein Wellen-Boot-Kontakt-Rendering (Boot „schwimmt" auf der berechneten Wasserhöhe,
