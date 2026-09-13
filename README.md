@@ -26,8 +26,11 @@ npm run dev
 Danach im Browser öffnen: **http://localhost:5173/**
 
 ```bash
-npm run build     # Produktions-Build → ./dist
+npm run build     # Produktions-Build → packages/client/dist
 npm run preview   # Build testen → http://localhost:4173/
+npm run typecheck # TypeScript in shared/ und server/ prüfen
+npm run server    # Headless-Simulation ohne Browser (Phase-0-Nachweis)
+npm test          # alle Testebenen
 ```
 
 > **Wichtig:** Befehle immer **ohne** angehängten Kommentar ausführen.
@@ -381,63 +384,110 @@ Im Kern (siehe `src/physics.js`, voll testbar unter `tests/`):
 
 ## Projektstruktur
 
+Seit Phase 0 der Mehrspieler-Umstellung ([Issue #23](https://github.com/latentspace-lab/sailing/issues/23))
+liegt das Projekt als npm-Workspace vor. Die Trennlinie ist streng: `shared/`
+enthaelt reine Logik ohne DOM und ohne Renderer, `client/` alles Sichtbare.
+
 ```
 segel-simulator/
-├─ index.html            # Viewport + HUD + Menü + Kompass-Canvas
-├─ vite.config.js
-├─ package.json
-├─ src/
-│  ├─ main.js            # Einstiegspunkt (Renderer-Loop, WebGL-Fallback)
-│  ├─ game.js            # Simulations-Loop: bindet Szene/Boot/Physik/Kamera/Modi/UI
-│  ├─ physics.js         # Kernphysik (Test: tests/physics.test.js)
-│  ├─ wind.js            # Wind (Gusts, Veer, Beaufort)
-│  ├─ ocean.js           # Gerstner-Wellenmeer, windabhängig (JS ↔ GLSL identisch)
-│  ├─ scene.js           # Szene: Himmel, Sonne, Lichter, Wolken
-│  ├─ boat.js            # 3D-Yacht: gelofteter Rumpf, Rigg, windgetriebene Segel
-│  ├─ factions.js        # Parteien: Schiffe, Doktrin, Ausbildungsstand, Flagge
-│  ├─ vessels.js         # Schiffskatalog: Masse, Polarkurven, Dynamik, Batterien
-│  ├─ warship.js         # 3D-Rahsegler: Rumpf mit Stückpforten, Masten, Rahsegel
-│  ├─ guns.js            # Breitseiten: Ballistik, Richtlösung, Trefferprüfung
-│  ├─ damage.js          # Strukturmodell: Rumpf, Masten, Ruder, Lecks, Brand
-│  ├─ debris.js          # Starrkörper-Simulation der Wrackteile (Auftrieb, Drall)
-│  ├─ ship.js            # Schiff als Einheit: Modell + Fahrt + Schaden + Batterie
-│  ├─ fleet.js           # Gegner und ihre Kapitäne (Doktrin, Manöver, Feuer)
-│  ├─ collide.js         # Schiff gegen Schiff, Grundberührung
-│  ├─ terrain.js         # Insel, Riffe, Brandung, Wassertiefe
-│  ├─ crew.js            # Besatzung: Rollen, Verluste, Wirkung auf alle Systeme
-│  ├─ crewview.js        # die Leute an Deck (zwei InstancedMeshes, animiert)
-│  ├─ fx.js              # gemeinsame Effekt-Texturen (Rauch, Feuer, Löcher)
-│  ├─ camera.js          # Kamera-Regie (4 Modi + Maus-Orbit)
-│  ├─ controls.js        # Tastatur-/Maussteuerung
-│  ├─ marks.js           # Regatta-Kurs: Bojen, Start- & Ziellinie, Runden
-│  ├─ trainer.js         # Trainings-Herausforderungen (Edge- & Zeit-Logik)
-│  ├─ ui.js              # 2D-HUD + 2D-Kompass + Menü + Trainings-Panel
-│  └─ styles.css         # Optik
-└─ tests/
-   ├─ physics.test.js    # 20 Einzelfalltests (Knoten/Winkel/Polar/Kenter)
-   ├─ sim.smoke.js       # 10 Integrationssimulationen (Wenden/Gieren/Kenter/Gusts)
-   ├─ visual.test.js     # 40 Checks: Wellen/Seegang, Segel, Baum, Rumpf (headless)
-   ├─ vessels.test.js    # 72 Checks: Katalog, Rahsegler-Physik, Brassen, Batterie
-   └─ damage.test.js     # 105 Checks: Schäden, Wrack, Ballistik, Parteien, Gefecht
+├─ packages/
+│  ├─ shared/            # @segel/shared — reine Logik (TypeScript, kein Three.js-Renderer)
+│  │  └─ src/
+│  │     ├─ utils.ts         # Winkel, Interpolation, approach() (dt-invariante Glaettung)
+│  │     ├─ rng.ts           # mulberry32, abgeleitete Stroeme, gauss()
+│  │     ├─ timestep.ts      # SIM_DT (30 Hz) + Akkumulator fuer die Spielschleife
+│  │     ├─ types.ts         # Protokoll: ShipState, SeaSync, InputCommand, WorldParams
+│  │     ├─ physics.ts       # Segelphysik, BoatDynamics (fester Schritt)
+│  │     ├─ wind.ts          # Wind — reine Funktion der Simulationszeit
+│  │     ├─ ocean-math.ts    # Gerstner-Wellen, SeaState (nachlaufender Seegang + Phase)
+│  │     ├─ terrain-math.ts  # Seekarte aus einem Seed: World, Tiefe, Riffe
+│  │     ├─ pose.ts          # Rumpflage auf der Welle + Interpolation fuers Bild
+│  │     ├─ ballistics.ts    # Wurfbahn, Salvenwurf, Trefferpruefung
+│  │     ├─ damage.ts        # Strukturmodell: Rumpf, Masten, Ruder, Lecks, Brand
+│  │     ├─ crew.ts          # Besatzung: Rollen, Verluste, Wirkung auf alle Systeme
+│  │     ├─ collide.ts       # Schiff gegen Schiff, Grundberuehrung
+│  │     ├─ vessels.ts       # Schiffskatalog: Masse, Polarkurven, Dynamik, Batterien
+│  │     └─ factions.ts      # Parteien: Doktrin, Ausbildungsstand, Flagge
+│  │
+│  ├─ server/            # @segel/server — headless. Phase 1 bringt hier Colyseus ein.
+│  │  └─ src/headless.ts     # HeadlessRoom/HeadlessShip: ein Raum ohne Browser
+│  │
+│  └─ client/            # @segel/client — Browser: Three.js, Eingabe, HUD
+│     ├─ index.html
+│     ├─ vite.config.js
+│     └─ src/
+│        ├─ main.js          # Spielschleife: feste Simulation, freie Darstellung
+│        ├─ game.js          # stepFixed() (Simulation) + render(alpha) (Bild)
+│        ├─ ship.js          # Schiff als Einheit: Modell + Fahrt + Schaden + Batterie
+│        ├─ guns.js          # Breitseiten-DARSTELLUNG (Ballistik in @segel/shared)
+│        ├─ ocean.js         # Wellen-Mesh und Shader (Mathematik in @segel/shared)
+│        ├─ terrain.js       # Gelaendemesh und Brandung (Seekarte in @segel/shared)
+│        ├─ scene.js         # Szene: Himmel, Sonne, Lichter, Wolken
+│        ├─ boat.js          # 3D-Yacht: gelofteter Rumpf, Rigg, windgetriebene Segel
+│        ├─ warship.js       # 3D-Rahsegler: Rumpf mit Stueckpforten, Masten, Rahsegel
+│        ├─ debris.js        # Starrkoerper-Simulation der Wrackteile (Auftrieb, Drall)
+│        ├─ fleet.js         # Gegner und ihre Kapitaene (Doktrin, Manoever, Feuer)
+│        ├─ crewview.js      # die Leute an Deck (zwei InstancedMeshes, animiert)
+│        ├─ fx.js            # gemeinsame Effekt-Texturen (Rauch, Feuer, Loecher)
+│        ├─ camera.js        # Kamera-Regie (4 Modi + Maus-Orbit)
+│        ├─ controls.js      # Tastatur-/Maussteuerung
+│        ├─ marks.js         # Regatta-Kurs: Bojen, Start- & Ziellinie, Runden
+│        ├─ trainer.js       # Trainings-Herausforderungen (Edge- & Zeit-Logik)
+│        ├─ ui.js            # 2D-HUD + 2D-Kompass + Menue + Trainings-Panel
+│        ├─ audio.js         # Sprachansagen je Nation
+│        ├─ styles.css       # Optik
+│        └─ physics.js …     # Re-Exporte aus @segel/shared (alte Importpfade)
+└─ tests/                # siehe unten
 ```
+
+### Feste Simulationsrate
+
+Die Simulation laeuft mit **30 Hz** (`SIM_DT`), gerendert wird mit
+Bildschirmrate. `main.js` sammelt die vergangene Zeit in einem Akkumulator und
+gibt sie in ganzen Schritten aus; der Rest (`alpha`) interpoliert die
+Schiffslagen zwischen den letzten beiden Schritten.
+
+Der Grund ist nicht Eleganz, sondern Notwendigkeit: die Physik enthaelt
+Glaettungsterme, und `f(dt₁)` gefolgt von `f(dt₂)` ist nicht dasselbe wie
+`f(dt₁+dt₂)`. Client-Prediction verlangt aber genau das — der Client rechnet
+Eingaben nach, die der Server schon gerechnet hat. Deshalb gibt es fuer die
+Ruderglaettung seit Phase 0B' auch nur noch **einen** Smoother, und der sitzt
+in `BoatDynamics.step()`.
 
 ---
 
 ## Tests
 
-```bash
-npm test                     # alle fünf Suiten, 248 Checks
+Drei Ebenen, weil sie verschiedene Fragen beantworten.
 
-# oder einzeln:
-node tests/physics.test.js   # 20/20
-node tests/sim.smoke.js      # 10/10
-node tests/visual.test.js    # 40/40 (Seegang + Segel-3D, headless)
-node tests/vessels.test.js   # 72/72 (Schiffe, Brassen, Geschütze, headless)
-node tests/damage.test.js    # 105/105 (Schäden, Wrack, Ballistik, Parteien, headless)
+```bash
+npm test                  # alles (Build + 699 Checks, ~60 s)
+
+npm run test:unit         # ein Modul, eine Zusicherung      (~0.1 s)
+npm run test:regression   # was sich nicht aendern darf      (~0.2 s)
+npm run test:integration  # mehrere Module ueber Zeit        (~55 s)
+npm run test:pending      # zusaetzlich die offenen Faelle
+
+node tests/run.js ocean ballistics   # nur Suiten, deren Pfad das enthaelt
+node tests/unit/pose.test.js         # eine Suite direkt, ohne Runner
 ```
 
-Die Tests brauchen **kein npm-Installation** (reines Node, nur für `physics`/`wind`/`trainer`):
-`node tests/sim.smoke.js`.
+| Ebene | Was sie prueft |
+|---|---|
+| `tests/unit/` | Einzelne Module: Winkel, Zufall, Akkumulator, Wellen, Seekarte, Rumpflage, Ballistik, Schaden, Mannschaft, Segelphysik. Schnell und deterministisch — faellt hier etwas um, weiss man sofort, wo. |
+| `tests/regression/` | Die Zusagen, auf denen der Mehrspieler-Umbau steht: **dt-Invarianz**, **Determinismus** (gleicher Seed → gleiches Gefecht, inklusive eines Laufs mit abgeklemmtem `Math.random`) und eine **Golden-Spur** gegen `tests/fixtures/golden-trace.json`. |
+| `tests/integration/` | Mehrere Module ueber Zeit: Segeln, Schiffe und Rigg, Geometrie, ein vollstaendiges Gefecht, die Headless-Simulation und die Render-Interpolation. Dazu ein **Boot-Smoke-Test**, der das gebaute Spiel in Chromium startet — der faengt fehlende Importe, die kein Modultest sieht. |
+| `tests/pending/` | Faelle fuer Funktionen, die es noch nicht gibt. Laeuft nur mit `--pending` und zaehlt nicht gegen den Exit-Code. |
+
+Die Golden-Spur neu festschreiben — nur, wenn die Aenderung gewollt ist:
+
+```bash
+node tests/regression/golden-trace.test.js --update
+```
+
+Der Boot-Smoke-Test braucht einen Build und Chromium
+(`npx playwright install chromium`); fehlt eines davon, ueberspringt er sich
+selbst. Alles andere laeuft mit reinem Node.
 
 ---
 

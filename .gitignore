@@ -4,6 +4,7 @@ node_modules/
 
 # Vite-Build
 dist/
+packages/*/dist/
 
 # Logs
 *.log
