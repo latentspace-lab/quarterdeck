@@ -1,0 +1,862 @@
+// warship.js - Rahsegler der Royal Navy (Hornblower-Aera), prozedural gebaut.
+//
+// Aufbau wie bei der Yacht:  Schiff (yaw) > heeler (Krengung/Stampfen) > Teile.
+// Bug = +Z, Steuerbord = +X.
+//
+// Rumpf:  aus Stationsquerschnitten geloift, mit Einziehung (Tumblehome) ueber
+//         der Wasserlinie, Kupferbeschlag darunter und Nelson-Schachbrett
+//         (ockerfarbene Baender auf Hoehe der Batteriedecks, schwarz dazwischen).
+// Rigg:   Fock-, Gross- und Besanmast mit je drei Segmenten (Untermast, Mars-,
+//         Bramstenge), Marsplattformen, Rahen.
+// Segel:  Rahsegel als parametrische Tuchflaechen, die sich nach Lee woelben.
+//         Die Rahen werden gebrasst: Rahwinkel = 90 - AwA/2, begrenzt auf 45
+//         Grad - genau der Grund, warum ein Rahsegler nicht hoeher als etwa
+//         sechs Strich an den Wind gehen kann.
+// Dazu:   Klueverbaum mit Stagsegeln, Besan (Gaffelsegel), Heckgalerie,
+//         Kanonenrohre mit Rueckstoss, White Ensign und Kommandowimpel.
+
+import * as THREE from "three";
+import { clamp, DEG } from "./utils.js";
+import { VESSEL_COLORS } from "./vessels.js";
+
+const UP = new THREE.Vector3(0, 1, 0);
+
+// ---------------- Materialien ----------------
+const matHull = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.62, metalness: 0.04, side: THREE.DoubleSide });
+const matDeck = new THREE.MeshStandardMaterial({ color: VESSEL_COLORS.deck, roughness: 0.92, metalness: 0.0, side: THREE.DoubleSide });
+const matSpar = new THREE.MeshStandardMaterial({ color: 0x6b4c28, roughness: 0.78, metalness: 0.02 });
+const matSparDark = new THREE.MeshStandardMaterial({ color: 0x2c1f13, roughness: 0.8 });
+const matRope = new THREE.MeshStandardMaterial({ color: 0x2a2622, roughness: 0.9 });
+const matTrim = new THREE.MeshStandardMaterial({ color: VESSEL_COLORS.trim, roughness: 0.42, metalness: 0.55 });
+const matIron = new THREE.MeshStandardMaterial({ color: 0x1a1a1d, roughness: 0.42, metalness: 0.75 });
+const matPortLid = new THREE.MeshStandardMaterial({ color: 0x0b0b0d, roughness: 0.75, side: THREE.DoubleSide });
+const matGlass = new THREE.MeshStandardMaterial({ color: 0x9fd8e8, roughness: 0.2, metalness: 0.3, emissive: 0x16323c });
+
+const C = VESSEL_COLORS;
+
+// =========================================================================
+// Rumpfform
+// =========================================================================
+// Halbbreite ueber die Laenge (0 = Bug, 1 = Spiegel)
+function hbStation(s) {
+   if (s < 0.44) return Math.pow(smooth(s, 0.0, 0.44), 0.72);
+   return 1 - 0.40 * Math.pow(smooth(s, 0.44, 1.0), 1.45);
+}
+// Kiellinie: vorn steigt der Vorsteven, achtern leichter Kielfall
+function kdStation(s) {
+   return 0.26 + 0.74 * smooth(s, 0.0, 0.24) + 0.06 * smooth(s, 0.40, 0.80)
+        - 0.16 * smooth(s, 0.88, 1.0);
+}
+// Deckssprung: hohe Back vorn, tiefste Stelle mittschiffs, Achterdeck/Poop hinten.
+// Beide Enden steigen erst im letzten Drittel - dazwischen laeuft die
+// Scheuerlinie glatt durch, wie bei einem echten Rumpf.
+function sheerStation(s) {
+   return 1.0
+      + 0.30 * Math.pow(smooth(0.34 - s, 0.0, 0.34), 1.5)   // Back steigt zum Bug
+      + 0.22 * Math.pow(smooth(s - 0.66, 0.0, 0.34), 1.4);  // Poop steigt zum Heck
+}
+// Querschnittsform: schmal am Kiel, voll an der Wasserlinie, eingezogen oben
+function beamFactor(t, tW) {
+   const tMax = Math.min(0.94, tW * 1.06 + 0.05);
+   if (t <= tMax) {
+      const u = t / Math.max(tMax, 1e-4);
+      return 0.12 + 0.88 * Math.pow(Math.sin(u * Math.PI / 2), 0.74);
+   }
+   const v = (t - tMax) / Math.max(1 - tMax, 1e-4);
+   return 1.0 - 0.21 * v * v; // Tumblehome
+}
+function smooth(x, a, b) {
+   return THREE.MathUtils.smoothstep(x, a, b);
+}
+
+// Geometrie-Helfer: liefert Punkt + Halbbreite fuer Station s, Hoehenparameter t
+function makeHullGeom(dim) {
+   const { LOA, BEAM, DRAFT, FB } = dim;
+   const tW = DRAFT / (DRAFT + FB); // Hoehenparameter der Wasserlinie
+
+   function point(s, t, side) {
+      let z = THREE.MathUtils.lerp(LOA / 2, -LOA / 2, s);
+      const yKeel = -DRAFT * kdStation(s);
+      const ySheer = FB * sheerStation(s);
+      const y = yKeel + (ySheer - yKeel) * t;
+      // lokaler Hoehenparameter relativ zur eigenen Station
+      const tLocal = (y - yKeel) / Math.max(ySheer - yKeel, 1e-4);
+      const tWLocal = (0 - yKeel) / Math.max(ySheer - yKeel, 1e-4);
+      const hb = hbStation(s) * (BEAM / 2) * beamFactor(tLocal, tWLocal);
+      // Steven- und Spiegelfall: oben nach vorn bzw. nach achtern ausladend
+      z += tLocal * LOA * 0.075 * smooth(1 - s, 0.84, 1.0);
+      z -= tLocal * LOA * 0.055 * smooth(s, 0.86, 1.0);
+      return { x: side * hb, y, z, hb, sheer: ySheer };
+   }
+   return { point, tW };
+}
+
+// Die Wasserlinie ist waagerecht, die Baender folgen dem Deckssprung: genau so
+// laufen Barkholz und Stueckpfortenstrake an einem echten Rumpf.
+// bands sind Bruchteile des mittschiffs gemessenen Freibords.
+function hullColorAt(y, s, FB, bands) {
+   if (y < -0.015) return C.copper;              // Kupferbeschlag
+   if (y < FB * 0.12) return C.boot;             // Barkholz an der Wasserlinie
+   const u = y / (FB * sheerStation(s));         // Hoehe relativ zur eigenen Station
+   for (let i = 0; i < bands.length; i++) {
+      if (Math.abs(u - bands[i]) < 0.078) return C.band;
+   }
+   return C.dark;
+}
+
+function buildHull(dim, bands) {
+   const { LOA, FB } = dim;
+   const { point } = makeHullGeom(dim);
+   const S = 34, M = 36;
+   const positions = [], colors = [], indices = [];
+
+   function push(p, s) {
+      positions.push(p.x, p.y, p.z);
+      const c = hullColorAt(p.y, s, FB, bands);
+      colors.push(c[0], c[1], c[2]);
+      return positions.length / 3 - 1;
+   }
+
+   const port = [], stbd = [];
+   for (let i = 0; i < S; i++) {
+      const s = i / (S - 1);
+      port.push([]); stbd.push([]);
+      for (let j = 0; j <= M; j++) {
+         const t = j / M;
+         port[i].push(push(point(s, t, 1), s));
+         stbd[i].push(push(point(s, t, -1), s));
+      }
+   }
+   for (let i = 0; i < S - 1; i++) {
+      for (let j = 0; j < M; j++) {
+         for (const side of [port, stbd]) {
+            const a = side[i][j], b = side[i][j + 1];
+            const c2 = side[i + 1][j], d = side[i + 1][j + 1];
+            indices.push(a, b, d, a, d, c2);
+         }
+      }
+   }
+   // Spiegel (Heckflaeche)
+   const rim = [];
+   for (let j = 0; j <= M; j++) rim.push(port[S - 1][j]);
+   for (let j = M; j >= 0; j--) rim.push(stbd[S - 1][j]);
+   let cx = 0, cy = 0, cz = 0;
+   for (const vi of rim) { cx += positions[vi * 3]; cy += positions[vi * 3 + 1]; cz += positions[vi * 3 + 2]; }
+   const rn = rim.length;
+   positions.push(cx / rn, cy / rn, cz / rn);
+   const cc = hullColorAt(cy / rn, 1, FB, bands);
+   colors.push(cc[0], cc[1], cc[2]);
+   const centroid = positions.length / 3 - 1;
+   for (let k = 0; k < rim.length; k++) indices.push(centroid, rim[k], rim[(k + 1) % rim.length]);
+
+   const geo = new THREE.BufferGeometry();
+   geo.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+   geo.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
+   geo.setIndex(indices);
+   geo.computeVertexNormals();
+   const mesh = new THREE.Mesh(geo, matHull);
+   mesh.castShadow = true;
+   return mesh;
+}
+
+// Decksflaeche knapp unterhalb der Schanzkleid-Oberkante
+function buildDeck(dim) {
+   const { LOA, FB } = dim;
+   const { point } = makeHullGeom(dim);
+   const S = 34;
+   const positions = [], indices = [];
+   for (let i = 0; i < S; i++) {
+      const s = i / (S - 1);
+      const edge = point(s, 0.86, 1);
+      const hb = Math.max(edge.hb * 0.99, 0.001);
+      const y = edge.y;
+      positions.push(hb, y, edge.z, 0, y + FB * 0.035, edge.z, -hb, y, edge.z);
+   }
+   for (let i = 0; i < S - 1; i++) {
+      const a = i * 3, b = (i + 1) * 3;
+      indices.push(a, a + 1, b + 1, a, b + 1, b);
+      indices.push(a + 1, a + 2, b + 2, a + 1, b + 2, b + 1);
+   }
+   const geo = new THREE.BufferGeometry();
+   geo.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+   geo.setIndex(indices);
+   geo.computeVertexNormals();
+   const d = new THREE.Mesh(geo, matDeck);
+   d.receiveShadow = true;
+   return d;
+}
+
+// =========================================================================
+// Tauwerk
+// =========================================================================
+function rope(a, b, r, mat = matRope) {
+   const dir = new THREE.Vector3().subVectors(b, a);
+   const len = dir.length();
+   if (len < 1e-4) return new THREE.Group();
+   const m = new THREE.Mesh(new THREE.CylinderGeometry(r, r, len, 5), mat);
+   m.position.copy(a).addScaledVector(dir, 0.5);
+   m.quaternion.setFromUnitVectors(UP, dir.normalize());
+   return m;
+}
+
+// =========================================================================
+// Segeltuch
+// =========================================================================
+const SAIL_VERT = `
+varying vec3 vN; varying vec2 vUv;
+void main() {
+   vN = normalize(normalMatrix * normal);
+   vUv = uv;
+   gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+}
+`;
+const SAIL_FRAG = `
+precision highp float;
+uniform vec3 uColor; uniform vec3 uSunDir; uniform float uWear;
+varying vec3 vN; varying vec2 vUv;
+void main() {
+   vec3 N = normalize(vN);
+   vec3 L = normalize(uSunDir);
+   float diff = clamp(dot(N, L), 0.0, 1.0);
+   float back = clamp(dot(-N, L), 0.0, 1.0);
+   // Senkrecht genaehte Tuchbahnen: nur schmale Naehte, kein Karomuster
+   float seamX = fract(vUv.x * 9.0);
+   float cloth = 1.0 - 0.045 * (smoothstep(0.0, 0.045, seamX) * (1.0 - smoothstep(0.045, 0.09, seamX)));
+   // Reihen von Reffbaendseln als feine Linie
+   float seamY = fract(vUv.y * 3.0 + 0.5);
+   float reef = 1.0 - 0.035 * (smoothstep(0.0, 0.03, seamY) * (1.0 - smoothstep(0.03, 0.06, seamY)));
+   float shade = 0.58 + 0.42 * diff + 0.26 * back;
+   vec3 col = uColor * (1.0 - uWear * 0.05);
+   gl_FragColor = vec4(col * shade * cloth * reef, 1.0);
+}
+`;
+
+function sailMaterial(color, wear = 0.35) {
+   return new THREE.ShaderMaterial({
+      uniforms: {
+         uColor: { value: new THREE.Color(color) },
+         uSunDir: { value: new THREE.Vector3(0.4, 0.6, 0.7) },
+         uWear: { value: wear },
+      },
+      vertexShader: SAIL_VERT,
+      fragmentShader: SAIL_FRAG,
+      side: THREE.DoubleSide,
+   });
+}
+
+// Rahsegel: haengt unter der Rah, Kopf = Rahbreite, Fuss etwas breiter.
+// Lokal:  x = quer (Rahrichtung),  y = 0 an der Rah nach unten,  z = Bauch.
+function makeSquareSail(U = 14, V = 9, color = 0xf2ecdb) {
+   const count = (U + 1) * (V + 1);
+   const pos = new Float32Array(count * 3);
+   const uvs = new Float32Array(count * 2);
+   const idx = [];
+   let k = 0;
+   for (let iu = 0; iu <= U; iu++) {
+      for (let iv = 0; iv <= V; iv++) {
+         uvs[k * 2] = iu / U; uvs[k * 2 + 1] = iv / V; k++;
+      }
+   }
+   for (let iu = 0; iu < U; iu++) {
+      for (let iv = 0; iv < V; iv++) {
+         const a = iu * (V + 1) + iv, b = a + 1;
+         const c2 = (iu + 1) * (V + 1) + iv, d = c2 + 1;
+         idx.push(a, b, d, a, d, c2);
+      }
+   }
+   const geo = new THREE.BufferGeometry();
+   geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+   geo.setAttribute("uv", new THREE.BufferAttribute(uvs, 2));
+   geo.setIndex(idx);
+   const mesh = new THREE.Mesh(geo, sailMaterial(color));
+   mesh.frustumCulled = false;
+   mesh.userData = { U, V, kind: "square" };
+   return mesh;
+}
+
+function updateSquareSail(mesh, o) {
+   const { U, V } = mesh.userData;
+   const pos = mesh.geometry.attributes.position;
+   const headHalf = o.headHalf;
+   const footHalf = o.headHalf * 1.06;
+   const drop = o.drop;
+   const belly = o.belly * o.sgn;
+   const set = clamp(o.set, 0.06, 1); // 1 = voll gesetzt, klein = gegeit/gerefft
+   let i = 0;
+   for (let iu = 0; iu <= U; iu++) {
+      const u = iu / U;
+      const xs = (u - 0.5) * 2; // -1 .. 1
+      for (let iv = 0; iv <= V; iv++) {
+         const v = iv / V;
+         const half = THREE.MathUtils.lerp(headHalf, footHalf, v);
+         // Gillung: das Achterliek haengt in der Mitte etwas durch
+         const sag = 0.06 * drop * Math.sin(Math.PI * Math.abs(xs)) * v;
+         let bulge = belly * Math.sin(Math.PI * (u * 0.96 + 0.02)) * Math.sin(Math.PI * (0.18 + v * 0.72));
+         if (o.flutter > 0.01) {
+            bulge *= 1 - 0.78 * o.flutter;
+            bulge += o.flutter * headHalf * (0.10 * Math.sin(v * 7.0 + o.time * 15.0 + u * 8.5)
+                                          + 0.05 * Math.sin(u * 11.0 - o.time * 21.0));
+         }
+         pos.setXYZ(i, xs * half, -v * drop * set - sag * set, bulge * set);
+         i++;
+      }
+   }
+   pos.needsUpdate = true;
+   mesh.geometry.computeVertexNormals();
+   mesh.geometry.attributes.normal.needsUpdate = true;
+}
+
+// Schratsegel (Stagsegel / Klueber / Besan) als Dreieck:
+// lokal: Hals bei (0,0,0), Kopf oben am Stag, Schothorn nach achtern ausgestellt.
+function makeTriSail(U = 10, V = 8, color = 0xf4eee0) {
+   const m = makeSquareSail(U, V, color);
+   m.userData.kind = "tri";
+   return m;
+}
+
+const _tA = new THREE.Vector3(), _tB = new THREE.Vector3(), _tP = new THREE.Vector3();
+const _camDir = new THREE.Vector3(), _luffV = new THREE.Vector3();
+
+function updateTriSail(mesh, o) {
+   const { U, V } = mesh.userData;
+   const pos = mesh.geometry.attributes.position;
+   const { tack, head, clew } = o;
+   _luffV.subVectors(head, tack);
+   _camDir.subVectors(clew, tack).normalize();
+   _camDir.cross(UP).normalize();
+   if (_camDir.lengthSq() < 1e-6) _camDir.set(o.leeX, 0, 0);
+   if (_camDir.x * o.leeX < 0) _camDir.negate();
+   let i = 0;
+   for (let iu = 0; iu <= U; iu++) {
+      const u = iu / U;
+      _tA.copy(tack).addScaledVector(_luffV, u);
+      _tB.copy(clew).lerp(head, u);
+      for (let iv = 0; iv <= V; iv++) {
+         const v = iv / V;
+         const vv = v * (1 - u);
+         _tP.copy(_tA).lerp(_tB, vv);
+         let bulge = o.camber * Math.sin(Math.PI * v) * (1 - 0.35 * u);
+         if (o.flutter > 0.01) {
+            bulge *= 1 - 0.8 * o.flutter;
+            bulge += o.flutter * (0.12 * Math.sin(v * 6.3 + o.time * 17.0 + u * 7.0));
+         }
+         _tP.addScaledVector(_camDir, bulge);
+         pos.setXYZ(i, _tP.x, _tP.y, _tP.z);
+         i++;
+      }
+   }
+   pos.needsUpdate = true;
+   mesh.geometry.computeVertexNormals();
+   mesh.geometry.attributes.normal.needsUpdate = true;
+}
+
+// =========================================================================
+// Flaggen (White Ensign + Kommandowimpel) als Canvas-Textur
+// =========================================================================
+function ensignTexture() {
+   if (typeof document === "undefined") return null;
+   const c = document.createElement("canvas");
+   c.width = 128; c.height = 64;
+   const g = c.getContext("2d");
+   g.fillStyle = "#f4f4f2"; g.fillRect(0, 0, 128, 64);
+   // St.-Georgs-Kreuz
+   g.fillStyle = "#c8102e";
+   g.fillRect(0, 26, 128, 12);
+   g.fillRect(58, 0, 12, 64);
+   // Union-Canton
+   const cw = 56, ch = 28;
+   g.fillStyle = "#012169"; g.fillRect(0, 0, cw, ch);
+   g.strokeStyle = "#ffffff"; g.lineWidth = 6;
+   g.beginPath(); g.moveTo(0, 0); g.lineTo(cw, ch); g.moveTo(cw, 0); g.lineTo(0, ch); g.stroke();
+   g.strokeStyle = "#c8102e"; g.lineWidth = 2.5;
+   g.beginPath(); g.moveTo(0, 0); g.lineTo(cw, ch); g.moveTo(cw, 0); g.lineTo(0, ch); g.stroke();
+   g.fillStyle = "#ffffff";
+   g.fillRect(0, ch / 2 - 5, cw, 10); g.fillRect(cw / 2 - 5, 0, 10, ch);
+   g.fillStyle = "#c8102e";
+   g.fillRect(0, ch / 2 - 2.5, cw, 5); g.fillRect(cw / 2 - 2.5, 0, 5, ch);
+   const tex = new THREE.CanvasTexture(c);
+   tex.needsUpdate = true;
+   return tex;
+}
+
+function makeFlag(w, h, tex, fallbackColor = 0xf2f2f0) {
+   const geo = new THREE.PlaneGeometry(w, h, 8, 3);
+   geo.rotateY(-Math.PI / 2);
+   geo.translate(0, 0, -w / 2); // haengt nach achtern vom Pivot weg
+   const mat = tex
+      ? new THREE.MeshStandardMaterial({ map: tex, side: THREE.DoubleSide, roughness: 0.92 })
+      : new THREE.MeshStandardMaterial({ color: fallbackColor, side: THREE.DoubleSide, roughness: 0.92 });
+   const m = new THREE.Mesh(geo, mat);
+   m.userData.base = geo.attributes.position.array.slice();
+   return m;
+}
+
+function waveFlag(mesh, time, strength) {
+   const pos = mesh.geometry.attributes.position;
+   const base = mesh.userData.base;
+   for (let i = 0; i < pos.count; i++) {
+      const z = base[i * 3 + 2];
+      const y = base[i * 3 + 1];
+      const f = Math.abs(z);
+      pos.setX(i, base[i * 3] + Math.sin(time * 7 + f * 3.2) * f * 0.22 * strength);
+      pos.setY(i, y + Math.sin(time * 5.5 + f * 2.4) * f * 0.08 * strength);
+   }
+   pos.needsUpdate = true;
+}
+
+// =========================================================================
+// Hauptbaukasten
+// =========================================================================
+export function buildWarship(vessel) {
+   const ship = new THREE.Group();
+   const heeler = new THREE.Group();
+   ship.add(heeler);
+
+   const LOA = vessel.hull.loa;
+   const BEAM = vessel.hull.beam;
+   const DRAFT = vessel.hull.draft;
+   const FB = DRAFT * 0.70 + BEAM * 0.10; // Freibord bis Schanzkleidoberkante
+   const dim = { LOA, BEAM, DRAFT, FB };
+   const { point } = makeHullGeom(dim);
+
+   const gunDecks = (vessel.guns && vessel.guns.decks) || [];
+   const bands = gunDecks.map((d) => d.y);
+
+   heeler.add(buildHull(dim, bands), buildDeck(dim));
+
+   // ---- Ruder ----
+   const rudderPivot = new THREE.Group();
+   rudderPivot.position.set(0, 0, -LOA / 2 + LOA * 0.035);
+   const blade = new THREE.Mesh(
+      new THREE.BoxGeometry(BEAM * 0.035, DRAFT * 0.95, LOA * 0.035), matSparDark);
+   blade.position.set(0, -DRAFT * 0.48, -LOA * 0.012);
+   rudderPivot.add(blade);
+   heeler.add(rudderPivot);
+
+   // ---- Galionsfigur / Beakhead ----
+   const beak = new THREE.Mesh(new THREE.ConeGeometry(BEAM * 0.10, LOA * 0.09, 8), matTrim);
+   beak.rotation.x = Math.PI / 2;
+   beak.position.set(0, FB * 0.62, LOA / 2 + LOA * 0.015);
+   heeler.add(beak);
+
+   // ---- Heckgalerie ----
+   const sternY = FB * sheerStation(1) * 0.66;
+   // Der Spiegel faellt oben nach achtern aus - die Galerie muss mitwandern
+   const sternZ = -LOA / 2 - LOA * 0.030;
+   const sternW = hbStation(1) * BEAM * 0.92;
+   const gallery = new THREE.Mesh(new THREE.BoxGeometry(sternW, FB * 0.30, LOA * 0.016), matTrim);
+   gallery.position.set(0, sternY, sternZ);
+   heeler.add(gallery);
+   for (let i = -1; i <= 1; i++) {
+      const w = new THREE.Mesh(new THREE.BoxGeometry(sternW * 0.22, FB * 0.19, LOA * 0.008), matGlass);
+      w.position.set(i * sternW * 0.28, sternY, sternZ - LOA * 0.009);
+      heeler.add(w);
+   }
+   const taffrail = new THREE.Mesh(new THREE.BoxGeometry(sternW * 1.04, FB * 0.06, LOA * 0.022), matTrim);
+   taffrail.position.set(0, FB * sheerStation(1) * 0.98, sternZ - LOA * 0.008);
+   heeler.add(taffrail);
+
+   // ---- Decksausstattung ----------------------------------------------
+   // Ein leeres Deck sieht aus wie ein Floss; ein paar Baugruppen geben dem
+   // Schiff Massstab: Gangspill, Steuerrad, Luken, Beiboot, Niedergang.
+   const deckAt = (s0) => FB * sheerStation(s0) * 0.86;
+   const zAt = (s0) => THREE.MathUtils.lerp(LOA / 2, -LOA / 2, s0);
+
+   // Gangspill (Ankerwinde) zwischen Fock- und Grossmast
+   const capstan = new THREE.Mesh(
+      new THREE.CylinderGeometry(BEAM * 0.075, BEAM * 0.095, FB * 0.30, 10), matSpar);
+   capstan.position.set(0, deckAt(0.42) + FB * 0.15, zAt(0.42));
+   heeler.add(capstan);
+
+   // Steuerrad + Kompasshaus auf dem Achterdeck
+   const wheelZ = zAt(0.80);
+   const binnacle = new THREE.Mesh(
+      new THREE.BoxGeometry(BEAM * 0.16, FB * 0.20, LOA * 0.018), matSpar);
+   binnacle.position.set(0, deckAt(0.80) + FB * 0.10, wheelZ - LOA * 0.020);
+   heeler.add(binnacle);
+   const wheel = new THREE.Mesh(
+      new THREE.TorusGeometry(BEAM * 0.075, BEAM * 0.010, 6, 16), matSpar);
+   wheel.position.set(0, deckAt(0.80) + FB * 0.16, wheelZ);
+   heeler.add(wheel);
+
+   // Luken mit Gratings
+   for (const hs of [0.36, 0.52, 0.68]) {
+      const hatch = new THREE.Mesh(
+         new THREE.BoxGeometry(BEAM * 0.28, FB * 0.07, LOA * 0.045), matSparDark);
+      hatch.position.set(0, deckAt(hs) + FB * 0.035, zAt(hs));
+      heeler.add(hatch);
+   }
+
+   // Beiboot auf Schlittenbalken mittschiffs
+   const boat = new THREE.Mesh(
+      new THREE.CapsuleGeometry(BEAM * 0.075, LOA * 0.10, 4, 8), matDeck);
+   boat.rotation.x = Math.PI / 2;
+   boat.scale.set(1, 1, 0.55);
+   boat.position.set(0, deckAt(0.47) + FB * 0.14, zAt(0.47));
+   heeler.add(boat);
+
+   // =====================================================================
+   // Kanonen
+   // =====================================================================
+   const batteries = { PORT: new THREE.Group(), STBD: new THREE.Group() };
+   const muzzles = { PORT: [], STBD: [] };
+   heeler.add(batteries.PORT, batteries.STBD);
+
+   for (const deck of gunDecks) {
+      const barrelLen = BEAM * 0.16;
+      const barrelR = BEAM * 0.018;
+      const geoBarrel = new THREE.CylinderGeometry(barrelR * 0.72, barrelR, barrelLen, 8);
+      geoBarrel.rotateZ(Math.PI / 2); // Rohr zeigt in +X
+      geoBarrel.translate(barrelLen / 2, 0, 0);
+      for (let i = 0; i < deck.count; i++) {
+         const s = THREE.MathUtils.lerp(deck.from, deck.to, deck.count === 1 ? 0.5 : i / (deck.count - 1));
+         // Die Pforte sitzt auf dem Strake, also relativ zum Deckssprung
+         const y = deck.y * FB * sheerStation(s);
+         const p = point(s, 0.5, 1);
+         // exakte Halbbreite auf Batteriehoehe suchen
+         let hbHere = p.hb;
+         let zHere = p.z;
+         for (let t = 0; t <= 1.0001; t += 0.02) {
+            const q = point(s, t, 1);
+            if (q.y >= y) { hbHere = q.hb; zHere = q.z; break; }
+         }
+         const z = zHere;
+         for (const side of ["STBD", "PORT"]) {
+            const sx = side === "STBD" ? 1 : -1;
+            // Stueckpforte
+            const lid = new THREE.Mesh(new THREE.PlaneGeometry(LOA * 0.022, FB * 0.15), matPortLid);
+            lid.rotation.y = sx * Math.PI / 2;
+            lid.position.set(sx * (hbHere + 0.02), y, z);
+            heeler.add(lid);
+            // Rohr (sitzt in der Rueckstoss-Gruppe)
+            const barrel = new THREE.Mesh(geoBarrel, matIron);
+            barrel.scale.x = sx;
+            barrel.position.set(sx * (hbHere - barrelLen * 0.15), y, z);
+            batteries[side].add(barrel);
+            muzzles[side].push(new THREE.Vector3(
+               sx * (hbHere + barrelLen * 0.85), y, z));
+         }
+      }
+   }
+
+   // =====================================================================
+   // Rigg
+   // =====================================================================
+   // rake = Mastfall nach achtern in Grad; er nimmt von vorn nach achtern zu
+   const mastDefs = [
+      { key: "fore", z: LOA * 0.26, h: LOA * 0.86, yardBase: LOA * 0.56, course: true, rake: 1.8 },
+      { key: "main", z: LOA * 0.01, h: LOA * 0.98, yardBase: LOA * 0.62, course: true, rake: 3.2 },
+      { key: "mizzen", z: -LOA * 0.27, h: LOA * 0.74, yardBase: LOA * 0.40, course: false, rake: 4.6 },
+   ];
+
+   const masts = {};
+   const squareSails = []; // { mesh, yardGroup, headHalf, drop, mastKey, level }
+
+   for (const md of mastDefs) {
+      const deckY = FB * sheerStation((LOA / 2 - md.z) / LOA) * 0.80;
+      const H = md.h;
+      const g = new THREE.Group();
+      g.position.set(0, deckY, md.z);
+      g.rotation.x = -md.rake * DEG; // Masttop wandert nach achtern
+      heeler.add(g);
+
+      const rLow = BEAM * 0.036, rMid = BEAM * 0.026, rTop = BEAM * 0.017;
+      const seg = (r0, r1, y0, y1, mat) => {
+         const m = new THREE.Mesh(new THREE.CylinderGeometry(r1, r0, y1 - y0, 9), mat);
+         m.position.y = (y0 + y1) / 2;
+         m.castShadow = true;
+         g.add(m);
+         return m;
+      };
+      seg(rLow, rMid, 0, H * 0.46, matSpar);            // Untermast
+      seg(rMid * 0.95, rTop, H * 0.44, H * 0.76, matSpar); // Marsstenge
+      seg(rTop * 0.95, rTop * 0.55, H * 0.74, H * 1.0, matSpar); // Bramstenge
+
+      // Mars (Plattform)
+      const topR = BEAM * 0.13;
+      const marsTop = new THREE.Mesh(new THREE.CylinderGeometry(topR, topR * 0.9, H * 0.012, 12), matSparDark);
+      marsTop.position.y = H * 0.455;
+      g.add(marsTop);
+      const cross = new THREE.Mesh(new THREE.BoxGeometry(topR * 1.3, H * 0.008, topR * 0.5), matSparDark);
+      cross.position.y = H * 0.755;
+      g.add(cross);
+
+      // Wanten (Ruesteisen an der Bordwand -> Mars) mit Webleinen
+      const sTA = (LOA / 2 - md.z) / LOA;
+      const chain = point(sTA, 0.78, 1);
+      const N = 4; // Wanten je Seite
+      for (const sx of [1, -1]) {
+         const feet = [], heads = [];
+         for (let k = 0; k < N; k++) {
+            const u = k / (N - 1) - 0.5;
+            feet.push(new THREE.Vector3(
+               sx * chain.hb * (0.90 + 0.10 * Math.abs(u)), chain.y - deckY, u * LOA * 0.055));
+            heads.push(new THREE.Vector3(sx * topR * (0.55 + 0.5 * Math.abs(u)), H * 0.45, u * topR * 0.9));
+            g.add(rope(feet[k], heads[k], BEAM * 0.0035));
+         }
+         // Webleinen: waagerechte Sprossen, auf denen die Leute entern
+         const steps = 11;
+         for (let r = 1; r <= steps; r++) {
+            const t = r / (steps + 1.4);
+            const a = feet[0].clone().lerp(heads[0], t);
+            const b = feet[N - 1].clone().lerp(heads[N - 1], t);
+            g.add(rope(a, b, BEAM * 0.0022));
+         }
+      }
+
+      masts[md.key] = { group: g, H, deckY, z: md.z, rake: md.rake, def: md };
+
+      // ---- Rahen ----
+      const levels = [];
+      if (md.course) levels.push({ name: "course", y: H * 0.235, len: md.yardBase, drop: H * 0.215 });
+      else levels.push({ name: "crossjack", y: H * 0.30, len: md.yardBase, drop: 0 });
+      levels.push({ name: "topsail", y: H * 0.545, len: md.yardBase * 0.78, drop: H * 0.225 });
+      if (md.key !== "mizzen") {
+         levels.push({ name: "topgallant", y: H * 0.80, len: md.yardBase * 0.55, drop: H * 0.155 });
+      }
+
+      for (const lv of levels) {
+         const yardGroup = new THREE.Group();
+         yardGroup.position.y = lv.y;
+         g.add(yardGroup);
+         const yardGeo = new THREE.CylinderGeometry(BEAM * 0.010, BEAM * 0.010, lv.len, 7);
+         yardGeo.rotateZ(Math.PI / 2);
+         const yard = new THREE.Mesh(yardGeo, matSpar);
+         yard.castShadow = true;
+         yardGroup.add(yard);
+         // Nocken (verjuengt)
+         for (const sx of [1, -1]) {
+            const tipGeo = new THREE.CylinderGeometry(BEAM * 0.004, BEAM * 0.010, lv.len * 0.12, 6);
+            tipGeo.rotateZ(-sx * Math.PI / 2);
+            const tip = new THREE.Mesh(tipGeo, matSpar);
+            tip.position.x = sx * (lv.len / 2 + lv.len * 0.055);
+            yardGroup.add(tip);
+         }
+         if (lv.drop > 0) {
+            const sail = makeSquareSail(14, 9, lv.name === "course" ? 0xeee7d3 : 0xf4eedd);
+            sail.castShadow = true;
+            yardGroup.add(sail);
+            squareSails.push({
+               mesh: sail, yardGroup, headHalf: lv.len * 0.46, drop: lv.drop,
+               mastKey: md.key, level: lv.name,
+            });
+         } else {
+            squareSails.push({ mesh: null, yardGroup, headHalf: lv.len * 0.46, drop: 0, mastKey: md.key, level: lv.name });
+         }
+      }
+   }
+
+   // Stage von Mast zu Mast / zum Bug
+   const mastTop = (k, f) => {
+      const m = masts[k];
+      const r = m.rake * DEG;
+      return new THREE.Vector3(
+         0,
+         m.deckY + Math.cos(r) * m.H * f,
+         m.z - Math.sin(r) * m.H * f);
+   };
+   const bowTip = new THREE.Vector3(0, FB * 0.86, LOA / 2 - LOA * 0.01);
+   heeler.add(rope(mastTop("fore", 0.46), bowTip, BEAM * 0.005));
+   heeler.add(rope(mastTop("main", 0.46), mastTop("fore", 0.30), BEAM * 0.005));
+   heeler.add(rope(mastTop("mizzen", 0.46), mastTop("main", 0.30), BEAM * 0.005));
+   // Achterstage
+   const sternTop = new THREE.Vector3(0, FB * sheerStation(1) * 0.95, -LOA / 2 + LOA * 0.02);
+   heeler.add(rope(mastTop("mizzen", 0.98), sternTop, BEAM * 0.004));
+
+   // ---- Klueverbaum + Stagsegel ----
+   const bsLen = LOA * 0.34;
+   const bsGeo = new THREE.CylinderGeometry(BEAM * 0.013, BEAM * 0.026, bsLen, 8);
+   bsGeo.rotateX(Math.PI / 2);
+   bsGeo.translate(0, 0, bsLen / 2);
+   const bowsprit = new THREE.Mesh(bsGeo, matSpar);
+   bowsprit.position.set(0, FB * 0.80, LOA / 2 - LOA * 0.03);
+   bowsprit.rotation.x = -22 * DEG;
+   bowsprit.castShadow = true;
+   heeler.add(bowsprit);
+   const bsTip = new THREE.Vector3(
+      0,
+      bowsprit.position.y + Math.sin(22 * DEG) * bsLen,
+      bowsprit.position.z + Math.cos(22 * DEG) * bsLen
+   );
+   heeler.add(rope(mastTop("fore", 0.76), bsTip, BEAM * 0.004));
+
+   const jib = makeTriSail(10, 8, 0xf5efe1);
+   const staysail = makeTriSail(9, 7, 0xf2ecde);
+   heeler.add(jib, staysail);
+   const jibTack = bsTip.clone().lerp(bowsprit.position, 0.18);
+   const jibHead = mastTop("fore", 0.74);
+   const stayTack = bowsprit.position.clone().lerp(bsTip, 0.10);
+   const stayHead = mastTop("fore", 0.46);
+
+   // ---- Besan (Gaffelsegel auf dem Kreuzmast) ----
+   const mz = masts.mizzen;
+   const spankerBoomLen = LOA * 0.30;
+   const spankerPivot = new THREE.Group();
+   spankerPivot.position.set(0, mz.deckY + mz.H * 0.10, mz.z);
+   const sbGeo = new THREE.CylinderGeometry(BEAM * 0.010, BEAM * 0.013, spankerBoomLen, 7);
+   sbGeo.rotateX(Math.PI / 2);
+   sbGeo.translate(0, 0, -spankerBoomLen / 2);
+   spankerPivot.add(new THREE.Mesh(sbGeo, matSpar));
+   const gaffLen = spankerBoomLen * 0.72;
+   const gaffGeo = new THREE.CylinderGeometry(BEAM * 0.008, BEAM * 0.010, gaffLen, 6);
+   gaffGeo.rotateX(Math.PI / 2);
+   gaffGeo.translate(0, 0, -gaffLen / 2);
+   const gaff = new THREE.Mesh(gaffGeo, matSpar);
+   gaff.position.y = mz.H * 0.38;
+   gaff.rotation.x = -16 * DEG;
+   spankerPivot.add(gaff);
+   heeler.add(spankerPivot);
+   const spanker = makeTriSail(10, 9, 0xefe8d8);
+   heeler.add(spanker);
+
+   // ---- Flaggen ----
+   const ensTex = ensignTexture();
+   const ensignPivot = new THREE.Group();
+   ensignPivot.position.set(0, mz.deckY + mz.H * 0.40, mz.z - gaffLen * 0.9);
+   const ensign = makeFlag(LOA * 0.09, LOA * 0.055, ensTex);
+   ensignPivot.add(ensign);
+   heeler.add(ensignPivot);
+
+   const pennantPivot = new THREE.Group();
+   pennantPivot.position.set(0, masts.main.deckY + masts.main.H * 1.01, masts.main.z);
+   const pennant = makeFlag(LOA * 0.14, LOA * 0.014, null, 0xe8e8e6);
+   pennantPivot.add(pennant);
+   heeler.add(pennantPivot);
+
+   // =====================================================================
+   // Zustand + Animation
+   // =====================================================================
+   let braceCur = 0;      // Rahwinkel (rad)
+   let spankerCur = 0;
+   let flutterCur = 0;
+   let rudderCur = 0;
+   let leeX = 1;
+   let recoil = { PORT: 0, STBD: 0 };
+   const _clew = new THREE.Vector3();
+   const _clewS = new THREE.Vector3();
+   const _clewSp = new THREE.Vector3();
+
+   ship.userData = {
+      heeler, masts, batteries, muzzles, LOA, BEAM, FB, DRAFT,
+      yards: squareSails,
+      spankerPivot, bowsprit,
+      rudder: rudderPivot, rudderPivot,
+      sails: squareSails.filter((s) => s.mesh).map((s) => s.mesh).concat([jib, staysail, spanker]),
+      vesselId: vessel.id,
+      kind: "warship",
+   };
+
+   // Rueckstoss von aussen ausloesen
+   ship.kickRecoil = function (side, amount) {
+      recoil[side] = Math.max(recoil[side], amount);
+   };
+
+   ship.animate = function (dt, o = {}) {
+      const time = o.time || 0;
+
+      // Ruder
+      rudderCur += ((o.rudderAngle || 0) - rudderCur) * Math.min(1, dt * 5);
+      rudderPivot.rotation.y = -rudderCur * DEG;
+
+      // --- Brassen ---------------------------------------------------------
+      // AwA relativ: + = Wind von Steuerbord.  Rahwinkel-Betrag = 90 - |AwA|/2,
+      // begrenzt auf 45 Grad (maximale Brasse). Luvseitige Nock geht nach achtern.
+      const A = o.awaRel === undefined ? 180 : normHalf(o.awaRel);
+      const braceMag = clamp(90 - Math.abs(A) / 2, 0, 45);
+      const braceTarget = (A >= 0 ? 1 : -1) * braceMag * DEG;
+      braceCur += (braceTarget - braceCur) * Math.min(1, dt * 1.1); // schweres Rigg
+      if (Math.abs(A) > 3) leeX = A > 0 ? -1 : 1; // Leeseite
+
+      // Bauchrichtung: die Normale, die mit dem Wind zeigt
+      const downwind = (A + 180) * DEG;
+      const sgn = Math.cos(braceCur - downwind) >= 0 ? 1 : -1;
+
+      // Flattern (No-Go / Backen)
+      flutterCur += ((o.luffing ? 1 : 0) - flutterCur) * Math.min(1, dt * 2.2);
+
+      const windF = clamp(0.40 + (o.windKts || 10) * 0.045, 0.40, 1.20);
+      const setAll = clamp(o.sailSet === undefined ? 1 : o.sailSet, 0.05, 1);
+
+      for (const s of squareSails) {
+         s.yardGroup.rotation.y = braceCur;
+         if (!s.mesh) continue;
+         const bellyBase = s.headHalf * 0.33 * windF;
+         updateSquareSail(s.mesh, {
+            headHalf: s.headHalf,
+            drop: s.drop,
+            belly: bellyBase,
+            sgn,
+            set: setAll,
+            flutter: flutterCur,
+            time: time + (s.level === "topsail" ? 1.3 : s.level === "topgallant" ? 2.6 : 0),
+         });
+      }
+
+      // --- Schratsegel ------------------------------------------------------
+      const fsMag = clamp((Math.abs(A) - 20) * 0.45, 5, 70);
+      const fsTarget = (A > 0 ? -1 : 1) * fsMag * DEG;
+      spankerCur += (fsTarget - spankerCur) * Math.min(1, dt * 1.6);
+      const camJ = (0.14 + 0.26 * Math.min(Math.abs(braceCur) / (Math.PI / 4), 1)) * windF * BEAM * 0.16;
+
+      _clew.set(
+         jibTack.x - LOA * 0.16 * Math.sin(-spankerCur),
+         jibTack.y - LOA * 0.055,
+         jibTack.z - LOA * 0.16 * Math.cos(-spankerCur)
+      );
+      updateTriSail(jib, {
+         tack: jibTack, head: jibHead, clew: _clew,
+         camber: camJ, flutter: flutterCur, time, leeX,
+      });
+      _clewS.set(
+         stayTack.x - LOA * 0.14 * Math.sin(-spankerCur),
+         stayTack.y + LOA * 0.02,
+         stayTack.z - LOA * 0.14 * Math.cos(-spankerCur)
+      );
+      updateTriSail(staysail, {
+         tack: stayTack, head: stayHead, clew: _clewS,
+         camber: camJ * 0.85, flutter: flutterCur, time: time + 0.8, leeX,
+      });
+
+      spankerPivot.rotation.y = -spankerCur;
+      const spTack = spankerPivot.position;
+      const spHead = new THREE.Vector3(0, spTack.y + mz.H * 0.38, spTack.z);
+      _clewSp.set(
+         spTack.x - spankerBoomLen * Math.sin(-spankerCur),
+         spTack.y,
+         spTack.z - spankerBoomLen * Math.cos(-spankerCur)
+      );
+      updateTriSail(spanker, {
+         tack: spTack, head: spHead, clew: _clewSp,
+         camber: camJ * 1.1, flutter: flutterCur * 0.85, time: time + 2.1, leeX,
+      });
+
+      // --- Rueckstoss -------------------------------------------------------
+      for (const side of ["PORT", "STBD"]) {
+         if (recoil[side] > 0.0005) {
+            recoil[side] = Math.max(0, recoil[side] - dt * 1.6);
+            const sx = side === "STBD" ? -1 : 1; // Rohre fahren nach innen
+            batteries[side].position.x = sx * recoil[side];
+         } else if (batteries[side].position.x !== 0) {
+            batteries[side].position.x = 0;
+         }
+      }
+
+      // --- Flaggen ----------------------------------------------------------
+      const flagYaw = normHalf(A + 180) * DEG;
+      ensignPivot.rotation.y = flagYaw;
+      pennantPivot.rotation.y = flagYaw;
+      const fs = clamp((o.windKts || 10) / 18, 0.3, 1.4);
+      waveFlag(ensign, time, fs);
+      waveFlag(pennant, time * 1.3, fs);
+   };
+
+   // Startpose
+   ship.animate(0.016, { awaRel: 180, windKts: 12, time: 0 });
+   return ship;
+}
+
+function normHalf(d) {
+   return ((d % 360) + 540) % 360 - 180;
+}
+
+export default { buildWarship };
