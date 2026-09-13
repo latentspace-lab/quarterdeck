@@ -78,6 +78,12 @@ export const ShipSchema = schema(
       /** last InputCommand the server applied - the prediction ack */
       lastSeq: t.uint32().default(0),
 
+      raceLeg: t.uint8().default(0),
+      raceLap: t.uint16().default(0),
+      raceProgress: t.float32().default(0),
+      raceTime: t.float32().default(0),
+      raceBest: t.float32().default(-1),
+
       /** Copy a ShipState in. Assigning an unchanged value does not mark the field dirty. */
       sync(s: ShipState): void {
          this.x = s.x; this.z = s.z; this.heading = s.heading; this.speed = s.speed; this.heel = s.heel;
@@ -96,6 +102,8 @@ export const ShipSchema = schema(
          this.driveMul = s.driveMul; this.rudderMul = s.rudderMul; this.dragMul = s.dragMul;
          this.turnBias = s.turnBias; this.heelBias = s.heelBias; this.stopped = s.stopped;
          this.wreckDrag = s.wreckDrag; this.lastSeq = s.lastSeq;
+         this.raceLeg = s.raceLeg; this.raceLap = s.raceLap; this.raceProgress = s.raceProgress;
+         this.raceTime = s.raceTime; this.raceBest = s.raceBest;
       },
    },
    "ShipSchema",

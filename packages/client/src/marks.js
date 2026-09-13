@@ -1,7 +1,8 @@
-// marks.js - Regatta-Kurs (Windward-Leeward) + Bojen + Runden-Logik
-// Wind aus dem Nord (+Z ist Luv). Kurs: Startlinie → Windward → Leeward → Ziellinie.
+// marks.js - the regatta course: buoys and lines in the scene, and the race
+// judged by the shared course tracker (@segel/shared/course), which is what
+// the server runs in a regatta room. Wind from the north: +Z is upwind.
 import * as THREE from "three";
-import { normDeg, diffDeg } from "./utils.js";
+import { courseLayout, newRace, raceStep, SIM_DT } from "@segel/shared";
 
 // ---------- Boje (Floater / Komitee) ----------
 export function makeBuoy(color, type = "float") {
@@ -61,31 +62,20 @@ export class Course {
       this.origin = origin;
       this.root = new THREE.Group();
       scene.add(this.root);
-
-       // Start-/Ziellinie (Ost/West, 90 m breit)
-      this.committee = { x: origin.x + 45, z: origin.z };
-      this.pin = { x: origin.x - 45, z: origin.z };
-      this.lineZ = origin.z;
-      this.halfWidth = 45;
-
-       // Wendebojen
-      this.windward = { x: origin.x, z: origin.z + 850, radius: 18 };
-      this.leeward = { x: origin.x + 30, z: origin.z - 800, radius: 18 };
-
-       // Legs: 0 Startlinie · 1 Windward · 2 Leeward · 3 Ziellinie
-      this.legs = [
-           { type: "start", name: "Startlinie" },
-           { type: "turn", ref: this.windward, name: "Windward-Wendeboje" },
-           { type: "turn", ref: this.leeward, name: "Leeward-Wendeboje" },
-           { type: "finish", name: "Ziellinie" },
-        ];
-
+      this.layout = courseLayout(origin);
+      // Kept as properties: the HUD and older callers read them.
+      this.committee = this.layout.committee;
+      this.pin = this.layout.pin;
+      this.lineZ = this.layout.lineZ;
+      this.halfWidth = this.layout.halfWidth;
+      this.windward = this.layout.windward;
+      this.leeward = this.layout.leeward;
+      this.legs = this.layout.legs;
       this._build();
-      this.reset();
-     }
+      this.reset(0);
+   }
 
-     _build() {
-      const O = this.origin;
+   _build() {
       const cb = makeBuoy(0x222222, "committee");
       cb.position.set(this.committee.x, 0, this.committee.z);
       this.root.add(cb);
@@ -100,150 +90,75 @@ export class Course {
       this.root.add(ll);
       this.root.add(makeLine(this.committee, this.pin, 0xffe680, 0.12));
       this.root.add(makeLine(this.committee, this.pin, 0xf2f2f2, 0.5));
-      // Weg-Indikator-Marker (kleine Bojen auf den Beinen)
-      this._guideMarkers = [];
-     }
+   }
 
-    // Bojen und Linien aus- bzw. einblenden (im Freeride/Training stoeren sie)
-    setVisible(v) {
+   /** Move the buoys to another origin (a server room's course). */
+   moveTo(origin) {
+      this.origin = { x: origin.x, z: origin.z };
+      this.layout = courseLayout(this.origin);
+      this.committee = this.layout.committee;
+      this.pin = this.layout.pin;
+      this.lineZ = this.layout.lineZ;
+      this.halfWidth = this.layout.halfWidth;
+      this.windward = this.layout.windward;
+      this.leeward = this.layout.leeward;
+      this.legs = this.layout.legs;
+      for (const c of [...this.root.children]) this.root.remove(c);
+      this._build();
+      return this;
+   }
+
+   // Bojen und Linien aus- bzw. einblenden (im Freeride/Training stoeren sie)
+   setVisible(v) {
       this.root.visible = !!v;
       return this;
-    }
+   }
 
-    reset() {
-      this.leg = 0;
-      this.prevZ = this.origin.z;
-      this.lapStart = performance.now();
-      this.best = null;
-      this.lap = 0;
-      this.progress = 0;
-      this.messageT = 0;
+   /** Start a new race at simulation time t. */
+   reset(t = 0) {
+      this.race = newRace(this.layout, t, { x: this.origin.x, z: this.origin.z - 1 });
       this.message = "";
-      this.dist = 0;
-      this.bearing = 0;
-      this.nextRef = null;
-      this.legName = this.legs[0].name;
-      this.justPassed = null;
-      this.nextTarget = { x: this.origin.x, z: this.lineZ, radius: 0 };
-    }
+      this.messageT = 0;
+      this.lapTimeLast = 0;
+      return this;
+   }
 
-    // Ueberquero der Linie (z = lineZ) in norder Richtung
-    _crossedLineN(boatPos) {
-      return (
-             boatPos.z > this.lineZ &&
-          this.prevZ <= this.lineZ &&
-         Math.abs(boatPos.x - this.origin.x) <= this.halfWidth + 6
-          );
-      }
+   get leg() { return this.race.leg; }
+   get lap() { return this.race.lap; }
+   get best() { return this.race.best; }
+   get progress() { return this.race.progress; }
 
-    _distTarget(boatPos) {
-      const t = this.nextTarget;
-      return Math.hypot(t.x - boatPos.x, t.z - boatPos.z);
-    }
-
-    update(boatPos) {
-      const now = performance.now();
-      const leg = this.legs[this.leg];
-              // Fortsetzung: Ueberquero / Abstand
-
-      let advanced = false;
-      let msg = "";
-
-      if (leg.type === "start") {
-          if (this._crossedLineN(boatPos)) {
-            this.leg = 1;
-             this.progress = 0;
-             this.nextTarget = { x: this.windward.x, z: this.windward.z, radius: this.windward.radius };
-             this.legName = this.legs[1].name;
-             this.lapStart = now;
-             msg = "Abfahrt — Runde " + this.lap + " gestartet!";
-             advanced = true;
-            }
-          this.nextTarget = { x: this.origin.x, z: this.lineZ, radius: 0 };
-        } else if (leg.type === "finish") {
-          if (this._crossedLineN(boatPos)) {
-            this._completeLap(now);
-            advanced = true;
-             return this._result("🏁 Lap " + this.lap + " in " + this._lapTime + " s");
-           }
-          this.nextTarget = { x: this.origin.x, z: this.lineZ, radius: 0 };
-        } else if (leg.type === "turn") {
-          this.nextTarget = { x: leg.ref.x, z: leg.ref.z, radius: leg.ref.radius };
-           if (this._distToRef(boatPos, leg.ref) < leg.ref.radius) {
-            msg = leg.name + " passiert!";
-             this.leg = (this.leg + 1) % this.legs.length;
-             this.progress = 0;
-             this.progress = this.leg / this.legs.length;
-             this.legName = this.legs[this.leg].name;
-             const nt = this.legs[this.leg];
-             if (nt.type === "start" || nt.type === "finish") {
-               this.nextTarget = { x: this.origin.x, z: this.lineZ, radius: 0 };
-                } else {
-               this.nextTarget = { x: nt.ref.x, z: nt.ref.z, radius: nt.ref.radius };
-                }
-             advanced = true;
-              }
-        }
-
-      this.prevZ = boatPos.z;
-      this.dist = this._distTarget(boatPos);
-      const dx = this.nextTarget.x - boatPos.x;
-      const dz = this.nextTarget.z - boatPos.z;
-      this.bearing = normDeg((Math.atan2(dx, dz) * 180) / Math.PI);
-
-      if (advanced) {
-         this.progress = this.leg / this.legs.length;
-         this.message = msg || this.message;
+   /**
+    * One simulation step. `t` is simulation time - the same clock the server
+    * judges with in a regatta room. Returns what the HUD shows.
+    */
+   update(boatPos, t) {
+      const s = raceStep(this.layout, this.race, boatPos, t);
+      if (s.advanced) {
+         this.message = s.message;
          this.messageT = 3.2;
-       } else if (this.messageT > 0) {
-         this.messageT -= 1 / 60;
+         if (s.lapDone) this.lapTimeLast = s.lapTime;
+      } else if (this.messageT > 0) {
+         this.messageT -= SIM_DT;
          if (this.messageT <= 0) this.message = "";
       } else {
          this.message = "";
-       }
-      this.progress = Math.max(this.progress, this.leg / this.legs.length);
-      return this._result(msg || this.message);
-     }
-
-    _lapTime = 0;
-
-     _distToRef(boatPos, ref) {
-      return Math.hypot(ref.x - boatPos.x, ref.z - boatPos.z);
       }
-
-     _result(extraMsg) {
-      const t = this.nextTarget;
       return {
-          next: t,
-           dist: this.dist,
-           bearing: this.bearing,
-           leg: this.leg,
-           legType: this.legs[this.leg].type,
-           legName: this.legName,
-           lap: this.lap,
-           best: this.best,
-           time: (performance.now() - this.lapStart) / 1000,
-           progress: this.progress,
-           message: extraMsg || this.message,
-           justPassed: this.justPassed,
-            };
-       }
-
-     _completeLap(now) {
-      const lapTime = (now - this.lapStart) / 1000;
-      this._lapTime = lapTime;
-      this.lap++;
-      this.best = this.best === null ? lapTime : Math.min(this.best, lapTime);
-      this.lapStart = now;
-      this.leg = 0;
-      this.progress = 0;
-      this.legName = this.legs[0].name;
-      this.nextTarget = { x: this.origin.x, z: this.lineZ, radius: 0 };
-      this.message = "🏁 Lap " + this.lap + " done (" + lapTime.toFixed(1) + " s)";
-      this.messageT = 4;
-     }
-
-     _resetMarkers() {}
+         next: s.next,
+         dist: s.dist,
+         bearing: s.bearing,
+         leg: s.leg,
+         legType: s.legType,
+         legName: s.legName,
+         lap: this.race.lap,
+         best: this.race.best,
+         time: s.time,
+         progress: this.race.progress,
+         message: s.message || this.message,
+         justPassed: s.passed,
+      };
+   }
 }
 
 export default { Course, makeBuoy };

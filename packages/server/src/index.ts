@@ -11,9 +11,11 @@ import { WebSocketTransport } from "@colyseus/ws-transport";
 import { ROOMS } from "@segel/shared";
 import { BattleRoom } from "./rooms/BattleRoom.ts";
 import { PracticeRoom } from "./rooms/PracticeRoom.ts";
+import { RegattaRoom } from "./rooms/RegattaRoom.ts";
 
 export const ROOM_BATTLE = ROOMS.battle;
 export const ROOM_PRACTICE = ROOMS.practice;
+export const ROOM_REGATTA = ROOMS.regatta;
 
 export interface RunningServer {
    server: Server;
@@ -39,6 +41,7 @@ export async function startServer(
    });
    server.define(ROOM_BATTLE, BattleRoom).sortBy({ clients: -1 });
    server.define(ROOM_PRACTICE, PracticeRoom);
+   server.define(ROOM_REGATTA, RegattaRoom).sortBy({ clients: -1 });
    await server.listen(port, host);
    installLobbyRoute(http);
    const addr = http.address();
@@ -61,10 +64,13 @@ export interface RoomListing {
    metadata: Record<string, unknown>;
 }
 
-/** Battle rooms with a free seat, for the lobby. */
+/** Battle and regatta rooms with a free seat, for the lobby. */
 export async function listBattleRooms(): Promise<RoomListing[]> {
-   const rooms = await matchMaker.query({ name: ROOM_BATTLE, private: false, locked: false });
-   return rooms.map((r) => ({
+   const [battles, regattas] = await Promise.all([
+      matchMaker.query({ name: ROOM_BATTLE, private: false, locked: false }),
+      matchMaker.query({ name: ROOM_REGATTA, private: false, locked: false }),
+   ]);
+   return [...battles, ...regattas].map((r) => ({
       roomId: r.roomId,
       clients: r.clients,
       maxClients: r.maxClients,

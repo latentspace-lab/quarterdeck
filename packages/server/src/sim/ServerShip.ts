@@ -109,6 +109,8 @@ export class ServerShip implements CollidableShip {
    disconnected = false;
    /** Broadsides ordered by the client, resolved by the simulation this tick */
    fireRequests: Side[] = [];
+   /** Race progress, kept by a regatta room; null elsewhere */
+   race: { leg: number; lap: number; progress: number; time: number; best: number | null } | null = null;
 
    private readonly swamp: SwampState = { swampT: 0, railClear: 0 };
    /** Everything the clients need to hear about this ship, in order */
@@ -408,6 +410,11 @@ export class ServerShip implements CollidableShip {
          stopped: d.stopped,
          wreckDrag: this.wreckDrag,
          lastSeq: this.lastSeq,
+         raceLeg: this.race ? this.race.leg : 0,
+         raceLap: this.race ? this.race.lap : 0,
+         raceProgress: this.race ? this.race.progress : 0,
+         raceTime: this.race ? this.race.time : 0,
+         raceBest: this.race && this.race.best !== null ? this.race.best : -1,
       };
    }
 }

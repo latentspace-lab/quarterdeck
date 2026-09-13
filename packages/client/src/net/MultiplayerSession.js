@@ -11,7 +11,7 @@
 import { NetClient } from "./NetClient.js";
 import { RemoteShip } from "./RemoteShip.js";
 import { Predictor, ViewOffset } from "./Predictor.js";
-import { lerp, clamp } from "@segel/shared";
+import { lerp, clamp, courseLayout, normDeg } from "@segel/shared";
 
 /** Seconds over which sea state is blended onto the server's. */
 const SEA_TAU = 0.5;
@@ -66,6 +66,11 @@ export class MultiplayerSession {
       });
       this.mode = mode || "battle";
       this.welcome = await this.net.join({ vesselId, name, roomId, mode: this.mode, create });
+      // The room decides what it is (a room id may point at any kind).
+      if (this.welcome.mode) this.mode = this.welcome.mode;
+      this.course = this.mode === "regatta"
+         ? courseLayout((this.welcome.course && this.welcome.course.origin) || { x: 0, z: 0 })
+         : null;
 
       // The world the server plays on. Every parameter is checked: a NaN in
       // the wind would run through sea, pose and flooding into the dynamics.
@@ -222,6 +227,44 @@ export class MultiplayerSession {
    /** Last reconciliation, for the HUD and the tests. */
    get correction() {
       return this.predictor ? this.predictor.last : null;
+   }
+
+   /**
+    * The HUD's course panel in a regatta room: the server's leg, lap, times
+    * and progress for our ship, plus distance and bearing to the next mark
+    * from the shared course geometry. Same shape as Course.update().
+    */
+   raceStatus(pos) {
+      const s = this._serverMe;
+      const L = this.course;
+      if (!s || !L) return null;
+      const leg = L.legs[Math.min(Math.max(s.raceLeg | 0, 0), L.legs.length - 1)];
+      const next = leg.ref ? { x: leg.ref.x, z: leg.ref.z, radius: leg.ref.radius } : { x: L.origin.x, z: L.lineZ, radius: 0 };
+      const dx = next.x - pos.x;
+      const dz = next.z - pos.z;
+      return {
+         next,
+         dist: Math.hypot(dx, dz),
+         bearing: normDeg((Math.atan2(dx, dz) * 180) / Math.PI),
+         leg: s.raceLeg,
+         legType: leg.type,
+         legName: leg.name,
+         lap: s.raceLap,
+         best: s.raceBest >= 0 ? s.raceBest : null,
+         time: s.raceTime,
+         progress: s.raceProgress,
+         message: "",
+         justPassed: null,
+      };
+   }
+
+   /** Standings in a regatta: every boat by laps, then progress. */
+   standings() {
+      const rows = [];
+      const push = (id, name, s, me) => rows.push({ id, name, me, lap: s.raceLap, progress: s.raceProgress, best: s.raceBest });
+      if (this._serverMe) push(this.shipId, "you", this._serverMe, true);
+      for (const r of this.remotes.values()) if (r.latest) push(r.id, r.name, r.latest, false);
+      return rows.sort((a, b) => b.lap - a.lap || b.progress - a.progress);
    }
 
    _routeEvents() {

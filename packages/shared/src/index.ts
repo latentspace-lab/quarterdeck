@@ -21,4 +21,5 @@ export * from "./terrain-math.ts";
 export * from "./pose.ts";
 export * from "./hull.ts";
 export * from "./seamanship.ts";
+export * from "./course.ts";
 export * from "./ballistics.ts";

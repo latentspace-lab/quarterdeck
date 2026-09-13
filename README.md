@@ -44,8 +44,10 @@ npm run dev      # terminal 2: client on http://localhost:5173/sailing/
 In the menu choose **Multiplayer**: the open rooms on the server are listed
 (name, players, AI enemies, wind) with a Join button each. Or pick a ship and
 press Join to enter any open room — or create one, with the room name, wind
-and the AI enemies from the scenario cards. **Practice** creates a private
-one-seat room against the AI on the server. Deep link:
+and the AI enemies from the scenario cards. **Regatta** rooms race the
+windward-leeward course: the server judges the line, the marks and the laps
+for every boat. **Practice** creates a private one-seat room against the AI
+on the server. Deep link:
 `http://localhost:5173/sailing/?mp=1&server=ws://localhost:2567&vessel=lydia&name=Hornblower&enemies=amelie&roomName=Trafalgar`
 (`&mode=practice` for a practice room, `&room=<id>` to join a specific one).
 

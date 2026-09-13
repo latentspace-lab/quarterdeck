@@ -195,6 +195,8 @@ small, .small { font-size: 11px; opacity: 0.85; }
 }
 .room-row.full { opacity: 0.55; }
 .room-name { font-weight: 600; }
+.room-kind { font-weight: 400; font-size: 11px; opacity: 0.7; margin-left: 6px; padding: 1px 6px; border-radius: 6px; border: 1px solid rgba(120, 180, 220, 0.35); }
+.mode-grid.m3 { grid-template-columns: repeat(3, 1fr); }
 .room-info { opacity: 0.75; font-size: 12px; }
 .room-join { padding: 5px 12px; border-radius: 8px; border: 0; background: #3da3ff; color: #061019; font-weight: 700; cursor: pointer; }
 .room-join:disabled { cursor: default; opacity: 0.5; }

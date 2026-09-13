@@ -11,6 +11,7 @@ import { MSG, ROOMS } from "@segel/shared";
 
 export const ROOM_BATTLE = ROOMS.battle;
 export const ROOM_PRACTICE = ROOMS.practice;
+export const ROOM_REGATTA = ROOMS.regatta;
 
 /** The server's lobby route (see packages/server/src/index.ts). */
 export const LOBBY_ROUTE = "/rooms";
@@ -82,7 +83,9 @@ export class NetClient {
          ? await this.client.joinById(opts.roomId, joinOpts)
          : opts.mode === "practice"
            ? await this.client.create(ROOM_PRACTICE, create)
-           : await this.client.joinOrCreate(ROOM_BATTLE, create);
+           : opts.mode === "regatta"
+             ? await this.client.joinOrCreate(ROOM_REGATTA, create)
+             : await this.client.joinOrCreate(ROOM_BATTLE, create);
       this.room = room;
 
       const welcome = new Promise((resolve, reject) => {
