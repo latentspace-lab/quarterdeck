@@ -1,10 +1,10 @@
-// trainer.js - Training-Modus mit manuellen / segeltechnischen Uebungen
+// trainer.js - Training mode with manual / sail-handling exercises
 // state.boat: {twa, twaSigned, tack, luffing, speed, capsize, heading, pos}
 // state.wind: {dir, speed}
 //
-// Die Winkelbaender richten sich nach der No-Go-Zone des gewaehlten Schiffs:
-// eine Yacht kreuzt in 45 Grad, ein Rahsegler kommt nicht ueber ~67 Grad heran.
-// Ohne Argument verhaelt sich der Trainer exakt wie zuvor (No-Go = 32 Grad).
+// The target bands are based on the selected ship's no-go zone:
+// a yacht luffs at 45 degrees, a square-rigger cannot point above ~67 degrees.
+// Without an argument the trainer behaves exactly as before (No-Go = 32 degrees).
 export function makeTrainer(vessel) {
     const noGo = (vessel && vessel.sail && vessel.sail.noGo) || 32;
     const square = !!(vessel && vessel.rig === "square");
@@ -17,56 +17,56 @@ export function makeTrainer(vessel) {
 
     const challenges = [
         {
-        title: square ? "1 · Hart am Wind liegen" : "1 · Krausen halten",
-        desc: `Halte den Segelkurs (TWA) dauerhaft zwischen ${lo1}° und ${hi1}°. Kein Backen (unter ${lo1}° = No-Go-Zone).`,
-        hint: `|TWA| ${lo1}–${hi1}° für 10 sec`,
+        title: square ? "1 · Hold a close-hauled course" : "1 · Hold close-hauled",
+        desc: `Hold close-hauled (TWA) between ${lo1}° and ${hi1}° at all times. No backing (below ${lo1}° = no-go zone).`,
+        hint: `|TWA| ${lo1}-${hi1}° for 10 sec`,
         dur: 10,
         ok: (b) => Math.abs(b.twa) < hi1 && Math.abs(b.twa) > lo1,
         },
         {
-        title: "2 · Upwind-VMG (bester Aufwind-Fortschritt)",
-        desc: `Segle auf ~${best}° TWA: der schnellste Weg gegen den Wind (Upwind). Halte 8 sec.`,
-        hint: `|TWA| ${lo2}–${hi2}° für 8 sec`,
+        title: "2 · Upwind VMG (best upwind progress)",
+        desc: `Sail at ~${best}° TWA: the fastest way upwind. Hold for 8 sec.`,
+        hint: `|TWA| ${lo2}-${hi2}° for 8 sec`,
         dur: 8,
         ok: (b) => Math.abs(b.twa) >= lo2 && Math.abs(b.twa) <= hi2,
         },
         {
-        title: square ? "3 · Durch den Wind gehen (Tack / Halsen)" : "3 · Wendemanöver (Halse / Tack)",
+        title: square ? "3 · Tack / Wear ship" : "3 · Tack (close-hauled tack)",
         desc: square
-           ? `Wechsle die Flanke (Stbd ↔ Port). Ein Rahsegler verliert dabei viel Fahrt — nimm Schwung mit, oder falle ab und halse (wear ship).`
-           : `Wechsle die Flanke (Stbd ↔ Port). Fahre über die No-Go-Zone (kurz durch TWA < ${noGo}°).`,
-        hint: "Tack wechseln (Stbd ↔ Port)",
+           ? `Change tack (Stbd ↔ Port). A square-rigger loses way fast — gather headway first, or bear away and wear ship.`
+           : `Change tack (Stbd ↔ Port). Sail through the no-go zone (briefly through TWA < ${noGo}°).`,
+        hint: "Change tack (Stbd ↔ Port)",
         edge: "tack",
         },
         {
-        title: "4 · Raumschot (Beam Reach)",
+        title: "4 · Beam Reach",
         desc: square
-           ? `Wind quer ein: ~${beam}° TWA ("Soldier's Wind"). 6 sec halten.`
-           : `Steuere auf den Segelkurs von ${beam}° TWA (Wind auf einer Seite) — das ist der schnellste Windkurs. 6 sec.`,
-        hint: `|TWA| ~${beam}° für 6 sec`,
+           ? `Wind on the beam: ~${beam}° TWA ("Soldier's Wind"). Hold for 6 sec.`
+           : `Sail at ~${beam}° TWA (wind on the beam) — the fastest point of sail. Hold for 6 sec.`,
+        hint: `|TWA| ~${beam}° for 6 sec`,
         dur: 6,
         ok: (b) => Math.abs(Math.abs(b.twa) - beam) < beamTol,
         },
         {
-        title: "5 · Gieren (Jibe / Downwind-Tackwechsel)",
-        desc: `Vom einen Downwind-Flanken zum anderen: bei > ${deep}° TWA über 180° (Vorderwind). Achte auf dein Ruder beim Gieren!`,
-        hint: `Downwind-Tackwechsel (TWA > ${deep}°)`,
+        title: "5 · Jibe / Downwind tack change",
+        desc: `From one downwind board to the other: at > ${deep}° TWA go through 180° (running). Watch your helm when jibing!`,
+        hint: `Downwind tack change (TWA > ${deep}°)`,
         edge: "downTack",
         },
         {
-        title: "6 · Kenter vermeiden (starker Wind)",
+        title: "6 · Avoid capsize (strong wind)",
         desc: square
-           ? "Bei 18+ kn: das Schiff steif halten, Rahen brassen und 15 sec durchstehen."
-           : "Bei 18+ kn Wind: segle tiefer (weniger Gier, z.B. Raumschot ~90°) und vermeide das Kentern (Gier > 60°) 15 sec lang.",
-        hint: "15 sec ohne Kenter bei 20+ kn",
+           ? "At 18+ kn: keep the ship stiff, brace yards and endure for 15 sec."
+           : "At 18+ kn wind: sail deeper (less leeway, e.g. beam reach ~90°) and avoid capsizing (leeway > 60°) for 15 sec.",
+        hint: "15 sec without capsizing at 20+ kn",
         dur: 15,
         capsizeSafe: true,
         ok: (b, w) => w.speed >= 18 && !b.capsize,
         },
         {
-        title: "7 · Boje erreichen",
-        desc: "Navigiere zur gelben Wendeboje 500 m nördlich (Richtung: Rgk 0°, nach Norden). Nutze den Kompass und den Vorsegel!",
-        hint: "Ziel: Boje bei (~0, +500 m)",
+        title: "7 · Reach the buoy",
+        desc: "Navigate to the yellow mark buoy 500 m north (bearing: 0°, north). Use the compass and the jib!",
+        hint: "Target: buoy at (~0, +500 m)",
         target: { x: 0, z: 500 },
         ok: (b) => Math.abs(b.pos.z - 500) + Math.abs(b.pos.x) < 30,
         },
