@@ -16,13 +16,13 @@
     "build": "npm run build:shared && npm run build:client",
     "dev": "npm run dev -w @segel/client",
     "preview": "npm run preview -w @segel/client",
-    "typecheck": "npm run typecheck -w @segel/shared && npm run typecheck -w @segel/server",
+    "typecheck": "npm run build:shared --silent && npm run typecheck -w @segel/shared && npm run typecheck -w @segel/server",
     "server": "npm run start -w @segel/server",
     "test": "npm run build --silent && node tests/run.js",
-    "test:unit": "node tests/run.js --unit",
+    "test:unit": "npm run build:shared --silent && node tests/run.js --unit",
     "test:regression": "npm run build:shared --silent && node tests/run.js --regression",
-    "test:integration": "npm run build:shared --silent && node tests/run.js --integration",
-    "test:pending": "node tests/run.js --pending"
+    "test:integration": "npm run build --silent && node tests/run.js --integration",
+    "test:pending": "npm run build:shared --silent && node tests/run.js --pending"
   },
   "devDependencies": {
     "playwright": "^1.49.0",
