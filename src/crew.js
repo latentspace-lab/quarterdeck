@@ -1,31 +1,31 @@
-// crew.js - die Besatzung.
+// crew.js - Crew model.
 //
-// Ein Schiff dieser Zeit ist nichts ohne seine Leute: die Breitseite ist so
-// schnell wie ihre Bedienungen, die Segel so gut wie die Toppsgasten, und die
-// Pumpen laufen nur, solange jemand daran steht. Deshalb ist die Mannschaft
-// hier kein Zahlenschmuck, sondern haengt an allen drei Systemen.
+// A ship of this era is nothing without her men: the broadside is only as
+// fast as its crew, the sails are only as good as the topsmen, and the pumps
+// only run while someone is at them. Crew is not decoration — it drives the
+// three core systems.
 //
-// Verluste: Der grosse Toeter an Bord war nicht die Kugel selbst, sondern der
-// Holzsplitterhagel, den sie aus der Bordwand schlug - und auf kurze Distanz
-// die Kartaetsche. Getroffene sind ueberwiegend VERWUNDET, nicht tot; sie
-// fallen trotzdem aus, weil sie unter Deck zum Wundarzt gehen.
+// Casualties: the great killer on board was not the ball itself, but the
+// wooden splinters it tore from the hull — and at close range, grape shot.
+// Wounded vastly outnumber the dead; they are removed from action because
+// they go below to the surgeon.
 
 import { clamp } from "./utils.js";
 
 export const ROLES = [
-   { id: "officer",   name: "Offiziere & Rudergänger", short: "Offiziere",  share: 0.07 },
-   { id: "gun",       name: "Geschützbedienungen",     short: "Geschütze",  share: 0.49 },
+   { id: "officer",   name: "Officers & Helmsmen",     short: "Officers",   share: 0.07 },
+   { id: "gun",       name: "Gunnery Crew",             short: "Guns",       share: 0.49 },
    { id: "top",       name: "Toppsgasten",             short: "Toppsgasten", share: 0.22 },
    { id: "marine",    name: "Seesoldaten",             short: "Seesoldaten", share: 0.11 },
    { id: "carpenter", name: "Zimmerleute & Pumpen",    share: 0.06, short: "Zimmerleute" },
    { id: "powder",    name: "Pulverjungen",            short: "Pulverjungen", share: 0.05 },
 ];
 
-// Wo halten sich die Rollen auf? Davon haengt ab, wen ein Treffer erwischt.
-// bord  = an der Bordwand (Splitter aus dem getroffenen Rumpfabschnitt)
-// deck  = offenes Deck (Kartaetsche, Musketenfeuer)
-// rigg  = oben in der Takelage (Kettenkugel)
-// unten = unter Deck (relativ sicher)
+// Where are the roles located? That determines who gets hit.
+// bord  = at the hull (splinters from the struck section)
+// deck  = on open deck (grape, musketry)
+// rigg  = aloft in the rigging (chain shot)
+// unten = below deck (relatively safe)
 const EXPOSURE = {
    officer:   { bord: 0.6, deck: 1.4, rigg: 0.2, unten: 0.3 },
    gun:       { bord: 1.8, deck: 0.9, rigg: 0.1, unten: 0.5 },
@@ -51,8 +51,8 @@ export class Crew {
       this.isPlayer = !!opts.isPlayer;
       this._events = [];
       this._healTimer = 0;
-      // Schock: ein gefallener Mast, ein Rammstoss oder eine Grundberuehrung
-      // sitzt der Mannschaft in den Knochen und klingt erst langsam ab.
+      // Shock: a fallen mast, a ram strike, or grounding
+      // the crew feels it and recovers slowly.
       this.shaken = 0;
    }
 
@@ -84,7 +84,7 @@ export class Crew {
    // Verluste
    // n      = Zahl der Getroffenen
    // where  = "bord" | "deck" | "rigg" | "unten"
-   // Rueckgabe: { hurt, killed, worst } - worst = am staerksten betroffene Rolle
+   // Returns: { hurt, killed, worst } — worst = role most affected
    // ------------------------------------------------------------------
    hit(n, where = "bord") {
       n = Math.max(0, Math.round(n));
@@ -111,7 +111,7 @@ export class Crew {
          const r = this.roles[pick];
          if (r.fit <= 0) continue;
          r.fit--;
-         // Rund ein Drittel der Treffer war toedlich, der Rest kam zum Wundarzt
+         // About one third of hits were fatal; the rest went to the surgeon
          if (Math.random() < 0.34) { r.dead++; killed++; } else { r.wounded++; hurt++; }
          perRole[pick] = (perRole[pick] || 0) + 1;
       }
@@ -150,7 +150,7 @@ export class Crew {
    // Erschuetterung durch ein schweres Ereignis
    shock(a) { this.shaken = clamp(this.shaken + a, 0, 1); }
 
-   // Nach dem Gefecht kommen leicht Verwundete zurueck an die Geschuetze
+   // Recovery: lightly wounded return to the guns after battle
    update(dt) {
       if (this.shaken > 0) this.shaken = Math.max(0, this.shaken - dt * 0.012);
       this._healTimer += dt;

@@ -10,7 +10,7 @@
 // spuerbar verschiedenen Gefechten.
 
 import { Ship } from "./ship.js";
-import { getVessel, shipOfTier } from "./vessels.js";
+import { getVessel } from "./vessels.js";
 import { AMMO } from "./damage.js";
 import { clamp, normDeg, diffDeg } from "./utils.js";
 
@@ -165,7 +165,6 @@ export class Fleet {
       const vessel = getVessel(vesselId);
       const ship = new Ship({
          vessel,
-         faction: o.faction || null,
          scene: this.scene,
          debris: this.debris,
          targets: this.targets,
@@ -175,11 +174,7 @@ export class Fleet {
          name: o.name || vessel.name,
       });
       ship.place(o.x ?? 0, o.z ?? 0, o.heading ?? 0, o.speed ?? 0);
-      const cap = new Captain(ship, {
-         ...o,
-         doctrine: o.doctrine || (o.faction && o.faction.doctrine) || "hull",
-         skill: o.skill ?? (o.faction ? o.faction.gunnery : 0.9),
-      });
+      const cap = new Captain(ship, o);
       this.ships.push(ship);
       this.captains.push(cap);
       return ship;
@@ -214,26 +209,31 @@ export class Fleet {
 // ---------------------------------------------------------------------------
 // Gefechtslagen: was dem Spieler gegenuebersteht, haengt von seinem Schiff ab.
 // ---------------------------------------------------------------------------
-// Gefechtslagen sind nach GROESSENKLASSE beschrieben, nicht nach festen
-// Schiffen - so funktioniert jede Lage mit jeder Gegnerpartei.
 export const SCENARIOS = [
    {
       id: "single",
       title: "Einzelgefecht",
-      desc: "Ein Gegner vergleichbarer Stärke. Ehrlicher Schlagabtausch.",
-      tiers: (t) => [t],
+      desc: "Ein Gegner von vergleichbarer Staerke. Ehrlicher Schlagabtausch.",
+      forces: {
+         yacht: [], hotspur: ["hirondelle"], lydia: ["amelie"], sutherland: ["vengeur"],
+      },
    },
    {
       id: "outnumbered",
-      title: "Übermacht",
-      desc: "Zwei Gegner. Halte sie auseinander, sonst nehmen sie dich in die Zange.",
-      tiers: (t) => [t, Math.max(1, t - 1)],
+      title: "Overwhelming Force",
+      desc: "Two enemies. Keep them apart or they will take you in a crossfire.",
+      forces: {
+         yacht: [], hotspur: ["hirondelle", "hirondelle"],
+         lydia: ["amelie", "hirondelle"], sutherland: ["vengeur", "amelie"],
+      },
    },
    {
       id: "lineofbattle",
       title: "Gegen ein Linienschiff",
-      desc: "Der schwerste Gegner, den die Partei hat. Auf Distanz bleiben, Takelage zerschießen, weglaufen.",
-      tiers: () => [3],
+      desc: "Ein Vierundsiebziger. Auf Distanz bleiben, die Takelage zerschiessen, weglaufen.",
+      forces: {
+         yacht: [], hotspur: ["vengeur"], lydia: ["vengeur"], sutherland: ["vengeur", "amelie"],
+      },
    },
 ];
 
@@ -241,13 +241,4 @@ export function scenarioFor(id) {
    return SCENARIOS.find((s) => s.id === id) || SCENARIOS[0];
 }
 
-// Konkrete Gegnerschiffe fuer eine Lage: Groessenklassen auf die Schiffe der
-// feindlichen Partei abbilden.
-export function forcesFor(scenarioId, playerVessel, enemyFaction) {
-   const sc = scenarioFor(scenarioId);
-   if (!playerVessel || !playerVessel.guns || !enemyFaction) return [];
-   const tiers = sc.tiers(playerVessel.tier || 2);
-   return tiers.map((t) => shipOfTier(enemyFaction.id, t)).filter(Boolean);
-}
-
-export default { Fleet, Captain, SCENARIOS, scenarioFor, forcesFor, sailableHeading };
+export default { Fleet, Captain, SCENARIOS, scenarioFor, sailableHeading };
