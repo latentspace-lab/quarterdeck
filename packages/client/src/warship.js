@@ -19,6 +19,7 @@ import * as THREE from "three";
 import { clamp, DEG } from "./utils.js";
 import { VESSEL_COLORS } from "./vessels.js";
 import { holeTexture, fireTexture } from "./fx.js";
+import { freeboardOf as sharedFreeboardOf } from "@segel/shared";
 
 const UP = new THREE.Vector3(0, 1, 0);
 
@@ -512,13 +513,11 @@ function waveFlag(mesh, time, strength) {
    pos.needsUpdate = true;
 }
 
-// Freibord bis Oberkante Schanzkleid, mittschiffs gemessen.
-// Ein Rahsegler dieser Zeit trug sein Batteriedeck gut zwei Meter ueber Wasser
-// und das Schanzkleid noch einmal so hoch darueber - sonst stuende die See bei
-// jedem Seegang in der Batterie. Genau danach ist der Wert bemessen.
+// Freeboard to the top of the bulwark. The formula lives in @segel/shared
+// (pose.ts) because the server's swamp check needs the same number; this
+// wrapper keeps the vessel-taking signature the client code uses.
 export function freeboardOf(vessel) {
-   const { draft, beam } = vessel.hull;
-   return draft * 0.80 + beam * 0.11;
+   return sharedFreeboardOf(vessel.hull);
 }
 
 // =========================================================================

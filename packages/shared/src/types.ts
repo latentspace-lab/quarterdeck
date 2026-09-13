@@ -98,3 +98,57 @@ export interface WorldSnapshot {
    sea: SeaSync;
    ships: ShipState[];
 }
+
+// ---------------------------------------------------------------------------
+// Room protocol (Phase 1)
+//
+// State flows through the Colyseus schema (GameState in the server package);
+// everything that is an occurrence rather than a value goes through the
+// messages below.
+// ---------------------------------------------------------------------------
+
+/** Message names on the wire. */
+export const MSG = {
+   /** client -> server: one InputCommand */
+   input: "input",
+   /** server -> client, once after joining */
+   welcome: "welcome",
+   /** server -> all clients: a ServerEvent */
+   event: "event",
+} as const;
+
+/** What the first client passes when creating a room. Anything omitted is seeded. */
+export interface RoomCreateOptions {
+   terrainSeed?: number;
+   rngSeed?: number;
+   windBaseDir?: number;
+   windBaseSpeed?: number;
+   windVariability?: number;
+}
+
+/** What a client passes when joining. */
+export interface JoinOptions {
+   vesselId?: string;
+   name?: string;
+}
+
+export interface WelcomeMessage {
+   /** The ship this client controls; equals the Colyseus session id */
+   shipId: string;
+   params: WorldParams;
+   tick: number;
+}
+
+/** Something that happened to one ship (mast lost, holed, sunk, struck, aground, swamped, cutAway ...). */
+export interface ShipEvent {
+   type: string;
+   shipId: string;
+   [key: string]: unknown;
+}
+
+/** Something that happened between ships. */
+export type WorldEvent =
+   | { type: "collision"; a: string; b: string; closing: number }
+   | { type: "locked"; a: string; b: string };
+
+export type ServerEvent = ({ kind: "ship" } & ShipEvent) | ({ kind: "world" } & WorldEvent);

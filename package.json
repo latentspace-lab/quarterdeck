@@ -18,6 +18,7 @@
     "preview": "npm run preview -w @segel/client",
     "typecheck": "npm run build:shared --silent && npm run typecheck -w @segel/shared && npm run typecheck -w @segel/server",
     "server": "npm run start -w @segel/server",
+    "server:headless": "npm run start:headless -w @segel/server",
     "test": "npm run build --silent && node tests/run.js",
     "test:unit": "npm run build:shared --silent && node tests/run.js --unit",
     "test:regression": "npm run build:shared --silent && node tests/run.js --regression",
@@ -25,6 +26,7 @@
     "test:pending": "npm run build:shared --silent && node tests/run.js --pending"
   },
   "devDependencies": {
+    "@colyseus/sdk": "^0.18.2",
     "playwright": "^1.49.0",
     "typescript": "^5.7.2"
   }

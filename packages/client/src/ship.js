@@ -16,7 +16,7 @@ import { buildCrewView } from "./crewview.js";
 import { Battery } from "./guns.js";
 import { seaHeight } from "./ocean.js";
 import { clamp, lerp, DEG, dirVec, normDeg, diffDeg } from "./utils.js";
-import { shipPose, railClearance, lerpPose, lerpVec, systemRng, deriveRng } from "@segel/shared";
+import { shipPose, swampStep, lerpPose, lerpVec, systemRng, deriveRng } from "@segel/shared";
 import { DebrisField, RHO } from "./debris.js";
 
 let _nextId = 1;
@@ -68,7 +68,8 @@ export class Ship {
          ?? (this.vessel.rig === "square" ? freeboardOf(this.vessel)
             : this.vessel.hull.draft * 0.55);
       this.railClear = this.freeboard;
-      this._swampT = 0;
+      // Water-over-the-rail bookkeeping; the check itself is shared with the server.
+      this._swamp = { swampT: 0, railClear: this.freeboard };
 
       // --- Mannschaft ---
       this.crew = new Crew(this.vessel, { isPlayer: this.isPlayer, rng: this.rng });
@@ -561,32 +562,11 @@ export class Ship {
       );
    }
 
-   // Freibord der Lee-Reling ueber der oertlichen Wasserflaeche.
-   // Negativ = die See laeuft ueber Deck. Formel in @segel/shared/pose.
-   railClearance(rollRad, halfBeam, sinkIn, hy, hLee) {
-      return railClearance(this.freeboard, rollRad, halfBeam, sinkIn, hy, hLee);
-   }
-
+   // Water over the lee rail: flooding and casualties. Same function as on
+   // the server (@segel/shared/seamanship), so both book the same water.
    _swampCheck(dt, pose) {
-      const clear = this.railClearance(
-         pose.rollZ, this.vessel.hull.beam / 2, pose.sinkIn, pose.seaY, pose.leeY);
-      this.railClear = clear;
-      if (clear >= 0 || this.dmg.sunk) { this._swampT = 0; return; }
-      const depth = Math.min(-clear, 2.5);
-      this._swampT = (this._swampT || 0) + dt;
-      // Wassereinbruch ueber Deck: als offenes Leck buchen, damit die Pumpen
-      // und die Sinkmechanik davon wissen.
-      this.dmg.flooding = clamp(
-         this.dmg.flooding + depth * 0.022 * dt, 0, 1);
-      // Leute, die an Deck arbeiten, gehen ueber Bord
-      if (this.crew && this.rng() < depth * 0.18 * dt) {
-         this.crew.hit(1 + ((this.rng() * 2) | 0), "deck");
-         if (this.crew.shock) this.crew.shock(0.04);
-      }
-      if (this._swampT > 1.2) {
-         this._swampT = 0;
-         this.dmg._event("swamped", { depth });
-      }
+      this.railClear = swampStep(this._swamp, dt, pose, this.freeboard, this.vessel.hull.beam / 2,
+         { dmg: this.dmg, crew: this.crew }, this.rng);
    }
 
    animate(dt, ctx) {
