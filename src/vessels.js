@@ -172,11 +172,11 @@ export const VESSELS = [
    },
    {
       id: "indefatigable",
-      // Fahrbar, aber nicht in der Gegnerliste: jede Partei stellt genau ein
-      // Schiff je Groessenklasse, und die Lydia ist der britische Zweier.
-      // Ein zweiter waere fuer shipOfTier() nicht mehr eindeutig.
-      faction: null,
+      faction: "gb",
       paint: NELSON,
+      // Zweite Groessenklasse wie die Lydia. Als Gegner wird sie nie gezogen:
+      // shipOfTier() nimmt das erste Schiff der Klasse, und das bleibt die
+      // Lydia. Fahrbar ist sie trotzdem, und darum geht es.
       tier: 2,
       name: "Indefatigable",
       prefix: "HMS",
