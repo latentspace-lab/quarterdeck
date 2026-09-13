@@ -1,50 +1,53 @@
-// audio.js - Kommandostimme: kurze Zurufe zu Spielereignissen.
+// audio.js - Voice announcements + UI sounds
 //
-// Die Dateien liegen unter public/sounds/ und werden ueber die Vite-Basis-URL
-// geladen. Ein fester Pfad wie "/sounds/x.mp3" ginge auf GitHub Pages ins
-// Leere, weil die Seite dort unter /sailing/ ausgeliefert wird.
+// Voices are nation-specific: British (GB) or French (FR).
+// The correct voice set is selected at play time based on the player's vessel nation.
+import { clamp } from "./utils.js";
 
-const BASE = import.meta.env?.BASE_URL ?? "/";
-
-// Sperrzeit in Sekunden: verhindert, dass ein Zuruf im Gefecht im Sekundentakt
-// wiederholt wird. 0 = jederzeit.
-const VOICE = {
-   ahoi:            { file: "ahoi.mp3",                    cooldown: 0 },
-   battlestations:  { file: "battlestations.mp3",          cooldown: 8 },
-   braceforimpact:  { file: "braceforimpact.mp3",          cooldown: 6 },
-   ceasefire:       { file: "ceasefire.mp3",               cooldown: 5 },
-   fireatwill:      { file: "fireatwill.mp3",              cooldown: 2 },
-   makesail:        { file: "makesail.mp3",                cooldown: 3 },
-   pumps:           { file: "manthepumps_takingwater.mp3", cooldown: 15 },
-   pointouttheguns: { file: "pointouttheguns.mp3",         cooldown: 10 },
-   sunk:            { file: "sunk.mp3",                    cooldown: 8 },
-   takethatvessel:  { file: "takethatvessel.mp3",          cooldown: 5 },
-   victory:         { file: "victory.mp3",                 cooldown: 15 },
+// ---------------------------------------------------------------------------
+// Sound catalogue — GB (English) and FR (French) voices
+// ---------------------------------------------------------------------------
+const VOICE_GB = {
+   ahoi:              { key: "ahoi",              src: "/sounds/ahoi.ogg",              cooldown: 0  },
+   battlestations:    { key: "battlestations",    src: "/sounds/battlestations.ogg",    cooldown: 8  },
+   braceforimpact:    { key: "braceforimpact",    src: "/sounds/braceforimpact.ogg",    cooldown: 6  },
+   ceasefire:         { key: "ceasefire",         src: "/sounds/ceasefire.ogg",         cooldown: 5  },
+   fireatwill:        { key: "fireatwill",        src: "/sounds/fireatwill.ogg",        cooldown: 2  },
+   makesail:          { key: "makesail",          src: "/sounds/makesail.ogg",          cooldown: 3  },
+   pumps:             { key: "pumps",             src: "/sounds/manthepumps_takingwater.ogg", cooldown: 15 },
+   pointouttheguns:   { key: "pointouttheguns",   src: "/sounds/pointouttheguns.ogg",   cooldown: 10 },
+   sunk:              { key: "sunk",              src: "/sounds/sunk.ogg",              cooldown: 8  },
+   takethatvessel:    { key: "takethatvessel",    src: "/sounds/takethatvessel.ogg",   cooldown: 5  },
+   victory:           { key: "victory",           src: "/sounds/victory.ogg",           cooldown: 15 },
 };
 
-// Ereignisnamen fuer die Aufrufstellen. Der Umweg ueber diese Tabelle haelt
-// die Dateinamen aus dem Spielcode heraus.
-export const TRIGGER = {
-   MENU_OPEN: "ahoi",
-   BATTLE_STATIONS: "battlestations",
-   COLLISION: "braceforimpact",
-   CEASE_FIRE: "ceasefire",
-   FIRE_AT_WILL: "fireatwill",
-   MAKE_SAIL: "makesail",
-   FLOODING: "pumps",
-   TARGET_ACQUIRED: "pointouttheguns",
-   SHIP_SUNK: "sunk",
-   HIT_CONFIRMED: "takethatvessel",
-   VICTORY: "victory",
+const VOICE_FR = {
+   ahoi:              { key: "ahoi",              src: "/sounds/ahoi_fr.ogg",           cooldown: 0  },
+   battlestations:    { key: "battlestations",    src: "/sounds/battlestations_fr.ogg",cooldown: 8  },
+   braceforimpact:    { key: "braceforimpact",    src: "/sounds/braceforimpact_fr.ogg",cooldown: 6  },
+   ceasefire:         { key: "ceasefire",         src: "/sounds/ceasefire_fr.ogg",     cooldown: 5  },
+   fireatwill:        { key: "fireatwill",        src: "/sounds/fireatwill_fr.ogg",    cooldown: 2  },
+   makesail:          { key: "makesail",          src: "/sounds/makesail_fr.ogg",      cooldown: 3  },
+   pumps:             { key: "pumps",             src: "/sounds/pumps_fr.ogg",         cooldown: 15 },
+   pointouttheguns:   { key: "pointouttheguns",   src: "/sounds/pointouttheguns_fr.ogg",cooldown: 10 },
+   sunk:              { key: "sunk",              src: "/sounds/sunk_fr.ogg",          cooldown: 8  },
+   takethatvessel:    { key: "takethatvessel",    src: "/sounds/takethatvessel_fr.ogg",cooldown: 5  },
+   victory:           { key: "victory",           src: "/sounds/victory_fr.ogg",       cooldown: 15 },
 };
 
+export const NATIONS = { GB: "GB", FR: "FR" };
+
+// ---------------------------------------------------------------------------
+// Audio player
+// ---------------------------------------------------------------------------
 export class VoiceAudio {
    constructor() {
       this.enabled = true;
       this.gain = 0.9;
-      this._buffers = {};
+      this._buffers = {};      // `${nation}:${key}` -> AudioBuffer
       this._ctx = null;
-      this._lastPlayed = {};
+      this._lastPlayed = {};   // `${nation}:${key}` -> timestamp
+      this._preloaded = {};    // nation -> Set of loaded keys
    }
 
    _ensure() {
@@ -56,42 +59,93 @@ export class VoiceAudio {
       return this._ctx;
    }
 
-   async _fetch(key) {
+   _voiceFor(nation) {
+      return nation === "FR" ? VOICE_FR : VOICE_GB;
+   }
+
+   // Pre-load a single sound file
+   async _fetch(nation, key) {
       const ctx = this._ensure();
-      if (!ctx || this._buffers[key]) return;
+      if (!ctx) return;
+      const bkey = `${nation}:${key}`;
+      if (this._buffers[bkey]) return;
+      const voice = this._voiceFor(nation);
+      const entry = voice[key];
+      if (!entry) return;
       try {
-         const res = await fetch(BASE + "sounds/" + VOICE[key].file);
+         const res = await fetch(entry.src);
          if (!res.ok) return;
-         this._buffers[key] = await ctx.decodeAudioData(await res.arrayBuffer());
-      } catch { /* Datei fehlt oder laesst sich nicht dekodieren - dann bleibt es still */ }
+         const buf = await res.arrayBuffer();
+         this._buffers[bkey] = await ctx.decodeAudioData(buf);
+      } catch { /* asset missing or decode failed */ }
    }
 
+   // Pre-load all voices for a given nation
+   async preloadNation(nation = "GB") {
+      const voice = this._voiceFor(nation);
+      await Promise.all(Object.keys(voice).map((k) => this._fetch(nation, k)));
+      this._preloaded[nation] = true;
+   }
+
+   // Pre-load both nations (call at init)
    async preload() {
-      await Promise.all(Object.keys(VOICE).map((k) => this._fetch(k)));
+      await Promise.all([
+         this.preloadNation("GB"),
+         this.preloadNation("FR"),
+      ]);
    }
 
-   play(key) {
-      const entry = VOICE[key];
-      // Ein unbekannter Schluessel bliebe sonst stumm, ohne dass es auffaellt.
-      if (!entry) { console.warn("audio: unbekannter Zuruf", key); return false; }
+   // Play a voice line for the given nation
+   play(key, nation = "GB") {
       const ctx = this._ensure();
-      if (!ctx || !this._buffers[key]) return false;
+      if (!ctx) return false;
+      const bkey = `${nation}:${key}`;
+      const buf = this._buffers[bkey];
+      if (!buf) return false;
+
       const now = performance.now() / 1000;
-      if (entry.cooldown > 0 && now - (this._lastPlayed[key] || 0) < entry.cooldown) return false;
+      const voice = this._voiceFor(nation);
+      const entry = voice[key];
+      const cooldown = entry ? entry.cooldown : 0;
+      if (cooldown > 0 && now - (this._lastPlayed[bkey] || 0) < cooldown) return false;
 
       const src = ctx.createBufferSource();
-      src.buffer = this._buffers[key];
+      src.buffer = buf;
       const g = ctx.createGain();
       g.gain.value = this.gain;
       src.connect(g);
       g.connect(ctx.destination);
       if (ctx.state === "suspended") ctx.resume().catch(() => {});
       src.start(0);
-      this._lastPlayed[key] = now;
+      this._lastPlayed[bkey] = now;
       return true;
    }
+
+   // Play using the current nation's voice
+   announce(key, nation = "GB") { return this.play(key, nation); }
 }
 
+// Singleton instance
 export const voiceAudio = new VoiceAudio();
 
-export function voiceAnnounce(key) { return voiceAudio.play(key); }
+// ---------------------------------------------------------------------------
+// Trigger helpers
+// ---------------------------------------------------------------------------
+export function voiceAnnounce(key, nation = "GB") {
+   voiceAudio.announce(key, nation);
+}
+
+// Triggers (mapped to game events):
+export const TRIGGER = {
+   MENU_OPEN:        "ahoi",           // menu opens
+   BATTLE_STATIONS: "battlestations", // Q/E/F pressed (broadside fire)
+   COLLISION:       "braceforimpact", // collision detected
+   CEASE_FIRE:      "ceasefire",      // guns finished reloading
+   FIRE_AT_WILL:    "fireatwill",     // first broadside shot
+   MAKE_SAIL:       "makesail",       // W key pressed (sails set/reefed)
+   FLOODING:        "pumps",          // flooding starts
+   TARGET_ACQUIRED: "pointouttheguns",// target in range
+   ENEMY_SUNK:      "sunk",           // enemy ship sunk
+   HIT_CONFIRMED:   "takethatvessel", // hit registered on enemy
+   VICTORY:         "victory",        // all enemies destroyed
+};

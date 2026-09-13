@@ -2,12 +2,11 @@
 import * as THREE from "three";
 import { createOcean, seaHeight, ampForWind, waveHeightForWind, seaStateName } from "./ocean.js";
 import { createScene } from "./scene.js";
-import { getVessel, VESSELS, vesselLabel, shipsOfFaction } from "./vessels.js";
-import { getFaction, enemyFactionFor } from "./factions.js";
+import { getVessel, VESSELS, vesselLabel } from "./vessels.js";
 import { Ship } from "./ship.js";
-import { Fleet, SCENARIOS, scenarioFor, forcesFor } from "./fleet.js";
+import { Fleet, SCENARIOS, scenarioFor } from "./fleet.js";
 import { DebrisField } from "./debris.js";
-import { createTerrain, findOpenWater, makeRng, worldInfo } from "./terrain.js";
+import { createTerrain } from "./terrain.js";
 import * as collide from "./collide.js";
 import { AMMO, AMMO_ORDER } from "./damage.js";
 import { BoatDynamics, pointOfSail, vmgUp, vmgDown, polarSpeedAt } from "./physics.js";
@@ -18,7 +17,7 @@ import { Course } from "./marks.js";
 import { makeTrainer } from "./trainer.js";
 import { UI } from "./ui.js";
 import { DEG, clamp, lerp, normDeg, dirVec, diffDeg } from "./utils.js";
-import { voiceAudio, voiceAnnounce, TRIGGER } from "./audio.js";
+import { voiceAudio, TRIGGER, voiceAnnounce } from "./audio.js";
 
 const CAM_LABEL = {
    CHASE: "Verfolger",
@@ -75,7 +74,6 @@ export class Simulator {
       // Land und Untiefen
       this.terrain = createTerrain(scene.scene);
       this.terrain.setVisible(false);
-      this.worldSeed = null;   // null = bei jedem Start neu auswuerfeln
 
       // Wind
       this.wind = new Wind({ dir: 0, speed: 12, gust: 0.5, veer: 0.4, variability: 1 });
@@ -110,10 +108,9 @@ export class Simulator {
       this.player = null;
       this.vessel = null;
       this.vesselId = null;
+      this.nation = "GB";
       this.scenarioId = "single";
-      this.factionId = "gb";
-      this.faction = getFaction("gb");
-      this.setVessel("lydia");
+      this.setVessel("yacht");
 
       // Regatta-Kurs
       this.course = new Course(scene.scene, { x: 0, z: 0 });
@@ -147,7 +144,7 @@ export class Simulator {
 
       // Zuerst Menü anzeigen
       this.openMenu();
-      voiceAudio.preload();
+      voiceAudio.preload(); // preloads both GB and FR
    }
 
    // Schiff wechseln: 3D-Modell, Physik-Profil, Kamera, Batterie, Trainer.
@@ -156,36 +153,22 @@ export class Simulator {
    get yacht() { return this.player ? this.player.model : null; }
    get battery() { return this.player ? this.player.battery : null; }
 
-   // Partei wechseln: Schiffsliste, Anstrich, Flagge und Gegner haengen daran
-   setFaction(id, vesselId) {
-      const f = getFaction(id);
-      if (f.id === this.factionId && !vesselId) return f;
-      this.factionId = f.id;
-      this.faction = f;
-      const list = shipsOfFaction(f.id);
-      let want = vesselId || this.vesselId;
-      if (want !== "yacht" && !list.some((v) => v.id === want)) {
-         want = list.length ? list[0].id : "yacht";
-      }
-      this.setVessel(want, true);
-      return f;
-   }
-
    setVessel(id, force = false) {
       const v = getVessel(id);
       if (!force && this.vesselId === v.id && this.player) return this.vessel;
       const old = this.player;
       this.vessel = v;
       this.vesselId = v.id;
+      this.nation = v.nation || "GB";
 
       this.player = new Ship({
          id: "player",
          vessel: v,
-         faction: this.faction,
          scene: this.scene,
          debris: this.debris,
          targets: this._targets,
          onHit: this._onHit,
+         onReloadDone: (side) => voiceAnnounce(TRIGGER.ceasefire, this.nation),
          isPlayer: true,
          heading: old ? old.dyn.heading : 0,
          x: old ? old.pos.x : 0,
@@ -224,13 +207,9 @@ export class Simulator {
    openMenu() {
       this.menuOpen = true;
       this.paused = true;
-      voiceAnnounce(TRIGGER.MENU_OPEN);
       this.ui.openMenu({
          mode: this.mode,
          vesselId: this.vesselId,
-         factionId: this.factionId,
-         forcesFor,
-         onFactionChange: (fid, vid) => this.setFaction(fid, vid),
          windDir: this.wind.baseDir,
          windSpeed: this.wind.baseSpeed,
          gusts: this.gusts,
@@ -247,9 +226,8 @@ export class Simulator {
          scenarios: SCENARIOS,
          onScenarioChange: (id) => { this.scenarioId = id; },
          onVesselChange: (id) => this.setVessel(id),
-         onStart: (mode, dir, speed, gusts, vesselId, scenarioId, factionId) => {
+         onStart: (mode, dir, speed, gusts, vesselId, scenarioId) => {
             if (scenarioId) this.scenarioId = scenarioId;
-            if (factionId && factionId !== this.factionId) this.setFaction(factionId, vesselId);
             this.startMode(mode, dir, speed, gusts, vesselId);
          },
          onHelp: () => this._showHelp(),
@@ -330,19 +308,13 @@ export class Simulator {
       this.ui.closeMenu();
       this.menuOpen = false;
       this.paused = false;
-      // Erst die Welt, dann die Schiffe: der Startplatz haengt von den Inseln ab.
-      if (mode === "Regatta" || mode === "Training") {
-         this.terrain.setVisible(false);
-      } else {
-         this._newWorld();
-         this.terrain.setVisible(true);
-      }
       this._placeAtStart(mode);
       this.battery.clear();
       this.debris.clear();
       this.course.setVisible(mode === "Regatta");
       if (mode !== "Gefecht") {
          this.fleet.clear();
+         this.terrain.setVisible(false);
       }
       this.ui.showMessage(
          vesselLabel(this.vessel) + " klar zum Auslaufen — " + this.vessel.rate);
@@ -381,20 +353,6 @@ export class Simulator {
       }
    }
 
-   // Neue Seekarte auswuerfeln (oder den gesetzten Seed wiederholen).
-   _newWorld(seed) {
-      const s = seed ?? this.worldSeed ?? ((Math.random() * 1e9) | 0);
-      const w = this.terrain.regenerate(s);
-      this.worldSeed = w.seed;
-      if (this.ui && this.ui.setSeed) this.ui.setSeed(w.seed);
-      return w;
-   }
-
-   // Feste Seekarte vorgeben; null = jedes Mal neu wuerfeln.
-   setSeed(seed) {
-      this.worldSeed = seed == null ? null : (seed >>> 0);
-   }
-
    _placeAtStart(mode) {
       const V = this.vessel;
       // Kein Start mitten im Wind: ein Rahsegler kaeme dort nie heraus.
@@ -408,17 +366,6 @@ export class Simulator {
       this.boat.heel = 0;
       this.boat.pos.x = 0;
       this.boat.pos.z = mode === "Regatta" ? -30 - V.hull.loa * 1.2 : 0;
-      // Im Archipel nicht blind auf dem Nullpunkt starten, sondern auf einem
-      // Platz mit genug Wasser unterm Kiel und Raum zum Manoevrieren.
-      if (this.terrain.visible) {
-         const rng = makeRng((worldInfo().seed ^ 0x5f3a) >>> 0);
-         const p = findOpenWater({
-            rng, maxDist: 700, minDepth: 22,
-            clearance: Math.max(240, V.hull.loa * 4),
-         });
-         this.boat.pos.x = p.x;
-         this.boat.pos.z = p.z;
-      }
       this.boat.sailSet = 1;
       this.boat.tack = "STBD";
       this.boat.leeway = 0;
@@ -495,10 +442,7 @@ export class Simulator {
       this.boat.setRudder(inp.rudder);
       if (this.vessel.rig === "square") {
          // W / S setzen bzw. reffen die Segel (mehr Tuch = mehr Fahrt und Krengung)
-         if (inp.trimIn) {
-            this.boat.sailSet = clamp(this.boat.sailSet + dt * 0.45, 0.25, 1);
-            voiceAnnounce(TRIGGER.MAKE_SAIL);
-         }
+         if (inp.trimIn) this.boat.sailSet = clamp(this.boat.sailSet + dt * 0.45, 0.25, 1);
          if (inp.trimOut) this.boat.sailSet = clamp(this.boat.sailSet - dt * 0.45, 0.25, 1);
       } else if (!this.manualTrim) {
          if (inp.trimIn) this.boat.trim = clamp(this.boat.trim + dt * 0.4, 0, 1);
@@ -694,9 +638,8 @@ export class Simulator {
                break;
             }
             case "cycleVessel": {
-               const roster = shipsOfFaction(this.factionId).concat([getVessel("yacht")]);
-               const i = roster.findIndex((v) => v.id === this.vesselId);
-               const nxt = roster[(i + 1) % roster.length];
+               const i = VESSELS.findIndex((v) => v.id === this.vesselId);
+               const nxt = VESSELS[(i + 1) % VESSELS.length];
                this.setVessel(nxt.id);
                if (this.mode === "Training") {
                   this.trainer.setIndex(0);
@@ -730,14 +673,17 @@ export class Simulator {
       const ok = this.battery.fire(side, {
          windDir: this.wind.dir,
          windSpeed: this.wind.speed,
-         gunnery: this.faction.gunnery,
+         gunnery: 1.0,
       });
       if (ok) {
          this.ui.showMessage((side === "PORT" ? "Backbord" : "Steuerbord")
             + "-Breitseite — " + n + " Rohre " + this.battery.ammoSpec().short + "!");
-         // Die erste Breitseite eroeffnet das Gefecht, danach nur noch Zurufe.
-         voiceAnnounce(this._battleStarted ? TRIGGER.BATTLE_STATIONS : TRIGGER.FIRE_AT_WILL);
-         this._battleStarted = true;
+         if (!this._battleStarted) {
+            this._battleStarted = true;
+            voiceAnnounce(TRIGGER.fireatwill, this.nation);
+         } else {
+            voiceAnnounce(TRIGGER.battlestations, this.nation);
+         }
       }
       return ok;
    }
@@ -748,14 +694,16 @@ export class Simulator {
    _startBattle() {
       this.fleet.clear();
       this.debris.clear();
-      const foeFaction = enemyFactionFor(this.factionId);
-      const list = forcesFor(this.scenarioId, this.vessel, foeFaction);
+      const sc = scenarioFor(this.scenarioId);
+      const list = sc.forces[this.vesselId] || [];
+      this.terrain.setVisible(true);
       // Der Seegang folgt dem Wind nur traege: eine See baut sich auf und
       // laeuft langsamer wieder ab. Sonst wuerde jede Boe die Wellen pumpen.
       this.seaWind = 12;
       this._groundMsg = 0;
       this._battleOver = false;
       this._battleStarted = false;
+      this._lockMsg = false;
 
       if (!list.length) {
          this.ui.showMessage("Die " + this.vessel.name + " ist kein Kriegsschiff — kein Gegner in Sicht.");
@@ -767,30 +715,18 @@ export class Simulator {
       list.forEach((id, i) => {
          const spread = (i - (list.length - 1) / 2) * 420;
          const across = dirVec(windDir + 90);
-         let x = this.player.pos.x + up.x * 900 + across.x * spread;
-         let z = this.player.pos.z + up.z * 900 + across.z * spread;
-         // Auch der Gegner braucht Wasser unterm Kiel: den Idealplatz nur als
-         // Ausgangspunkt nehmen und den naechsten freien Fleck dazu suchen.
-         if (this.terrain.visible) {
-            const rng = makeRng((worldInfo().seed + 977 * (i + 1)) >>> 0);
-            const p = findOpenWater({
-               rng, near: { x, z }, maxDist: 420, minDepth: 20, clearance: 260,
-               avoid: [{ x: this.player.pos.x, z: this.player.pos.z, r: 400 }],
-            });
-            x = p.x; z = p.z;
-         }
+         const x = this.player.pos.x + up.x * 900 + across.x * spread;
+         const z = this.player.pos.z + up.z * 900 + across.z * spread;
          const heading = normDeg(Math.atan2(this.player.pos.x - x, this.player.pos.z - z) * 180 / Math.PI);
-         this.fleet.spawn(id.id, {
+         this.fleet.spawn(id, {
             x, z, heading, speed: 4,
-            faction: foeFaction,
-            skill: foeFaction.gunnery * (0.88 + Math.random() * 0.24),
+            doctrine: "rig",
+            skill: 0.80 + Math.random() * 0.25,
             engage: 170 + Math.random() * 120,
          });
       });
       const names = this.fleet.ships.map((s) => s.name).join(" und ");
-      this.ui.showMessage(foeFaction.short === "☠"
-         ? "Totenkopf in Sicht: " + names + " — klar Schiff zum Gefecht!"
-         : "Segel in Sicht: " + names + " (" + foeFaction.country + ") — klar Schiff zum Gefecht!");
+      this.ui.showMessage("Segel in Sicht: " + names + " — klar Schiff zum Gefecht!");
    }
 
    _updateBattle(dt) {
@@ -801,6 +737,7 @@ export class Simulator {
       if (this.player.dmg.sunk) {
          msg = "Die " + this.vessel.name + " ist gesunken. R für ein neues Gefecht.";
          this._battleOver = true;
+         voiceAnnounce(TRIGGER.sunk, this.nation);
       } else if (this.player.dmg.beaten() && this.player.dmg.mastsStanding() <= 1) {
          msg = "Schwer angeschlagen — R setzt das Gefecht zurück.";
          this._battleOver = true;
@@ -810,7 +747,7 @@ export class Simulator {
          msg = "Gefecht gewonnen! " + (struck ? struck + " gestrichen" : "")
             + (struck && sunk ? ", " : "") + (sunk ? sunk + " gesunken" : "") + ".";
          this._battleOver = true;
-         voiceAnnounce(TRIGGER.VICTORY);
+         voiceAnnounce(TRIGGER.victory, this.nation);
       }
       return msg;
    }
@@ -853,19 +790,8 @@ export class Simulator {
          case "holed":
             if (isUs && Math.random() < 0.4) {
                this.ui.showMessage("Leck unter Wasser — die Pumpen!");
-               voiceAnnounce(TRIGGER.FLOODING);
+               voiceAnnounce(TRIGGER.pumps, this.nation);
             }
-            break;
-         case "shattered": {
-            const SEC = { BOW: "Bug", MID: "Mittschiffs", QUARTER: "Achterschiff" };
-            const SD = { PORT: "backbord", STBD: "steuerbord" };
-            this.ui.showMessage((isUs ? "Die Bordwand " : ev.ship.name + ": Bordwand ")
-               + SD[ev.side] + " " + (SEC[ev.sec] || "") + " ist aufgerissen!");
-            if (isUs) this.cam.shake(1.4);
-            break;
-         }
-         case "swamped":
-            if (isUs) this.ui.showMessage("See kommt über die Reling — Wasser in der Batterie!");
             break;
          case "rudder":
             if (isUs) this.ui.showMessage("Das Ruder ist getroffen!");
@@ -875,7 +801,7 @@ export class Simulator {
             break;
          case "sunk":
             this.ui.showMessage(isUs ? "Wir sinken." : ev.ship.name + " sinkt.");
-            voiceAnnounce(TRIGGER.SHIP_SUNK);
+            if (!isUs) voiceAnnounce(TRIGGER.sunk, this.nation);
             break;
          case "exploded":
             this.ui.showMessage(ev.ship.name + " fliegt in die Luft!");
@@ -896,7 +822,7 @@ export class Simulator {
          if (us) {
             this.cam.shake(1.6);
             this.ui.showMessage("Zusammenstoß! " + ev.closing.toFixed(1) + " kn Annäherung.");
-            voiceAnnounce(TRIGGER.COLLISION);
+            voiceAnnounce(TRIGGER.braceforimpact, this.nation);
          }
       } else if (ev.type === "locked") {
          const us = ev.a === this.player || ev.b === this.player;
@@ -1007,7 +933,6 @@ export class Simulator {
          pos: pointOfSail(b.twa, b.luffing, this.vessel.rig, this.vessel.sail.noGo),
          noGo: this.vessel.sail.noGo,
          vessel: this.vessel,
-         faction: this.faction,
          guns: this.battery.status(),
          sailSet: b.sailSet,
          damage: this.player.dmg.status(),

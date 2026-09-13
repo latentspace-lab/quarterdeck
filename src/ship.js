@@ -76,6 +76,7 @@ export class Ship {
          ownerId: this.id,
          targets: opts.targets || (() => []),
          onHit: opts.onHit || null,
+         onReloadDone: opts.onReloadDone || null,
       });
       this.battery.setShip(this.model, this.vessel);
 
