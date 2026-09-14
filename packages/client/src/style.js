@@ -86,6 +86,7 @@ export const PALETTE = {
             skyLo: [0.66, 0.79, 0.87], skyHi: [0.20, 0.44, 0.72],
             sss: [0.03, 0.30, 0.26], sun: [1.0, 0.93, 0.78],
             foam: [0.93, 0.96, 0.97], haze: [0.67, 0.79, 0.88],
+            ink: [0.004, 0.032, 0.068], painted: false,
             specular: 1.0,
          },
          terrain: {
@@ -94,6 +95,7 @@ export const PALETTE = {
          },
          sail: null,            // null: every sail keeps the colour it was built with
          smoke: 0xf0efe9, splash: 0xdff0ff,
+         puffs: null,           // null: sprites, not the painted puff field
       },
       hud: {
          font: "system-ui",
@@ -118,17 +120,20 @@ export const PALETTE = {
          background: 0xd6d4c4,
          fog: 0xd6d4c4, fogNear: 1100, fogFar: 4500,
          // the grey-blue is reached within a few degrees of the horizon
-         skyTop: 0x6f8fa6, skyMid: 0xdcd6c3, skyBot: 0xece2cf, skyBand: 0.14,
+         skyTop: 0x5f7c8e, skyMid: 0xdcd4bf, skyBot: 0xece0cb, skyBand: 0.14,
          skySun: 0xf8efd6, sunDisc: 0xf4eedb,
          sunLight: 0xf5ecd6, sunIntensity: 1.9,
          hemiSky: 0xb4c0c4, hemiGround: 0x3a403a, hemiIntensity: 0.6,
          ambient: 0x56605e, ambientIntensity: 0.45,
-         cloud: 0xcfc9c0,
+         cloud: 0xd6d0c4,
+         // The painted sea (ocean.js, `painted` branch): inky troughs, lit
+         // crests, cream foam with a grey underside.
          sea: {
-            deep: 0x122c22, crest: 0x3f7a52,
-            skyLo: 0x8aa494, skyHi: 0x527c70,
-            sss: 0x459660, sun: 0xf8efd6,
-            foam: 0xece6d2, haze: 0xc3c9b6,
+            deep: 0x142820, crest: 0x5f8f70,
+            skyLo: 0xb9c1b2, skyHi: 0x78968c,
+            sss: 0x4f8a64, sun: 0xf8efd6,
+            foam: 0xf3ecda, haze: 0xc6c8b8,
+            ink: 0x1d2622, painted: true,
             specular: 0.45,
          },
          terrain: {
@@ -137,6 +142,16 @@ export const PALETTE = {
          },
          sail: 0xdccfad,
          smoke: 0xe4e2d6, splash: 0xe9e8dc,
+         // The puff field (puffs.js): powder smoke lit cream with a grey-mauve
+         // underside and an apricot glow from the flash, brown burning smoke,
+         // an opaque flame from cream through orange to oxblood, grey clouds.
+         puffs: {
+            smokeLit: 0xf1ebdc, smokeShade: 0x8c8886, glow: 0xe7b48a, glowK: 0.9,
+            burnLit: 0x8d8378, burnShade: 0x4a4440,
+            flameCore: 0xf7e6b0, flameMid: 0xd9822f, flameEdge: 0x7d2a1c,
+            cloudLit: 0xd6d0c4, cloudShade: 0x807c78,
+            ink: 0x2b2f2c, fireLight: 900,
+         },
       },
       hud: {
          font: "'IM Fell English', 'Iowan Old Style', 'Palatino Linotype', Georgia, serif",

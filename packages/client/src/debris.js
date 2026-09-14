@@ -24,6 +24,7 @@
 import * as THREE from "three";
 import { clamp } from "./utils.js";
 import { puffTexture } from "./fx.js";
+import { puffField, splash as paintedSplash } from "./puffs.js";
 import { palette } from "./style.js";
 
 const G = 9.81;
@@ -544,6 +545,8 @@ export class DebrisField {
    }
 
    _splash(x, y, z, size) {
+      const field = puffField();
+      if (field) { paintedSplash(field, x, y, z, size); return; }
       if (!this._texPuff) return;
       const sp = new THREE.Sprite(new THREE.SpriteMaterial({
          map: this._texPuff, transparent: true, depthWrite: false,

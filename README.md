@@ -430,12 +430,29 @@ paper tone and a mild plate vignette. Two layers make the look
   smoke/splash sprites all take their colours from the style's `world`
   palette. A teal-grey sky, an olive sea with cream crests and buff sails
   are already in the frame before any post-processing.
+- **Painted sea** (`ocean.js`, the `painted` branch of the fragment shader).
+  Ranks of rollers with an inky trough and a lit crest, bands of tone and a
+  faint hatching running with the wind, wind-blown foam streaks, whitecaps
+  as broken brush strokes with a grey underside, and a bow wave and wake for
+  every ship in the water (`setShips()`). The plain style keeps the old
+  shading in the `plain` branch.
+- **Painted effects** (`puffs.js`). Powder smoke, spray, burning smoke, the
+  flames and the cloud masses are all drawn by one instanced billboard field
+  in a single draw call. Each puff is painted in the shader: a cumulus of
+  lobes with a lit top, a grey-mauve underside and an ink contour; powder
+  smoke near the guns is lit apricot from below by the flash while young; a
+  flame is an opaque tongue from cream through orange to oxblood that
+  streams brown smoke and throws a warm light on its ship. The colours live
+  in the style's `puffs` palette. Without the field (plain style, tests) the
+  emitters in `guns.js`, `debris.js` and `warship.js` fall back to sprites.
 - **Aquatint pass** (`aquatint.js`). The scene is rendered into an off-screen
   target with a depth texture; one full-screen shader then draws the etched
-  line (ink where the depth breaks between neighbouring pixels, fading with
-  distance), pulls the value onto an ink → wash → paper ramp while keeping
-  most of the chroma, adds a screen-fixed rosin grain that is heavier in the
-  darks, paper fibre, a warm cast and the vignette. Nothing ends up pure
+  line (ink where the depth breaks between neighbouring pixels, fading out
+  beyond a few hundred metres), gives the plate its full range (an S-curve
+  toward ink and paper, laid down in faint tonal steps as the acid bit the
+  plate in stages), pulls the value onto an ink → wash → paper ramp while
+  keeping most of the chroma, and adds the vignette. Grain is available but
+  off: at screen scale the prints read as smooth washes. Nothing ends up pure
   black or pure white: the printer's ink and the paper are the limits.
 
 The HUD keeps its see-through panes but wears the same period: a warm vellum
