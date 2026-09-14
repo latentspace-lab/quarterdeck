@@ -31,7 +31,10 @@ async function run() {
    let other = null;
    try {
       suite.section("The page joins a battle");
-      const url = `${site.url}?mp=1&server=${encodeURIComponent(srv.url)}&vessel=lydia&name=Browser&enemies=hirondelle&roomName=Smoke%20Test`;
+      // style=plain: this suite measures prediction against the frame rate,
+      // and the aquatint pass is too slow under software GL on the CI runner
+      // (inputs pile up, the correction grows). boot-smoke covers the pass.
+      const url = `${site.url}?mp=1&style=plain&server=${encodeURIComponent(srv.url)}&vessel=lydia&name=Browser&enemies=hirondelle&roomName=Smoke%20Test`;
       await page.goto(url, { waitUntil: "load", timeout: 30000 });
       await page.waitForFunction(() => window.__sim && window.__sim.mode === "Multiplayer" && window.__sim.session && window.__sim.session.shipId, null, { timeout: 15000 });
       const joined = await page.evaluate(() => ({
@@ -131,7 +134,7 @@ async function run() {
       const page2 = await browser.newPage({ viewport: { width: 1280, height: 760 } });
       const errors2 = watchErrors(page2);
       try {
-         await page2.goto(`${site.url}?mp=1&server=${encodeURIComponent(srv.url)}&vessel=yacht&name=Racer&mode=regatta&roomName=Cowes`,
+         await page2.goto(`${site.url}?mp=1&style=plain&server=${encodeURIComponent(srv.url)}&vessel=yacht&name=Racer&mode=regatta&roomName=Cowes`,
             { waitUntil: "load", timeout: 30000 });
          await page2.waitForFunction(() => window.__sim && window.__sim.session && window.__sim.session.mode === "regatta"
             && window.__sim.mode === "Multiplayer", null, { timeout: 15000 });
