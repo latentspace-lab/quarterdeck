@@ -2,7 +2,7 @@
 //
 // Issue #6: every battle should feel different. The wind and the enemy's
 // position come from a seeded generator, so a battle can also be replayed.
-import { makeRng } from "@segel/shared";
+import { makeRng } from "@quarterdeck/shared";
 import { battleWind, battleSpawns, WIND_KTS, SPAWN_M, UPWIND_M, STAGGER_M } from "../../packages/client/src/battleStart.js";
 import { createSuite, fingerprint } from "../lib/harness.js";
 
@@ -68,4 +68,4 @@ suite.section("random opening");
 
 export default () => suite.done();
 
-if (!process.env.SEGEL_TEST_RUNNER) suite.done();
+if (!process.env.QUARTERDECK_TEST_RUNNER) suite.done();

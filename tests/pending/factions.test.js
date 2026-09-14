@@ -99,4 +99,4 @@ ok(shipOfTier("gb", 2).name === "Lydia", "the British class-two ship stays the L
 
 export default () => suite.done();
 
-if (!process.env.SEGEL_TEST_RUNNER) suite.done();
+if (!process.env.QUARTERDECK_TEST_RUNNER) suite.done();

@@ -26,7 +26,7 @@ import {
    type ServerEvent,
    type TargetBox,
    type Rng,
-} from "@segel/shared";
+} from "@quarterdeck/shared";
 import { ServerShip, type ServerShipOptions } from "./ServerShip.ts";
 import { Captain, type CaptainOptions } from "./Captain.ts";
 

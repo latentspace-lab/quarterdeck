@@ -83,7 +83,7 @@ export function createSuite(name) {
       done() {
          const line = `=== ${name}: ${pass} passed, ${fail} failed ===`;
          console.log("\n" + (fail ? c("fail", line) : c("ok", line)));
-         if (!process.env.SEGEL_TEST_RUNNER && fail) process.exitCode = 1;
+         if (!process.env.QUARTERDECK_TEST_RUNNER && fail) process.exitCode = 1;
          return { name, pass, fail, failures };
       },
    };

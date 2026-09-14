@@ -1,7 +1,7 @@
 // game.js - Simulation: wires up scene, boat, physics, camera, controls, modes, UI
 import * as THREE from "three";
 import { createOcean, seaHeight, ampForWind, waveHeightForWind, seaStateName } from "./ocean.js";
-import { SeaState, SIM_DT, makeRng } from "@segel/shared";
+import { SeaState, SIM_DT, makeRng } from "@quarterdeck/shared";
 import { createScene } from "./scene.js";
 import { getVessel, VESSELS, vesselLabel } from "./vessels.js";
 import { Ship } from "./ship.js";
@@ -824,7 +824,7 @@ export class Simulator {
       try {
          this._draw();
       } catch (e) {
-         console.error("[segel-simulator] renderOnly:", e);
+         console.error("[quarterdeck] renderOnly:", e);
       }
    }
 

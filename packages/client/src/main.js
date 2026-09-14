@@ -1,6 +1,6 @@
 // main.js - entry point
 import { Simulator } from "./game.js";
-import { Accumulator, SIM_DT } from "@segel/shared";
+import { Accumulator, SIM_DT } from "@quarterdeck/shared";
 
 // Start overlay (stays visible until the renderer is running)
 const boot = document.createElement("div");
@@ -8,14 +8,14 @@ const boot = document.createElement("div");
 // rendering style (styles.css).
 boot.style.cssText =
     "position:fixed;left:50%;bottom:14px;transform:translateX(-50%);color:var(--text);font-family:var(--font);font-size:13px;opacity:.9;z-index:30;pointer-events:none;text-align:center;background:var(--paper-solid);border:1px solid var(--rule);padding:6px 14px;border-radius:var(--r-pill)";
-boot.textContent = "Sailing Simulator 3D — initializing…";
+boot.textContent = "Quarterdeck — initializing…";
 document.body.appendChild(boot);
 
 function showError(msg) {
    boot.textContent = "Error: " + msg;
    boot.style.color = "var(--bad)";
    boot.style.opacity = "1";
-   console.error("[segel-simulator] initialization error:", msg);
+   console.error("[quarterdeck] initialization error:", msg);
 }
 
 let sim = null;
@@ -65,10 +65,10 @@ function frame(now) {
       if (errShown) {
          errShown = false;
          boot.style.color = "var(--text)";
-         boot.textContent = "Sailing Simulator 3D";
+         boot.textContent = "Quarterdeck";
       }
    } catch (err) {
-      console.error("[segel-simulator] frame error:", err);
+      console.error("[quarterdeck] frame error:", err);
       sim.renderOnly(); // show a frame anyway
       acc.reset(now);   // after an error, don't make up for the lost time
       if (!errShown) {
@@ -90,4 +90,4 @@ document.addEventListener("visibilitychange", () => {
    if (!document.hidden) acc.reset(performance.now());
 });
 
-console.log("[segel-simulator] loaded. window.__sim", sim ? "= Simulator" : "(error)");
+console.log("[quarterdeck] loaded. window.__sim", sim ? "= Simulator" : "(error)");

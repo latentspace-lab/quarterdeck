@@ -59,7 +59,7 @@ if (!suites.length) {
    process.exit(1);
 }
 
-process.env.SEGEL_TEST_RUNNER = "1";
+process.env.QUARTERDECK_TEST_RUNNER = "1";
 
 const results = [];
 const t0 = Date.now();

@@ -9,7 +9,7 @@
 // execute decorators, and defineTypes() is deprecated in schema v5.
 
 import { schema, t, type SchemaType } from "@colyseus/schema";
-import type { ShipState, SeaSync } from "@segel/shared";
+import type { ShipState, SeaSync } from "@quarterdeck/shared";
 
 export const ShipSchema = schema(
    {

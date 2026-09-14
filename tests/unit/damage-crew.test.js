@@ -4,7 +4,7 @@
 // injected generator - only that makes these cases reliably testable
 // instead of "usually green".
 import { DamageModel, Crew, AMMO, AMMO_ORDER, SIDES, MASTS, sectionAt, getVessel, makeRng }
-   from "@segel/shared";
+   from "@quarterdeck/shared";
 import { createSuite, fingerprint } from "../lib/harness.js";
 
 const suite = createSuite("damage + crew");
@@ -257,4 +257,4 @@ suite.section("Every side and mast can be addressed");
 
 export default () => suite.done();
 
-if (!process.env.SEGEL_TEST_RUNNER) suite.done();
+if (!process.env.QUARTERDECK_TEST_RUNNER) suite.done();

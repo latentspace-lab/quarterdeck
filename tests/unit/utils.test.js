@@ -2,7 +2,7 @@
 import {
    clamp, lerp, invLerp, smoothstep, normDeg, diffDeg, absDiffDeg,
    dirVec, interpTable, approach, approachHalfLife, DEG, RAD, KNOT_TO_MS,
-} from "@segel/shared";
+} from "@quarterdeck/shared";
 import { createSuite } from "../lib/harness.js";
 
 const suite = createSuite("utils");
@@ -83,4 +83,4 @@ suite.section("approach(): dt-invariant smoothing");
 
 export default () => suite.done();
 
-if (!process.env.SEGEL_TEST_RUNNER) suite.done();
+if (!process.env.QUARTERDECK_TEST_RUNNER) suite.done();

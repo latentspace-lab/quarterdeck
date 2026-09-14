@@ -1,5 +1,5 @@
 // tests/unit/rng.test.js - deterministic randomness.
-import { makeRng, deriveRng, gauss } from "@segel/shared";
+import { makeRng, deriveRng, gauss } from "@quarterdeck/shared";
 import { createSuite, fingerprint } from "../lib/harness.js";
 
 const suite = createSuite("rng");
@@ -69,4 +69,4 @@ suite.section("gauss(): normal distribution from a uniform one");
 
 export default () => suite.done();
 
-if (!process.env.SEGEL_TEST_RUNNER) suite.done();
+if (!process.env.QUARTERDECK_TEST_RUNNER) suite.done();

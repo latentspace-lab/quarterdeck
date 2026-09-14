@@ -12,7 +12,7 @@ import * as THREE from "three";
 import { Ship } from "../../packages/client/src/ship.js";
 import { getVessel } from "../../packages/client/src/vessels.js";
 import { DebrisField } from "../../packages/client/src/debris.js";
-import { SIM_DT, SeaState, Accumulator, shipPose } from "@segel/shared";
+import { SIM_DT, SeaState, Accumulator, shipPose } from "@quarterdeck/shared";
 import { createSuite } from "../lib/harness.js";
 
 const suite = createSuite("Render interpolation");
@@ -197,4 +197,4 @@ suite.section("A sinking ship is interpolated too");
 
 export default () => suite.done();
 
-if (!process.env.SEGEL_TEST_RUNNER) suite.done();
+if (!process.env.QUARTERDECK_TEST_RUNNER) suite.done();

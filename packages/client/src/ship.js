@@ -16,7 +16,7 @@ import { buildCrewView } from "./crewview.js";
 import { Battery } from "./guns.js";
 import { seaHeight } from "./ocean.js";
 import { clamp, lerp, DEG, dirVec, normDeg, diffDeg } from "./utils.js";
-import { shipPose, swampStep, lerpPose, lerpVec, systemRng, deriveRng } from "@segel/shared";
+import { shipPose, swampStep, lerpPose, lerpVec, systemRng, deriveRng } from "@quarterdeck/shared";
 import { DebrisField, RHO } from "./debris.js";
 
 let _nextId = 1;
@@ -559,7 +559,7 @@ export class Ship {
 
    // Place on the wave (buoyancy, roll, pitch)
    //
-   // The pose itself is computed by shipPose() in @segel/shared - the same
+   // The pose itself is computed by shipPose() in @quarterdeck/shared - the same
    // function the server uses to build its hit-detection matrix. Here it is
    // only applied to the Three.js model.
    //
@@ -639,7 +639,7 @@ export class Ship {
    }
 
    // Water over the lee rail: flooding and casualties. Same function as on
-   // the server (@segel/shared/seamanship), so both book the same water.
+   // the server (@quarterdeck/shared/seamanship), so both book the same water.
    _swampCheck(dt, pose) {
       this.railClear = swampStep(this._swamp, dt, pose, this.freeboard, this.vessel.hull.beam / 2,
          { dmg: this.dmg, crew: this.crew }, this.rng);

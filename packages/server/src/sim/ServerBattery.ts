@@ -29,7 +29,7 @@ import {
    type TargetBox,
    type SeaHeightFn,
    type XYZ,
-} from "@segel/shared";
+} from "@quarterdeck/shared";
 
 const SIDES: Side[] = ["PORT", "STBD"];
 

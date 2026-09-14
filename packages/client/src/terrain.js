@@ -1,6 +1,6 @@
 // terrain.js - island and shoal, the visible part (Three.js).
 //
-// The chart itself moved to @segel/shared/terrain-math: the same analytic
+// The chart itself moved to @quarterdeck/shared/terrain-math: the same analytic
 // base function supplies the terrain mesh, the surf, ground contact and -
 // in Phase 1 - the chart on the server. What's left here is building the
 // mesh.
@@ -17,7 +17,7 @@ import {
    makeRng,
    World,
    PLAY_RADIUS,
-} from "@segel/shared";
+} from "@quarterdeck/shared";
 
 export {
    groundHeight,
@@ -30,7 +30,7 @@ export {
    makeRng,
    World,
    PLAY_RADIUS,
-} from "@segel/shared";
+} from "@quarterdeck/shared";
 
 // ---------------------------------------------------------------- Rendering
 // Land colours (linear triples) from the style palette; setPalette() swaps
