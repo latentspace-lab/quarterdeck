@@ -30,6 +30,7 @@ import {
    readStyleFromParams, storeStyle, nextStyle, setCurrentStyle, applyStyleToDocument, palette,
 } from "./style.js";
 import { createAquatint } from "./aquatint.js";
+import { PuffField, setPuffField, cloudBank, KIND } from "./puffs.js";
 import { applySailPalette } from "./warship.js";
 
 const CAM_LABEL = {
@@ -85,6 +86,14 @@ export class Simulator {
       // Pass the sun direction to the sea (the sun is fixed)
       this.sunDir = scene.sunLight.position.clone().normalize();
       this.ocean.uniforms.uSunDir.value.copy(this.sunDir);
+
+      // The painted effects (smoke, spray, fire, clouds) of the aquatint
+      // style: one instanced field, reached by the emitters through
+      // puffField(). Installed before any ship is built so fires find it.
+      this.puffs = new PuffField(900);
+      scene.add(this.puffs.mesh);
+      this._puffWind = new THREE.Vector3();
+      setPuffField(this.style === "aquatint" ? this.puffs : null);
 
       // Target marker (for training) — ring on the water
       this.targetMarker = makeTargetMarker();
@@ -446,6 +455,7 @@ export class Simulator {
       this._placeAtStart(mode);
       this.battery.clear();
       this.debris.clear();
+      for (const k of [KIND.SMOKE, KIND.BURN]) this.puffs.clear(k);
       this.course.setVisible(mode === "Regatta");
       if (mode !== "Battle") {
          this.fleet.clear();
@@ -566,9 +576,26 @@ export class Simulator {
       this.scene.setPalette(world);
       this.ocean.setPalette(world.sea);
       this.terrain.setPalette(world.terrain);
+      // The puff field draws only in the aquatint style; the sprite clouds
+      // give way to its cloud masses there.
+      this.puffs.setPalette(world);
+      this.puffs.clear();
+      if (world.puffs) {
+         setPuffField(this.puffs);
+         cloudBank(this.puffs, 12, 3);
+         this.scene.clouds.visible = false;
+      } else {
+         setPuffField(null);
+         this.scene.clouds.visible = true;
+      }
       const ships = [this.player, ...(this.fleet ? this.fleet.ships : []),
          ...(this.session ? this.session.remoteShips() : [])];
-      for (const s of ships) if (s && s.model) applySailPalette(s.model, world);
+      for (const s of ships) {
+         if (!s || !s.model) continue;
+         applySailPalette(s.model, world);
+         // fires move between the sprites and the puff field
+         if (s.model.setFire && s.dmg) { s.model.setFire(0); s.model.setFire(s.dmg.afire || 0); }
+      }
    }
 
    /** One frame onto the canvas: through the aquatint pass or straight. */
@@ -795,7 +822,25 @@ export class Simulator {
          this._uiMsg = "";
       }
 
+      this._updatePuffs(frameDt);
       this._draw();
+   }
+
+   /** Advance the painted effects and tell the sea where the ships are. */
+   _updatePuffs(dt) {
+      if (!this.puffs) return;
+      const wv = dirVec(this.wind.dir + 180);
+      const wms = this.wind.speed * 0.514444;
+      this._puffWind.set(wv.x * wms, 0, wv.z * wms);
+      this.puffs.update(dt, this._puffWind, this.camera, this.sunDir);
+      if (this.ocean.uniforms.uPainted.value > 0.5) {
+         this.ocean.setShips(this.allShips().filter((s) => s.dyn && s.vessel).map((s) => ({
+            x: s.dyn.pos.x, z: s.dyn.pos.z, heading: s.dyn.heading, speed: s.dyn.speed,
+            loa: s.vessel.hull.loa, beam: s.vessel.hull.beam,
+         })));
+      } else {
+         this.ocean.setShips([]);
+      }
    }
 
    /**

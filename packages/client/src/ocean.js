@@ -27,6 +27,7 @@ export {
 } from "@quarterdeck/shared";
 export { seaStateName, SeaState } from "@quarterdeck/shared";
 import { palette, rgb } from "./style.js";
+import { NOISE_GLSL } from "./puffs.js";
 
 const G = 9.81; // gravitational acceleration (deep-water dispersion relation)
 
@@ -106,12 +107,14 @@ void main() {
 
 const FRAG = `
 precision highp float;
+${NOISE_GLSL}
 uniform vec3 uSunDir;
 uniform vec3 uCamPos;
 uniform float uTime;
 uniform float uAmp;
 uniform float uWaveH;   // significant wave height in meters
 uniform float uWhite;   // fraction of whitecaps (0..1)
+uniform float uWindDir; // propagation direction, radians
 // Colours of the water, set from the style palette (see style.js)
 uniform vec3 uDeep;     // water in the troughs
 uniform vec3 uCrest;    // water on the crests
@@ -121,17 +124,107 @@ uniform vec3 uSss;      // light scattered through a crest
 uniform vec3 uSunCol;   // sun glitter
 uniform vec3 uFoam;     // foam and whitecaps
 uniform vec3 uHaze;     // distance haze
+uniform vec3 uInk;      // the printer's ink in the troughs (painted style)
 uniform float uSpec;    // glitter strength (a print has little)
+uniform float uPainted; // 1 = the aquatint sea, 0 = the plain one
+// Ships for bow waves and wakes: x, z, heading (rad), speed (kn); loa, beam
+uniform vec4 uShips[4];
+uniform vec2 uShipDim[4];
+uniform int uShipN;
 varying vec3 vWorld;
 varying vec3 vNormal;
 varying float vFoam;
 varying float vHeight;
 
-void main() {
-  vec3 toCam = uCamPos - vWorld;
-  float dist = length(toCam);
-  vec3 V = toCam / max(dist, 0.001);
-  vec3 L = normalize(uSunDir);
+// Long streaks that run with the wind: squeezed across, stretched along.
+float streaks(vec2 p, vec2 wd, float t) {
+   float along = dot(p, wd), across = dot(p, vec2(wd.y, -wd.x));
+   return fbm(vec2(along * 0.045 - t * 0.12, across * 0.55));
+}
+
+// The painted sea: ranks of rollers with an inky trough and a lit crest,
+// wind-blown foam streaks, whitecaps as broken brush strokes, bow waves
+// and wakes - the way the colourist of a naval aquatint drew water.
+vec3 painted(vec3 V, float dist, vec3 L) {
+  vec2 wd = vec2(sin(uWindDir), cos(uWindDir));
+  vec3 N = normalize(vNormal);
+  float near = 1.0 / (1.0 + dist * 0.045);
+  float rip = fbm(vWorld.xz * 0.9 + vec2(uTime * 0.6, -uTime * 0.4)) - 0.5;
+  float rip2 = fbm(vWorld.xz * 1.53 + vec2(-uTime * 0.5, uTime * 0.7)) - 0.5;
+  float rippleAmp = near * (0.04 + min(uAmp, 0.9) * 0.45);
+  N = normalize(N + vec3(rip * rippleAmp, 0.0, rip2 * rippleAmp));
+
+  float ndv = clamp(dot(N, V), 0.0, 1.0);
+  float fres = 0.02 + 0.98 * pow(1.0 - ndv, 5.0);
+  vec3 R = reflect(-V, N);
+  vec3 skyRef = mix(uSkyLo, uSkyHi, clamp(R.y, 0.0, 1.0));
+
+  float hSigned = clamp(vHeight / max(uWaveH * 0.55, 0.08), -1.0, 1.0);
+  float hMask = hSigned * 0.5 + 0.5;
+  vec3 trough = mix(uDeep, uInk, 0.45);
+  vec3 base = mix(trough, uCrest, pow(hMask, 1.6));
+  // bands of tone running with the wind, so the sea reads as rows of
+  // rollers even where the geometry is gentle
+  float along = dot(vWorld.xz, wd);
+  float band = sin(along * 0.26 - uTime * 1.0 + (fbm(vWorld.xz * 0.04) - 0.5) * 6.0);
+  base = mix(base, trough, smoothstep(0.1, 0.9, band) * 0.40 * smoothstep(0.1, 1.0, uWaveH));
+  // the engraver's hatching along each roller, fading with distance
+  float hatch = 0.5 + 0.5 * sin(along * 3.1 + (fbm(vWorld.xz * 0.3) - 0.5) * 4.0);
+  base = mix(base, trough, hatch * 0.16 * (1.0 - smoothstep(60.0, 400.0, dist)));
+  float sss = pow(clamp(dot(V, -L), 0.0, 1.0), 4.0) * hMask;
+  base += uSss * sss * 0.8;
+  float diff = clamp(dot(N, L), 0.0, 1.0);
+  vec3 col = base * (0.55 + 0.45 * diff) + skyRef * fres * 0.9;
+  vec3 H = normalize(L + V);
+  float spec = pow(clamp(dot(N, H), 0.0, 1.0), 120.0) * uSpec;
+  col += uSunCol * spec * 0.25;
+
+  // --- foam -----------------------------------------------------------
+  float st = streaks(vWorld.xz, wd, uTime);
+  float grain = fbm(vWorld.xz * 1.6 + 3.0);
+  float capZone = smoothstep(0.35, 0.95, hSigned) * (0.55 + 0.45 * clamp((1.0 - N.y) * 3.0, 0.0, 1.0));
+  float capField = capZone * (0.45 + 0.55 * st) + (grain - 0.5) * 0.35;
+  float caps = smoothstep(0.47 - uWhite * 0.18, 0.55 - uWhite * 0.18, capField) * step(0.02, uWhite);
+  float crestLine = smoothstep(0.80, 0.93, hSigned) * (1.0 - smoothstep(0.95, 1.0, hSigned)) * smoothstep(0.3, 1.2, uWaveH) * (0.4 + 0.6 * st);
+  float jacFoam = smoothstep(0.55, 0.9, vFoam * (0.6 + 0.6 * st)) * clamp(uAmp * 4.5, 0.0, 1.0) * smoothstep(0.35, 0.6, grain);
+  float lace = smoothstep(0.66, 0.76, st * (0.6 + 0.4 * grain)) * uWhite * 0.35 * smoothstep(-0.6, 0.4, hSigned);
+
+  // bow waves and wakes
+  float shipFoam = 0.0;
+  for (int i = 0; i < 4; i++) {
+     if (i >= uShipN) break;
+     vec4 sh = uShips[i]; vec2 dim = uShipDim[i];
+     vec2 d = vWorld.xz - sh.xy;
+     vec2 fwd = vec2(sin(sh.z), cos(sh.z));
+     float s = dot(d, fwd), r = dot(d, vec2(fwd.y, -fwd.x));
+     float loa = dim.x, beam = dim.y, spd = clamp(sh.w / 8.0, 0.0, 1.0);
+     float sn = s / (0.5 * loa);
+     float halfW = 0.5 * beam * sqrt(clamp(1.0 - sn * sn, 0.0, 1.0));
+     float rb = abs(r) - halfW;
+     float bow = smoothstep(-0.05, 0.35, sn) * smoothstep(1.02, 0.7, sn) * smoothstep(-0.3, 0.2, rb) * (1.0 - smoothstep(0.3, 1.2 + 3.5 * spd, rb));
+     bow *= (0.5 + 0.7 * fbm(vec2(s * 0.5, r * 0.9) + uTime * 0.7)) * (0.35 + spd);
+     float len = -(s + 0.45 * loa);
+     float wake = 0.0;
+     if (len > 0.0) {
+        float hw = 0.5 * beam * 0.9 + len * 0.10;
+        wake = (1.0 - smoothstep(hw * 0.6, hw, abs(r))) * exp(-len / (loa * 1.3)) * spd;
+        wake *= smoothstep(0.35, 0.65, fbm(vec2(len * 0.12 - uTime * 0.2, r * 0.45)));
+     }
+     shipFoam = max(shipFoam, max(bow, wake));
+  }
+
+  float foamMask = clamp(max(max(caps, jacFoam), max(lace * 0.7, shipFoam)), 0.0, 1.0);
+  vec3 foamCol = mix(uFoam * 0.72, uFoam, 0.4 + 0.6 * diff);
+  col = mix(col, foamCol, foamMask * 0.92);
+  col = mix(col, uFoam, crestLine * 0.55);
+  // a thin ink shadow under every foam patch, as the colourist did
+  float under = smoothstep(0.0, 0.25, foamMask) - smoothstep(0.25, 0.9, foamMask);
+  col = mix(col, uInk, under * 0.18);
+  return col;
+}
+
+// The plain sea: unchanged from before the aquatint work.
+vec3 plain(vec3 V, float dist, vec3 L) {
 
   // Base wave normal + high-frequency ripple perturbation (only near the viewer)
   vec3 N = normalize(vNormal);
@@ -191,6 +284,16 @@ void main() {
   float foamMask = clamp(max(jacFoam, caps), 0.0, 1.0);
   col = mix(col, uFoam, foamMask * 0.88);
 
+  return col;
+}
+
+void main() {
+  vec3 toCam = uCamPos - vWorld;
+  float dist = length(toCam);
+  vec3 V = toCam / max(dist, 0.001);
+  vec3 L = normalize(uSunDir);
+  vec3 col = uPainted > 0.5 ? painted(V, dist, L) : plain(V, dist, L);
+
   // Horizon haze
   float fog = smoothstep(450.0, 1400.0, dist);
   col = mix(col, uHaze, fog);
@@ -224,6 +327,11 @@ export function createOcean({ sunDir = new THREE.Vector3(0.4, 0.6, 0.7) } = {}) 
       uFoam: { value: new THREE.Color() },
       uHaze: { value: new THREE.Color() },
       uSpec: { value: 1.0 },
+      uInk: { value: new THREE.Color() },
+      uPainted: { value: 0.0 },
+      uShips: { value: [0, 1, 2, 3].map(() => new THREE.Vector4()) },
+      uShipDim: { value: [0, 1, 2, 3].map(() => new THREE.Vector2(40, 10)) },
+      uShipN: { value: 0 },
    };
    // Water colours from the style palette; raw linear triples go in as they
    // are, hex values are linearised (the shader works in linear space).
@@ -237,6 +345,8 @@ export function createOcean({ sunDir = new THREE.Vector3(0.4, 0.6, 0.7) } = {}) 
       uniforms.uFoam.value.setRGB(...rgb(sea.foam));
       uniforms.uHaze.value.setRGB(...rgb(sea.haze));
       uniforms.uSpec.value = sea.specular;
+      uniforms.uInk.value.setRGB(...rgb(sea.ink ?? sea.deep));
+      uniforms.uPainted.value = sea.painted ? 1.0 : 0.0;
    };
    setPalette(palette().world.sea);
 
@@ -287,6 +397,20 @@ export function createOcean({ sunDir = new THREE.Vector3(0.4, 0.6, 0.7) } = {}) 
          uniforms.uWindDir.value = sea.windRad;
          if (camPos) uniforms.uCamPos.value.copy(camPos);
          this.recenter(boatX, boatZ);
+      },
+
+      /**
+       * The ships that plough the painted sea (bow wave, wake): up to four
+       * of { x, z, heading (deg), speed (kn), loa, beam }.
+       */
+      setShips(list) {
+         const n = Math.min(4, list.length);
+         for (let i = 0; i < n; i++) {
+            const s = list[i];
+            uniforms.uShips.value[i].set(s.x, s.z, s.heading * Math.PI / 180, s.speed);
+            uniforms.uShipDim.value[i].set(s.loa, s.beam);
+         }
+         uniforms.uShipN.value = n;
       },
 
       // Phase time and stretch - so the boat, wreckage and projectiles

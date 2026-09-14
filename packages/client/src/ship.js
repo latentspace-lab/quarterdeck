@@ -696,6 +696,7 @@ export class Ship {
    }
 
    dispose() {
+      if (this.model && this.model.setFire) this.model.setFire(0);
       this.battery.clear();
       if (this.crewView) this.crewView.dispose();
       this._removeFromScene(this.model);
