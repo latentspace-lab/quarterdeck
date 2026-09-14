@@ -63,7 +63,7 @@ export interface ServerShipOptions {
  * the client for the vessels in the catalogue.
  */
 const MAST_MASS_SHARE: Record<MastKey, number> = { fore: 0.85, main: 1.0, mizzen: 0.55 };
-/** Mast state on the wire: 0 sound, 1 wounded, 2 gone. */
+/** mast state on the wire: 0 sound, 1 wounded, 2 gone. */
 const MAST_STATE: Record<string, number> = { sound: 0, wounded: 1, gone: 2 };
 export function wreckLoadFor(vessel: Vessel, mast: MastKey): number {
    const tons = vessel.hull.displacement || 100;
@@ -315,7 +315,7 @@ export class ServerShip implements CollidableShip {
       if (this.wreckage.has(key)) return;
       this.wreckage.add(key);
       const aloft = Math.round(this.crew.total * (0.008 + this.rng() * 0.014));
-      if (aloft > 0) this.crew.hit(aloft, "rigg");
+      if (aloft > 0) this.crew.hit(aloft, "rig");
       const onDeck = Math.round(this.crew.total * (0.003 + this.rng() * 0.007));
       if (onDeck > 0) this.crew.hit(onDeck, "deck");
       this.crew.shock(0.3);

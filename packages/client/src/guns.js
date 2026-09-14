@@ -1,18 +1,18 @@
-// guns.js - Batterie: Darstellung einer Breitseite.
+// guns.js - battery: rendering einer broadside.
 //
-// Eine Breitseite feuert nicht auf einen Schlag: die Bedienungen loesen mit
-// leichtem Versatz aus (spread), daher rollt der Donner die Bordwand entlang.
-// Jedes Rohr erzeugt Muendungsfeuer, eine Rauchwolke (treibt mit dem Wind ab)
-// und eine Kugel, die ballistisch faellt und eine Einschlagfontaene setzt.
+// Eine broadside feuert nicht auf einen Schlag: die crews loesen mit
+// leichtem Versatz aus (spread), daher rollt der Donner die hull side entlang.
+// Jedes gun erzeugt Muendungsfeuer, eine Rauchwolke (treibt mit dem wind ab)
+// und eine ball, die ballistisch faellt und eine impactfontaene setzt.
 //
-// Nachladen: eine gedrillte Royal-Navy-Bedienung schaffte rund drei Schuss in
-// zwei Minuten. Hier verkuerzt auf vessel.guns.reload Sekunden pro Seite.
+// reloading: eine gedrillte Royal-Navy-Bedienung schaffte rund drei Schuss in
+// zwei minutes. Hier verkuerzt auf vessel.guns.reload seconds pro side.
 
-// Die Ballistik ist nach @segel/shared/ballistics umgezogen (Phase 0C): Wurf-
-// bahn, Streuung, Salvenwurf und Trefferpruefung laufen jetzt im Browser wie
+// Die ballistics ist nach @segel/shared/ballistics umgezogen (Phase 0C): Wurf-
+// bahn, Streuung, salvonwurf und hitpruefung laufen jetzt im Browser wie
 // auf dem Server aus derselben Quelle. Hier bleibt alles Sichtbare -
-// Muendungsfeuer, Rauch, Geschossmeshes, Einschlagfontaenen, Donner - plus die
-// Nachladeuhren.
+// Muendungsfeuer, Rauch, Geschossmeshes, impactfontaenen, Donner - plus die
+// afterladeuhren.
 import * as THREE from "three";
 import { clamp, dirVec } from "./utils.js";
 import { puffTexture, flashTexture } from "./fx.js";
@@ -37,7 +37,7 @@ export {
 
 const SIDES = ["PORT", "STBD"];
 
-// ---------------- Geschuetzdonner (WebAudio, ohne Assets) ----------------
+// ---------------- gundonner (WebAudio, without Assets) ----------------
 class BoomAudio {
    constructor() {
       this.ctx = null;
@@ -89,7 +89,7 @@ export class Battery {
       this.reloadTime = 10;
       this.shotsFired = 0;
       this.broadsides = 0;
-      this.rollKick = 0;         // Grad, wird von game.js auf die Krengung addiert
+      this.rollKick = 0;         // deg, added to heel by game.js
       this.rollKickSide = 1;
       this.sound = opts.sound === false ? null : new BoomAudio();
       // Zufallsquelle. Server und Tests reichen einen geseedeten Generator
@@ -98,11 +98,11 @@ export class Battery {
 
       this.ammo = "ball";        // ball | chain | grape
       this.ownerId = opts.ownerId ?? null;
-      // Ziele liefert der Aufrufer; jedes Ziel beschreibt sein Trefferwerk
+      // targete liefert der Aufrufer; jedes target beschreibt sein hitwerk
       this.targets = opts.targets || (() => []);
       this.onHit = opts.onHit || null;
       this.onReloadDone = opts.onReloadDone || null;
-      // Anteil einsatzfaehiger Rohre je Seite (aus dem Schadensmodell)
+      // share einsatzfaehiger guns je side (aus dem damagesmodell)
       this.effectiveness = { PORT: 1, STBD: 1 };
 
       this.enabled = false;
@@ -130,7 +130,7 @@ export class Battery {
    /** Zufallsquelle nachtraeglich setzen. */
    setRng(rng) { this.rng = rng; }
 
-   // Munition waehlen / durchschalten
+   // ammunition waehlen / durchschalten
    setAmmo(id) { if (AMMO[id]) this.ammo = id; return this.ammo; }
    cycleAmmo() {
       const i = AMMO_ORDER.indexOf(this.ammo);
@@ -139,7 +139,7 @@ export class Battery {
    }
    ammoSpec() { return AMMO[this.ammo] || AMMO.ball; }
 
-   // Schiff anmelden (oder abmelden mit null)
+   // ship anmelden (oder abmelden mit null)
    setShip(ship, vessel) {
       this.clear();
       this.ship = ship || null;
@@ -148,7 +148,7 @@ export class Battery {
       if (this.spec) {
          this.reloadTime = this.spec.reload;
          this.maxRange = this.spec.range || 500;
-         // schwerstes Kaliber an Bord bestimmt die Wucht
+         // schwerstes calibre an overboard bestimmt die Wucht
          const lbs = this.spec.decks.map((d) => parseInt(d.calibre, 10) || 12);
          this.ballWeight = Math.max(...lbs);
       } else {
@@ -165,7 +165,7 @@ export class Battery {
       if (!this.enabled) return 0;
       return this.ship.userData.muzzles.PORT.length;
    }
-   // Wie viele Rohre einer Seite noch bedient werden koennen
+   // how viele guns einer side noch bedient werden koennen
    gunsReady(side) {
       return Math.round(this.gunsPerSide() * clamp(this.effectiveness[side] ?? 1, 0, 1));
    }
@@ -191,7 +191,7 @@ export class Battery {
    }
 
    // ------------------------------------------------------------------
-   // Feuer frei
+   // fire frei
    // ------------------------------------------------------------------
    fire(side, ctx = {}) {
       if (!this.ready(side)) return false;
@@ -203,9 +203,9 @@ export class Battery {
       this.ship.updateMatrixWorld(true);
       const spread = this.spec.spread || 0.3;
 
-      // Richten und Streuen macht die geteilte Ballistik. Damit ist die Salve
-      // durch (Seed, Optionen) vollstaendig beschrieben - genau das, was
-      // Phase 3C zum Nachspielen auf allen Clients braucht.
+      // Richten und Streuen macht die geteilte ballistics. Damit ist die salvo
+      // durch (sead, Optionen) vollstaendig beschrieben - genau das, was
+      // Phase 3C zum afterspielen auf allen Clients braucht.
       const shots = spawnSalvo({
          side,
          ammo: this.ammo,
@@ -232,11 +232,11 @@ export class Battery {
       return true;
    }
 
-   // Entfernung zum naechsten Ziel, das auf dieser Seite in der Breitseite
-   // steht (Peilung 30..150 Grad relativ zum Bug). 0 = nichts im Schussfeld.
+   // distance zum naechsten target, das auf dieser side in der broadside
+   // steht (bearing 30..150 degrees relativ zum bow). 0 = nichts im Schussfeld.
    /**
-    * Zielliste fuer die geteilte Ballistik aufbereiten: Weltmatrizen nachziehen
-    * und sicherstellen, dass jedes Ziel eine `matrixWorld` traegt. Ship liefert
+    * targetliste fuer die geteilte ballistics aufbereiten: worldmatrizen nachziehen
+    * und sicherstellen, dass jedes target eine `matrixWorld` traegt. Ship liefert
     * sie direkt mit; aeltere Aufrufer reichen nur den Three.js-Heeler herein.
     */
    _targetList() {
@@ -335,22 +335,22 @@ export class Battery {
       return true;
    }
 
-   // Einzelnes Rohr tatsaechlich abfeuern (aus der Warteschlange)
+   // Einzelnes gun tatsaechlich abfeuern (aus der Warteschlange)
    _discharge(p) {
       const heeler = this.ship.userData.heeler;
       const local = this.ship.userData.muzzles[p.side][p.idx];
       const world = this._v.copy(local);
       heeler.localToWorld(world);
 
-      // Auswaerts-Richtung (Bordwandnormale) in Weltkoordinaten
+      // Auswaerts-direction (hull sidenormale) in worldkoordinaten
       const outLocal = this._w.set(p.side === "STBD" ? -1 : 1, 0, 0); // starboard is -x
       const out = outLocal.clone().transformDirection(heeler.matrixWorld).normalize();
 
       this._muzzleFx(world, out);
 
       // --- Geschosse ------------------------------------------------------
-      // Richtung und Streuung rechnet die geteilte Ballistik; hier entstehen
-      // nur die sichtbaren Kugeln dazu.
+      // direction und Streuung rechnet die geteilte ballistics; hier entstehen
+      // nur die sichtbaren balls dazu.
       const a = AMMO[p.ammo] || AMMO.ball;
       const origin = world.clone().addScaledVector(out, 1.6);
       const shots = dischargeShots({
@@ -419,8 +419,8 @@ export class Battery {
    }
 
    // ------------------------------------------------------------------
-   // Trefferpruefung. Die Entscheidung faellt in @segel/shared/ballistics;
-   // hier werden nur die Ziele mit aktueller Weltmatrix bereitgestellt.
+   // hitpruefung. Die Entscheidung faellt in @segel/shared/ballistics;
+   // hier werden nur die targete mit aktueller worldmatrix bereitgestellt.
    // ------------------------------------------------------------------
    _checkHits(shot) {
       const list = this._targetList();
@@ -433,11 +433,11 @@ export class Battery {
       if (dt <= 0) return;
       const windDir = ctx.windDir ?? 0;
       const windSpeed = ctx.windSpeed ?? 10;
-      // Wind weht VON windDir, treibt also nach windDir+180
+      // wind weht VON windDir, treibt also nach windDir+180
       const wv = dirVec(windDir + 180);
       const wms = windSpeed * 0.514444;
 
-      // Nachladen
+      // reloading
       for (const side of SIDES) {
          if (this.reload[side] > 0) {
             const wasReloading = this.reload[side] > dt;
@@ -447,7 +447,7 @@ export class Battery {
             }
          }
       }
-      // Krengungsstoss klingt ab
+      // heelsstoss klingt ab
       if (this.rollKick > 0.001) this.rollKick = Math.max(0, this.rollKick - dt * 4.2);
 
       // Warteschlange
@@ -499,9 +499,9 @@ export class Battery {
          s.sprite.material.opacity = s.peak * Math.min(1, u * 7) * Math.pow(1 - u, 1.5);
       }
 
-      // Kugeln: Schwerkraft, Luftwiderstand, Trefferpruefung.
+      // balls: gravity, airwiderstand, hitpruefung.
       // Die Integration selbst steckt in stepProjectile() - dieselbe Formel,
-      // mit der rangeForElevation() die Rohre richtet, und dieselbe, mit der
+      // mit der rangeForElevation() die guns richtet, und dieselbe, mit der
       // der Server in Phase 1 rechnet.
       for (let i = this._shots.length - 1; i >= 0; i--) {
          const b = this._shots[i];
@@ -530,7 +530,7 @@ export class Battery {
          }
       }
 
-      // Einschlagfontaenen
+      // impactfontaenen
       for (let i = this._splashes.length - 1; i >= 0; i--) {
          const s = this._splashes[i];
          s.life += dt;

@@ -2,43 +2,43 @@
 //
 // Warum ueberhaupt:
 //
-// Die Physik enthaelt an mehreren Stellen Glaettungsterme der Form
+// Die physics enthaelt an mehreren Stellen Glaettungsterme der Form
 // `x += (ziel - x) * f(dt)`. Solche Terme sind nur dann exakt reproduzierbar,
 // wenn dt konstant ist - `f(dt1) danach f(dt2)` ist nicht dasselbe wie
 // `f(dt1 + dt2)`. Client-Prediction verlangt aber genau das: der Client
-// rechnet dieselben Eingaben noch einmal, die der Server schon gerechnet hat,
-// und muss auf dasselbe Ergebnis kommen. Also: Simulation mit festem Schritt,
-// Darstellung mit Bildschirmrate, dazwischen interpoliert.
+// rechnet dieselben inputn noch einmal, die der Server schon gerechnet hat,
+// und muss auf dasselbe Ergebnis kommen. Also: Simulation mit festem step,
+// rendering mit frameschirmrate, dazwischen interpoliert.
 //
-// 30 Hz ist der Kompromiss: fein genug fuer Ballistik und Trefferpruefung,
+// 30 Hz ist der Kompromiss: fein genug fuer ballistics und hitpruefung,
 // grob genug, dass ein Server mehrere Raeume traegt.
 
-/** Simulationsschritt in Sekunden. Client und Server benutzen exakt diesen Wert. */
+/** Simulationsschritt in seconds. Client und Server benutzen exakt diesen value. */
 export const SIM_HZ = 30;
 export const SIM_DT = 1 / SIM_HZ;
 
 /**
  * Hoechstzahl an Simulationsschritten je Frame. Verhindert die
- * "Todesspirale": wenn ein Rechner die Simulation ohnehin nicht schafft,
- * holt er den Rueckstand nicht durch noch mehr Schritte auf - dann laeuft die
- * Spielzeit lieber sichtbar langsamer.
+ * "Todesspirale": wenn ein Rechner die Simulation withouthin nicht schafft,
+ * holt er den Rueckstand nicht durch noch mehr stepe auf - dann laeuft die
+ * gamezeit lieber sichtbar langsamer.
  */
 export const MAX_STEPS_PER_FRAME = 5;
 
 /**
- * Fliesskomma-Spielraum beim Abzaehlen der Schritte.
+ * Fliesskomma-gameraum beim Abzaehlen der stepe.
  *
- * Ohne ihn ist der haeufigste Fall ueberhaupt - Bildrate gleich
+ * Ohne ihn ist der haeufigste Fall ueberhaupt - framerate gleich
  * Simulationsrate - der unangenehmste: `(now - last) / 1000` liegt dann mal
  * ein Bit ueber und mal ein Bit unter dt, und die Schleife liefert abwechselnd
- * 0 und 2 Schritte statt gleichmaessig 1. Sichtbar wird das als feines
- * Zittern. Eine Nanosekunde Spielraum raeumt das aus, ohne dass je Zeit
+ * 0 und 2 stepe statt gleichmaessig 1. Sichtbar wird das als feines
+ * Zittern. Eine Nanosekunde gameraum raeumt das aus, without dass je time
  * entsteht, die es nicht gab.
  */
 const STEP_EPS = 1e-9;
 
 /**
- * Akkumulator fuer die Schleife "feste Simulation, freie Darstellung".
+ * Akkumulator fuer die Schleife "feste Simulation, freie rendering".
  *
  *     const acc = new Accumulator();
  *     function frame(now) {
@@ -51,16 +51,16 @@ export class Accumulator {
    private acc = 0;
    private last = 0;
    private started = false;
-   /** Restanteil im laufenden Schritt (0..1) - der Interpolationsfaktor. */
+   /** Restanteil im laufenden step (0..1) - der Interpolationsfaktor. */
    alpha = 0;
-   /** Zahl der Schritte, die beim letzten advance() verworfen wurden. */
+   /** Zahl der stepe, die beim letzten advance() verworfen wurden. */
    dropped = 0;
 
    constructor(dt: number = SIM_DT) {
       this.dt = dt;
    }
 
-   /** Auf eine neue Zeitbasis setzen (Start, Pausenende, Tab-Wechsel). */
+   /** Auf eine neue timebasis setzen (Start, pausenende, Tab-Wechsel). */
    reset(nowMs: number): void {
       this.last = nowMs;
       this.acc = 0;
@@ -70,8 +70,8 @@ export class Accumulator {
    }
 
    /**
-    * Zeit bis `nowMs` verbuchen. Liefert die Zahl der faelligen
-    * Simulationsschritte und setzt `alpha` fuer die Darstellung.
+    * time bis `nowMs` verbuchen. Liefert die Zahl der faelligen
+    * Simulationsschritte und setzt `alpha` fuer die rendering.
     */
    advance(nowMs: number): number {
       if (!this.started) {

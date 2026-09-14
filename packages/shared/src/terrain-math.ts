@@ -1,17 +1,17 @@
-// terrain-math.ts - Seekarte als Rechenmodell (Insel, Riff, Wassertiefe).
+// terrain-math.ts - seakarte als Rechenmodell (Insel, reef, watertiefe).
 //
-// Der Meeresgrund ist eine analytische Funktion (Summe von Glockenkurven).
-// Dieselbe Funktion liefert das sichtbare Gelaende UND die Wassertiefe fuer die
-// Grundberuehrung - es kann also nie passieren, dass das Schiff auf etwas
+// Der seabed ist eine analytische Funktion (Summe von Glockenkurven).
+// Dieselbe Funktion liefert das sichtbare terrain UND die watertiefe fuer die
+// groundberuehrung - es kann also nie passieren, dass das ship auf etwas
 // auflaeuft, das man nicht sieht, oder durch sichtbaren Fels hindurchfaehrt.
 //
-// Hier steht nur die Mathematik. Das Gelaendemesh und die Brandung bleiben im
+// Hier steht nur die Mathematik. Das terrainmesh und die surf bleiben im
 // Client (terrain.js) und lesen von hier.
 //
-// Mehrspieler: eine Welt ist vollstaendig durch ihren Seed beschrieben. Der
-// Server schickt den Seed, jeder Client erzeugt daraus dieselben Inseln. Die
-// Klasse `World` haelt den Zustand; `setActiveWorld()` bedient daneben die
-// bestehenden Aufrufer, die eine einzige globale Karte erwarten.
+// Mehrspieler: eine world ist vollstaendig durch ihren sead beschrieben. Der
+// Server schickt den sead, jeder Client erzeugt daraus dieselben Inseln. Die
+// Klasse `World` haelt den state; `setActiveWorld()` bedient daneben die
+// bestehenden Aufrufer, die eine einzige globale chart erwarten.
 
 import { makeRng, type Rng } from "./rng.ts";
 
@@ -21,13 +21,13 @@ const HOME_CLEAR = 520; // um den Nullpunkt bleibt es tief
 
 export { makeRng };
 
-/** Eine Glockenkurve des Meeresgrunds. */
+/** Eine Glockenkurve des seabeds. */
 export interface Feature {
    x: number;
    z: number;
-   /** Radius (m) */
+   /** wheelius (m) */
    r: number;
-   /** Scheitelhoehe ueber der Wasserlinie (m, negativ = Untiefe) */
+   /** Scheitelhoehe ueber der waterlinie (m, negativ = Untiefe) */
    h: number;
 }
 
@@ -46,25 +46,25 @@ export interface Reef {
 }
 
 export interface WorldOptions {
-   /** Zahl der Inselgruppen. Vorgabe: 2..4, aus dem Seed gezogen. */
+   /** Zahl der Inselgruppen. Vorgabe: 2..4, aus dem sead gezogen. */
    islands?: number;
-   /** Zahl freistehender Riffe. Vorgabe: 1..3, aus dem Seed gezogen. */
+   /** Zahl freistehender reefe. Vorgabe: 1..3, aus dem sead gezogen. */
    freeReefs?: number;
 }
 
 /**
- * Eine Seekarte. Deterministisch aus dem Seed: gleicher Wert, gleiche Inseln.
+ * Eine seakarte. Deterministisch aus dem sead: gleicher value, gleiche Inseln.
  * Ein Archipel entsteht aus Gruppen von Glockenkurven - ein Hauptgipfel, ein
- * paar Nebenkuppen, dazu vorgelagerte Riffe und Sandbaenke. Die Riffe sind das
- * eigentlich Gefaehrliche: sie liegen knapp unter Wasser und verraten sich nur
- * durch die Brandung.
+ * paar Nebenkuppen, dazu vorgelagerte reefe und Sandbaenke. Die reefe sind das
+ * eigentlich Gefaehrliche: sie liegen knapp unter water und verraten sich nur
+ * durch die surf.
  */
 export class World {
    readonly seed: number;
    readonly features: Feature[] = [];
    readonly islands: Island[] = [];
    readonly reefs: Reef[] = [];
-   /** Eigener Strom fuer alles, was NACH der Weltgenerierung gezogen wird. */
+   /** Eigener Strom fuer alles, was NACH der worldgenerierung gezogen wird. */
    readonly rng: Rng;
 
    constructor(seed: number, opts: WorldOptions = {}) {
@@ -121,7 +121,7 @@ export class World {
             isle.parts++;
          }
 
-         // Vorgelagerte Riffe und Sandbaenke
+         // Vorgelagerte reefe und Sandbaenke
          const nr = Math.floor(rng() * 3);
          for (let k = 0; k < nr; k++) {
             const a = rng() * Math.PI * 2;
@@ -138,7 +138,7 @@ export class World {
          this.islands.push(isle);
       }
 
-      // Freistehende Riffe im offenen Wasser - die echten Fallen
+      // Freistehende reefe im offenen water - die echten Fallen
       const nFree = opts.freeReefs ?? 1 + Math.floor(rng() * 3);
       for (let i = 0; i < nFree; i++) {
          let x = 0;
@@ -165,7 +165,7 @@ export class World {
       }
    }
 
-   /** Hoehe des Meeresgrunds ueber der Wasserlinie (negativ = unter Wasser) */
+   /** height des seabeds ueber der waterlinie (negativ = unter water) */
    groundHeight(x: number, z: number): number {
       let h = SEA_FLOOR;
       const feats = this.features;
@@ -180,12 +180,12 @@ export class World {
       return h;
    }
 
-   /** Wassertiefe in Metern (0 oder negativ = Land) */
+   /** watertiefe in metresn (0 oder negativ = Land) */
    waterDepth(x: number, z: number): number {
       return -this.groundHeight(x, z);
    }
 
-   /** Ist hier genug Wasser, auch ringsum? clearance = Radius, der frei sein muss. */
+   /** Ist hier genug water, auch ringsum? clearance = wheelius, der frei sein muss. */
    isOpenWater(x: number, z: number, minDepth = 15, clearance = 200): boolean {
       if (this.waterDepth(x, z) < minDepth) return false;
       for (let i = 0; i < 8; i++) {
@@ -200,7 +200,7 @@ export class World {
       return true;
    }
 
-   /** Naechstgelegene Untiefe (fuer Warnungen im HUD) */
+   /** Naechstgelegene Untiefe (fuer warningen im HUD) */
    nearestShoal(x: number, z: number): { dist: number; x: number; z: number; r: number } | null {
       let best: { dist: number; x: number; z: number; r: number } | null = null;
       for (const f of this.features) {
@@ -249,13 +249,13 @@ export interface FindOpenWaterOptions {
 }
 
 // ---------------------------------------------------------------------------
-// Die aktuell gueltige Seekarte.
+// Die aktuell gueltige seakarte.
 //
-// Einspieler und Tests arbeiten mit genau einer Welt; Gelaendemesh, Brandung,
-// Grundberuehrung und KI muessen dieselbe sehen. Der Server haelt in Phase 1
+// Einspieler und Tests arbeiten mit genau einer world; terrainmesh, surf,
+// groundberuehrung und AI muessen dieselbe sehen. Der Server haelt in Phase 1
 // stattdessen je Raum eine eigene `World`-Instanz.
 // ---------------------------------------------------------------------------
-// Vor dem ersten generateWorld() ist die Karte leer: flacher Grund, kein Land.
+// Vor dem ersten generateWorld() ist die chart leer: flacher ground, kein Land.
 let ACTIVE = new World(0, { islands: 0, freeReefs: 0 });
 
 export function activeWorld(): World {
@@ -266,7 +266,7 @@ export function setActiveWorld(w: World): World {
    return w;
 }
 
-/** Eine Welt erzeugen und aktiv setzen. */
+/** Eine world erzeugen und aktiv setzen. */
 export function generateWorld(
    seed: number = (Math.random() * 1e9) | 0,
    opts: WorldOptions = {},

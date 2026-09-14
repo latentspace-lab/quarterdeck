@@ -6,7 +6,7 @@
 //   Hull    -> The French shot at the hull? No — the Royal Navy shot at the
 //              hull (to sink / knock out crews), while the French preferred the
 //              rigging (to cripple and escape).
-//   Masts   -> go overboard, taking their sail area with them and dragging
+//   masts   -> go overboard, taking their sail area with them and dragging
 //              alongside as wreck until cut away.
 //   Rudder  -> without rudder there is no course control.
 //   Battery -> knocked-out guns reduce the broadside.
@@ -34,14 +34,14 @@ export interface AmmoSpec {
    rig: number;
    gun: number;
    crew: number;
-   /** Rohrerhoehung ueber der Waagerechten (Grad) */
+   /** gunsrhoehung ueber der Waagerechten (degrees) */
    elevation: number;
    spreadDeg: number;
    pellets: number;
    rangeFactor: number;
    /** Muendungsgeschwindigkeit (m/s) */
    v0: number;
-   /** Luftwiderstand (1/s im Nenner) */
+   /** airwiderstand (1/s im Nenner) */
    drag: number;
 }
 
@@ -63,19 +63,19 @@ export interface DamageEvent {
    [key: string]: unknown;
 }
 
-/** Ein einzelner Treffer, wie ihn die Ballistik meldet. */
+/** Ein einzelner hit, wie ihn die ballistics meldet. */
 export interface HitInput {
    side?: Side;
-   /** Laengsposition 0 = Bug .. 1 = Spiegel */
+   /** Laengsposition 0 = bow .. 1 = Spiegel */
    s?: number;
-   /** Hoehe ueber der Wasserlinie (m) */
+   /** height ueber der waterlinie (m) */
    y?: number;
    ammo?: AmmoSpec;
-   /** Kugelgewicht (englische Pfund) */
+   /** ballgewicht (englische Pfund) */
    lb?: number;
    /** 0 = nah .. 1 = weit */
    range01?: number;
-   /** Freibord des Getroffenen (m) */
+   /** freeboard des those hit (m) */
    freeboard?: number;
 }
 
@@ -113,7 +113,7 @@ export const SIDES: Side[] = ["PORT", "STBD"];
 export const SECTIONS: Section[] = ["BOW", "MID", "QUARTER"];
 export const MASTS: MastKey[] = ["fore", "main", "mizzen"];
 
-// Munitionsarten: wie stark wirken sie auf welche Baugruppe?
+// ammunitionsarten: wie stark wirken sie auf welche Baugruppe?
 export const AMMO: Record<string, AmmoSpec> = {
    ball: {
       id: "ball",
@@ -134,7 +134,7 @@ export const AMMO: Record<string, AmmoSpec> = {
       short: "Chain",
       desc: "Two linked hemispheres — devastates rigging and sails.",
       hull: 0.18, rig: 1.4, gun: 0.25, crew: 0.30,
-      elevation: 2.2,      // hoch gerichtet, in die Takelage
+      elevation: 2.2,      // aimed high, into the rigging
       spreadDeg: 2.4,
       pellets: 1,
       rangeFactor: 0.62,   // taumelt, verliert schnell Energie
@@ -183,7 +183,7 @@ export const FLOOD_RATE = 0.032;
 /** Share of one side's guns dismounted by an 18-pound ball at point-blank range (mean). */
 export const GUN_LOSS_PER_HIT = 0.025;
 
-// Sektion aus der Laengsposition (0 = Bug, 1 = Spiegel)
+// section aus der Laengsposition (0 = bow, 1 = Spiegel)
 export function sectionAt(s: number): Section {
    if (s < 0.33) return "BOW";
    if (s < 0.70) return "MID";
@@ -205,17 +205,17 @@ export class DamageModel {
    flooding = 0;
    masts: Record<MastKey, MastStatus>;
    rudder = 1;
-   /** Anteil einsatzfaehiger Rohre */
+   /** share einsatzfaehiger guns */
    guns: Record<Side, number> = { PORT: 1, STBD: 1 };
    /** stehendes/laufendes Gut */
    rigging = 1;
-   /** Tuchzustand */
+   /** canvaszustand */
    sails = 1;
    afire = 0;
    struck = false;
    sunk = false;
    dead = false;
-   /** von aussen gesetzt (schleppendes Wrack) */
+   /** von aussen gesetzt (schleppendes wreck) */
    wreckDrag = 0;
    log: Array<Record<string, unknown>> = [];
    private rng: Rng;
@@ -246,15 +246,15 @@ export class DamageModel {
    }
 
    // ------------------------------------------------------------ Abfragen
-   // Mittlerer Zustand aller sechs Rumpfabschnitte (fuer die Anzeige)
+   // Mittlerer state aller sechs hullabschnitte (fuer die Anzeige)
    hullAverage(): number {
       let s = 0, n = 0;
       for (const k in this.hull) { s += this.hull[k]; n++; }
       return n ? s / n : 1;
    }
-   // Kampfkraft des Rumpfs. Bezugsgroesse ist eine komplett zerschossene
-   // Breitseite (drei Abschnitte), nicht der ganze Rumpf - ein Schiff ist
-   // erledigt, wenn EINE Seite aufgerissen ist, nicht erst wenn beide es sind.
+   // Kampfkraft des hulls. Bezugsgroesse ist eine komplett zerschossene
+   // broadside (drei Abschnitte), nicht der ganze hull - ein ship ist
+   // erledigt, wenn EINE side aufgerissen ist, nicht erst wenn beide es sind.
    integrity(): number {
       let dmg = 0;
       for (const k in this.hull) dmg += 1 - this.hull[k];
@@ -263,8 +263,8 @@ export class DamageModel {
    mastsStanding(): number {
       return MASTS.filter((m) => this.masts[m].state !== "gone").length;
    }
-   // Anteil der Segelkraft, den das Schiff noch aufbringt.
-   // Die Masten tragen unterschiedlich viel: Gross > Fock > Besan.
+   // share der sail force, den das ship noch aufbringt.
+   // Die masts tragen unterschiedlich viel: Gross > jib > mizzen.
    driveFactor(): number {
       const share = { fore: 0.36, main: 0.44, mizzen: 0.20 };
       let d = 0;
@@ -276,7 +276,7 @@ export class DamageModel {
       return clamp(d * lerp(0.62, 1, this.sails) * lerp(0.75, 1, this.rigging), 0, 1);
    }
    rudderFactor(): number { return clamp(lerp(0.10, 1, this.rudder), 0.10, 1); }
-   // Wasser im Schiff: traeger, tiefer, langsamer
+   // water im ship: traeger, tiefer, langsamer
    floodSpeedFactor(): number { return clamp(1 - 0.55 * this.flooding, 0.25, 1); }
    floodHeel(): number { return this.flooding * 14; }        // Grad Schlagseite
    gunFraction(side: Side): number { return clamp(this.guns[side], 0, 1); }
@@ -287,11 +287,11 @@ export class DamageModel {
    /** Queue an event. Public because seamanship and the ship classes report through the same queue. */
    _event(type: string, data: Record<string, unknown>): void { this._events.push({ type, ...data }); }
 
-   // ------------------------------------------------------------ Treffer
-   // hit: { side, s (0..1 Bug->Heck), y (Hoehe ueber Wasserlinie, m),
-   //        ammo (AMMO-Eintrag), lb (Kugelgewicht), range01 (0 nah .. 1 weit),
+   // ------------------------------------------------------------ hit
+   // hit: { side, s (0..1 bow->stern), y (height ueber waterlinie, m),
+   //        ammo (AMMO-Eintrag), lb (ballgewicht), range01 (0 nah .. 1 weit),
    //        freeboard (m) }
-   // Rueckgabe beschreibt, was sichtbar passieren soll (Splitter, Mastbruch ...)
+   // Rueckgabe beschreibt, was sichtbar passieren soll (splinters, mastbruch ...)
    applyHit(hit: HitInput): HitResult | null {
       if (this.sunk) return null;
       const a = hit.ammo || AMMO.ball;
@@ -300,9 +300,9 @@ export class DamageModel {
       const lb = hit.lb ?? 18;
       const FB = hit.freeboard || 4;
 
-      // Energie faellt mit der Entfernung; Kette und Kartaetsche viel schneller
-      // Wirkung faellt mit der Entfernung. Die Ballistik begrenzt die
-      // Reichweite bereits; hier geht es nur noch um die Restwucht.
+      // Energie faellt mit der distance; Kette und Kartaetsche viel schneller
+      // effect faellt mit der distance. Die ballistics begrenzt die
+      // range bereits; hier geht es nur noch um die Restwucht.
       const reach = clamp(1 - (hit.range01 ?? 0) * 0.60 / Math.max(a.rangeFactor, 0.30), 0.10, 1);
       const power = (lb / 18) * reach;
 
@@ -310,8 +310,8 @@ export class DamageModel {
          section: sec, side, y: hit.y ?? FB * 0.5, s: hit.s ?? 0.5,
          splinters: 0, holed: false, below: false,
          mastBroken: null, rudderHit: false, gunsLost: 0, sailTorn: 0, fire: false,
-         // Wen es an Bord trifft - der Aufrufer bucht es auf die Mannschaft
-         crew: { n: 0, where: "bord" },
+         // Wen es an overboard trifft - der Aufrufer bucht es auf die crewschaft
+         crew: { n: 0, where: "hull" },
       };
 
       // --- Crew losses ---------------------------------------------------
@@ -319,7 +319,7 @@ export class DamageModel {
       // hull — and at close range, grape shot.
       const isRigHit = (hit.y ?? 0) > FB * 1.25;
       res.crew.n = Math.round(power * a.crew * (1.2 + this.rng() * 2.2));
-      res.crew.where = isRigHit ? "rigg" : (a.id === "grape" ? "deck" : "bord");
+      res.crew.where = isRigHit ? "rig" : (a.id === "grape" ? "deck" : "hull");
 
       // --- Hull ----------------------------------------------------------
       if (!isRigHit) {
@@ -358,20 +358,20 @@ export class DamageModel {
             }
          }
 
-         // Rohre ausgeschlagen
+         // guns ausgeschlagen
          if (a.gun > 0 && sec !== "QUARTER") {
             const loss = power * a.gun * GUN_LOSS_PER_HIT * (0.5 + this.rng());
             const before = this.guns[side];
             this.guns[side] = clamp(this.guns[side] - loss, 0, 1);
             res.gunsLost = before - this.guns[side];
          }
-         // Ruder sitzt achtern
+         // rudder sitzt achtern
          if (sec === "QUARTER" && this.rng() < 0.16 * power * a.hull) {
             this.rudder = clamp(this.rudder - (0.25 + this.rng() * 0.4), 0, 1);
             res.rudderHit = true;
             this._event("rudder", { rudder: this.rudder });
          }
-         // Brand
+         // fire
          if (this.rng() < 0.025 * power * (a.id === "ball" ? 1 : 0.4)) {
             this.afire = clamp(this.afire + 0.18, 0, 1);
             res.fire = true;
@@ -385,7 +385,7 @@ export class DamageModel {
          this.sails = clamp(this.sails - rigDmg * 0.9, 0, 1);
          res.sailTorn = rigDmg;
 
-         // Welcher Mast? Kettenkugel geht bevorzugt in den grossen Mast.
+         // Welcher mast? chain shot geht bevorzugt in den grossen mast.
          const target: MastKey | null = isRigHit || a.rig > 1
             ? this._mastFor(hit.s ?? 0.5)
             : null;
@@ -406,19 +406,19 @@ export class DamageModel {
    }
 
    private _mastFor(s: number): MastKey {
-      // Laengsposition -> naechstgelegener Mast (Fock vorn, Besan achtern)
+      // Laengsposition -> naechstgelegener mast (jib vorn, mizzen achtern)
       if (s < 0.38) return "fore";
       if (s < 0.72) return "main";
       return "mizzen";
    }
 
-   // Mast geht ueber Bord. Rueckgabe sagt dem Aufrufer, was er wegbrechen soll.
+   // mast geht ueber overboard. Rueckgabe sagt dem Aufrufer, was er wegbrechen soll.
    private _breakMast(key: MastKey, cause: string): { mast: MastKey; cause: string } | null {
       const m = this.masts[key];
       if (m.state === "gone") return null;
       m.state = "gone";
       m.integrity = 0;
-      // Ein fallender Mast reisst Wanten und Stage mit
+      // Ein fallender mast reisst shrouds und Stage mit
       this.rigging = clamp(this.rigging - 0.22, 0, 1);
       this.sails = clamp(this.sails - 0.12, 0, 1);
       this._event("mastLost", { mast: key, cause });
@@ -426,7 +426,7 @@ export class DamageModel {
       return { mast: key, cause };
    }
 
-   // Von aussen: Mast durch Ueberlastung oder Kollision brechen lassen
+   // Von aussen: mast durch overlastung oder collision brechen lassen
    breakMast(key: MastKey, cause = "force") { return this._breakMast(key, cause); }
 
    // --------------------------------------------------------- Ram strike
@@ -476,9 +476,9 @@ export class DamageModel {
 
    // --------------------------------------------------- Storm overpress
    // Too much sail in too much wind: topmasts go overboard. Genau dafuer
-   // gibt es die Reffen-Tasten.
+   // gibt es die reefing-Tasten.
    stressRig(dt: number, { windKts, sailSet, twa }: { windKts: number; sailSet: number; twa: number }) {
-      // Staudruck ~ v^2; am Wind steht das Rigg schraeger und leidet mehr
+      // stagnation pressure ~ v^2; am wind steht das Rigg schraeger und leidet mehr
       const upwind = 1 + 0.45 * Math.cos(clamp(Math.abs(twa), 0, 180) * Math.PI / 180);
       const stress = Math.pow(clamp(windKts, 0, 90) / 34, 2) * clamp(sailSet, 0, 1) * upwind;
       let broke: { mast: MastKey; cause: string } | null = null;

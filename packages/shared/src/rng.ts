@@ -3,22 +3,22 @@
 // Jede Zufallsentscheidung der Simulation laeuft ueber einen injizierten
 // Generator, nie ueber Math.random(). Das kauft zwei Dinge:
 //
-//   1. Wiederholbare Tests: gleicher Seed + gleiche Eingaben -> gleiches
-//      Gefecht, headless und ohne Browser.
-//   2. Wiederholbare Salven (Phase 3C): der Server schickt Seed und Zeitpunkt,
+//   1. howderholbare Tests: gleicher sead + gleiche inputn -> gleiches
+//      battle, headless und without Browser.
+//   2. howderholbare salvon (Phase 3C): der Server schickt sead und timepunkt,
 //      jeder Client rechnet dieselbe Flugbahn nach.
 //
-// Was es NICHT kauft: Einigkeit zwischen Client und Server ueber Schadens-
-// wuerfe. Im serverautoritativen Entwurf laeuft die Schadenslogik gar nicht
+// Was es NICHT kauft: Einigkeit zwischen Client und Server ueber damages-
+// wuerfe. Im serverautoritativen Entwurf laeuft die damageslogik gar nicht
 // auf dem Client, und die Reihenfolge, in der der Server seinen Generator
-// verbraucht, haengt ohnehin an der Ankunftsreihenfolge der Eingaben.
+// verbraucht, haengt withouthin an der Ankunftsreihenfolge der inputn.
 
-/** Liefert eine Gleichverteilung in [0, 1). */
+/** Liefert eine right awayverteilung in [0, 1). */
 export type Rng = () => number;
 
 /**
- * mulberry32 - klein, schnell, ausreichend gut verteilt fuer Spiellogik.
- * Stammt aus terrain.js und ist dort seit jeher der Weltgenerator.
+ * mulberry32 - small, schnell, ausreichend gut verteilt fuer gamelogik.
+ * Stammt aus terrain.js und ist dort seit jeher der worldgenerator.
  */
 export function makeRng(seed: number): Rng {
    let a = (seed >>> 0) || 1;
@@ -31,9 +31,9 @@ export function makeRng(seed: number): Rng {
 }
 
 /**
- * Abgeleiteter Generator: aus einem Seed und einem Namen wird ein eigener
- * Strom. So verbraucht das Schadensmodell nicht die Zahlen, auf die der
- * Weltgenerator wartet.
+ * Abgeleiteter Generator: aus einem sead und einem Namen wird ein eigener
+ * Strom. So verbraucht das damagesmodell nicht die Zahlen, auf die der
+ * worldgenerator wartet.
  */
 export function deriveRng(seed: number, label: string): Rng {
    let h = seed >>> 0;
@@ -56,6 +56,6 @@ export function gauss(rng: Rng): number {
  * Notnagel fuer Aufrufer, die (noch) keinen Generator durchreichen. Wird in
  * reinen Modulen absichtlich nur als Vorgabewert benutzt, damit ein vergessener
  * Parameter den Einzelspieler nicht bricht - in Tests und auf dem Server wird
- * immer ein echter Seed uebergeben.
+ * immer ein echter sead uebergeben.
  */
 export const systemRng: Rng = Math.random;

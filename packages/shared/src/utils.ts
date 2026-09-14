@@ -1,18 +1,18 @@
-// utils.ts - mathematische und allgemeine Hilfsfunktionen
-// Winkelkonvention: 0° = Norden (+Z), 90° = Osten (+X), wie in der See.
-// "Richtung" = Kursrichtung (wohin der Begriff zeigt), in Grad, nach 0..360 normalisiert.
+// utils.ts - mathematical and general helper functions
+// Angle convention: 0° = north (+Z), 90° = east (+X), as at sea.
+// "Direction" = course direction (where the heading points), in degrees, normalized to 0..360.
 
 export const DEG = Math.PI / 180;
 export const RAD = 180 / Math.PI;
 
-// Knoten -> m/s und umgekehrt
+// Knots -> m/s and back
 export const KNOT_TO_MS = 0.514444;
 export const MS_TO_KNOT = 1 / KNOT_TO_MS;
 
-/** Tabelle aus [Grad, Wert]-Paaren, aufsteigend sortiert. */
+/** Table of [degrees, value] pairs, sorted ascending. */
 export type Table = ReadonlyArray<readonly [number, number]>;
 
-/** Vektor in der XZ-Ebene: +z = Norden, +x = Osten. */
+/** Vector in the XZ plane: +z = north, +x = east. */
 export interface Vec2 {
    x: number;
    z: number;
@@ -27,41 +27,41 @@ export const smoothstep = (edge0: number, edge1: number, x: number): number => {
    return t * t * (3 - 2 * t);
 };
 
-// Winkel in [0, 360)
+// Angle in [0, 360)
 export function normDeg(a: number): number {
    let r = a % 360;
    if (r < 0) r += 360;
    return r;
 }
 
-// Differenz des kürzesten Weges zwischen zwei Kursen in [-180, 180]
+// Shortest-path difference between two courses in [-180, 180]
 export function diffDeg(a: number, b: number): number {
    let d = normDeg(b - a);
    if (d > 180) d -= 360;
    return d;
 }
 
-// Kleinfeld-Abstand zweier Kurse in [0,180]
+// Absolute angular distance between two courses in [0,180]
 export function absDiffDeg(a: number, b: number): number {
    return Math.abs(diffDeg(a, b));
 }
 
-// Einheitliche Richtung "Kurs" (0=N,+z; 90=E,+x) als Vektor in der XZ-Ebene
+// Unified direction "course" (0=N,+z; 90=E,+x) as a vector in the XZ plane
 export function dirVec(deg: number): Vec2 {
    const r = deg * DEG;
    return { x: Math.sin(r), z: Math.cos(r) };
 }
 
-// Winkel zwischen zwei Kursen in [0,180]
+// Angle between two courses in [0,180]
 export function angleBetweenDeg(a: number, b: number): number {
    return absDiffDeg(a, b);
 }
 
-// Interpolation über tabellierte Werte (t in Grad 0..360, tab als [deg,val] paare,
-// sortiert, deckend 0..360 oder per Wrap).
+// Interpolation over tabulated values (t in degrees 0..360, tab as [deg,val] pairs,
+// sorted, covering 0..360 or by wrap).
 export function interpTable(t: number, tab: Table): number {
    let t0 = t;
-   // Wrap auf [0, highest]
+   // Wrap to [0, highest]
    const lo = tab[0][0];
    const hi = tab[tab.length - 1][0];
    if (t0 < lo) t0 += 360;
@@ -77,23 +77,23 @@ export function interpTable(t: number, tab: Table): number {
    return tab[tab.length - 1][1];
 }
 
-// 1D-Interpolateur-Fabrik (für Polar-Kurven). Akzeptiert tabellierte Paare.
+// 1D interpolator factory (for polar curves). Accepts tabulated pairs.
 export function makeTableInterpolator(tab: Table): (t: number) => number {
    return (t: number) => interpTable(t, tab);
 }
 
 // ---------------------------------------------------------------------------
-// dt-invariante Glaettung
+// dt-invariant smoothing
 //
-// `lerp(a, b, k)` mit festem k ist von der Aufrufrate abhaengig: derselbe
-// Vorgang laeuft bei 60 fps doppelt so schnell wie bei 30 fps. Fuer Client-
-// Prediction muss jede Glaettung allein von dt abhaengen, nie von der Zahl der
-// Aufrufe. `approach` naehert sich exponentiell mit einer Zeitkonstante:
+// `lerp(a, b, k)` with fixed k depends on call rate: the same
+// process runs twice as fast at 60 fps as at 30 fps. For client
+// prediction every smoothing must depend only on dt, never on the number
+// of calls. `approach` converges exponentially with a time constant:
 //
-//     x(t) = ziel + (x0 - ziel) * exp(-t / tau)
+//     x(t) = target + (x0 - target) * exp(-t / tau)
 //
-// Bei festem dt ist das exakt reproduzierbar - und zwar auch dann, wenn Client
-// und Server unterschiedlich oft rendern.
+// With fixed dt this is exactly reproducible — even when client
+// and server render at different rates.
 // ---------------------------------------------------------------------------
 export function approach(current: number, target: number, dt: number, tau: number): number {
    if (!(tau > 0)) return target;
@@ -102,9 +102,9 @@ export function approach(current: number, target: number, dt: number, tau: numbe
 }
 
 /**
- * Halbwertszeit-Schreibweise derselben Glaettung: nach `halfLife` Sekunden ist
- * die Haelfte des Abstands zum Ziel abgebaut. Liest sich beim Einstellen
- * leichter als eine Zeitkonstante.
+ * Half-life notation for the same smoothing: after `halfLife` seconds,
+ * half the distance to the target is closed. Reads easier when tuning
+ * than a time constant.
  */
 export function approachHalfLife(
    current: number,

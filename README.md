@@ -1,37 +1,36 @@
-# ⛵ Segel-Simulator 3D — Webbasiert
+# ⛵ Sailing Simulator 3D — Web-based
 
-Ein spielbarer **3D-Segel-Simulator** im Browser, gebaut mit **Vite + Three.js**.
-Reine 3D-Optik (Wasser-Shader, Wellen, Himmel, Sonne, Wolken, Schiff mit Masten & Segeln)
-und **semi-realistische Segelphysik**: scheinbarer Wind, Segelkurse (TWA/Point-of-Sail),
-Polar-Kurve, VMG, Gier (Heel), Kenter, Backen (Luffing) — plus **drei Spielmodi**.
+A playable **3D sailing simulator** in the browser, built with **Vite + Three.js**.
+Pure 3D visuals (water shader, waves, sky, sun, clouds, ship with masts & sails)
+and **semi-realistic sailing physics**: apparent wind, points of sail (TWA),
+polar curve, VMG, heel, capsize, luffing — plus **three game modes**.
 
-Gesegelt wird wahlweise eine moderne Yacht oder einer von **drei Rahseglern der
-Royal Navy** aus der Hornblower-Ära — bis hinauf zum 74-Kanonen-Linienschiff,
-inklusive **Breitseiten**. Im Modus **Gefecht** steht ein französischer Gegner
-in Luv, und die Schiffe gehen dabei kaputt: Masten fallen über Bord und
-schleppen als Wrack längsseit, Lecks unter Wasser lassen sich nur begrenzt
-lenzen, und Holzsplitter, Rundhölzer und Segelfetzen treiben als richtige
-Starrkörper davon.
+You can sail either a modern yacht or one of **three square-rigged Royal Navy
+vessels** from the Hornblower era — up to a 74-gun ship of the line,
+including **broadsides**. In **Battle** mode a French opponent is to windward,
+and ships take real damage: masts fall overboard and trail alongside as wreck,
+leaks below the waterline can only be pumped out so fast, and splinters,
+spars and sail scraps drift away as proper rigid bodies.
 
-> „3D Optik" im Sinne von 3D-Grafik: echte 3D-Szene mit WebGL, kein Karten-Top-Down.
+> "3D visuals" means 3D graphics: a real 3D scene with WebGL, not a top-down map view.
 
 ---
 
-## Schnellstart
+## Quick Start
 
 ```bash
 npm run dev
 ```
 
-Danach im Browser öffnen: **http://localhost:5173/**
+Then open in the browser: **http://localhost:5173/**
 
 ```bash
-npm run build     # Produktions-Build → packages/client/dist
-npm run preview   # Build testen → http://localhost:4173/
-npm run typecheck # TypeScript in shared/ und server/ prüfen
+npm run build     # Production build → packages/client/dist
+npm run preview   # Test the build → http://localhost:4173/
+npm run typecheck # Check TypeScript in shared/ and server/
 npm run server    # game server (Colyseus) on ws://0.0.0.0:2567 — PORT/HOST override
 npm run server:headless  # run a simulation without browser or socket, print timings
-npm test          # alle Testebenen
+npm test          # all test levels
 ```
 
 ### Multiplayer
@@ -60,353 +59,349 @@ has not seen yet - the two agree to the centimetre unless something the
 server alone knows (a collision, the ground) intervened, and then the
 picture eases onto the corrected place instead of jumping.
 
-> **Wichtig:** Befehle immer **ohne** angehängten Kommentar ausführen.
-> In zsh ist `#` interaktiv standardmäßig *kein* Kommentar — `npm run dev  # → ...`
-> übergibt `#`, `→`, `http://...` als Argumente an vite und der Start bricht mit
-> `Unused args` ab.
+> **Important:** Always run commands **without** appended comments.
+> In zsh, `#` is not a comment interactively by default — `npm run dev  # → ...`
+> passes `#`, `→`, `http://...` as arguments to vite and the start aborts with
+> `Unused args`.
 
-> Die Abhängigkeiten `three` + `vite` befinden sich bereits in `node_modules/`.
-> Falls `npm install` über den globalen npm-Cache klagt (EPERM), den Cache lokal
-> umleiten: `npm install --cache "$(pwd)/.npmcache" three vite`.
+> The dependencies `three` + `vite` are already in `node_modules/`.
+> If `npm install` complains about the global npm cache (EPERM), redirect the
+> cache locally: `npm install --cache "$(pwd)/.npmcache" three vite`.
 
 ---
 
-## Steuerungen
+## Controls
 
-| Taste | Aktion |
+| Key | Action |
 |-------|--------|
-| **A / D** oder **← / →** | Ruder — Backbord / Steuerbord (Kurs ändern) |
-| **W / S** | Yacht: Segel trimmen · Rahsegler: Segel **setzen / reffen** |
-| **Q / E / F** | Breitseite **Backbord** / **Steuerbord** / **beide** |
-| **Z** | Ladung wechseln: Vollkugel · Kettenkugel · Kartätsche |
-| **X** | Wrack kappen (gefallenen Mast loswerden) |
-| **V** | Schiff wechseln (ohne Umweg übers Menü) |
-| **Mausrad / Ziehen** | Zoom / Ansicht — aus der Nähe sieht man die Besatzung arbeiten |
-| **C** oder **1–4** | Kamera: **1** Verfolger · **2** Cockpit · **3** Draufsicht · **4** Orbit |
-| **M / Esc** | Menü / Pause |
-| **R** | Kurs (Regatta) / Übung (Training) zurücksetzen |
-| **G** | Wind-Gusts & Veer an/aus |
-| **H** | HUD ein/aus |
+| **A / D** or **← / →** | Rudder — Port / Starboard (change course) |
+| **W / S** | Yacht: trim sails · Square-rigger: **set / reef** sails |
+| **Q / E / F** | Broadside **Port** / **Starboard** / **Both** |
+| **Z** | Switch ammunition: Solid shot · Chain shot · Grape |
+| **X** | Cut away wreck (release a fallen mast) |
+| **V** | Switch ship (without going through the menu) |
+| **Mouse wheel / drag** | Zoom / view — up close you can see the crew working |
+| **C** or **1–4** | Camera: **1** Chase · **2** Cockpit · **3** Top-down · **4** Orbit |
+| **M / Esc** | Menu / Pause |
+| **R** | Reset course (Regatta) / exercise (Training) |
+| **G** | Wind gusts & veer on/off |
+| **H** | HUD on/off |
 | **P** | Rendering style: aquatint / plain (see below) |
-| **Leertaste** | Boot nach Kenter aufrichten |
-| **Mausrad** | Zoom · **Maus ziehen** | Ansicht drehen |
+| **Space** | Right the boat after a capsize |
+| **Mouse wheel** | Zoom · **Mouse drag** | Rotate view |
 
-> **Grundregel:** Du steuerst den **Kurs** (den Ruder). Daraus ergibt sich der
-> **Segelkurs TWA** zum Wind und damit die Geschwindigkeit — das klassische
-> „point-and-go" der Segelphysik.
-
----
-
-## Die drei Spielmodi
-
-1. **Freeride** — Frei auf offener See segeln, Wind erleben, Manöver üben.
-2. **Regatta** — Ein **Windward-Leeward-Kurs** (Startlinie → Windward-Wendeboje
-   → Leeward-Wendeboje → Ziellinie). Runden-Zeitnahme + Bestzeit, Fortschritt,
-   Distanz & Kompass-Rgk zur nächsten Boje.
-3. **Training** — Reihenfolge von **Übungen** (Krausen halten, Upwind-VMG,
-   Wenden/Halse, Raumschot, Gieren, Kenter vermeiden, Boje erreichen)
-   mit Fortschrittsleiste.
+> **Basic rule:** You steer the **course** (the rudder). From that follows the
+> **point of sail (TWA)** relative to the wind and thus the speed — the classic
+> "point-and-go" of sailing physics.
 
 ---
 
-## Die Parteien
+## The Three Game Modes
 
-Zuerst wird die **Flagge** gewählt, dann das Schiff. Die Partei bestimmt, welche
-Schiffe zur Verfügung stehen, wie sie aussehen, wie gut die Bedienungen sind —
-und wer einem gegenübersteht.
+1. **Freeride** — Sail freely on the open sea, experience the wind, practise manoeuvres.
+2. **Regatta** — A **windward-leeward course** (start line → windward mark →
+   leeward mark → finish line). Lap timing + best time, progress,
+   distance & compass bearing to the next mark.
+3. **Training** — A sequence of **exercises** (holding close-hauled, upwind VMG,
+   tacking/jibing, broad reach, heeling, avoiding capsize, reaching a mark)
+   with a progress bar.
 
-| Partei | Schiffe | Eigenart |
+---
+
+## The Factions
+
+First the **flag** is chosen, then the ship. The faction determines which
+ships are available, what they look like, how well the crews are trained —
+and who stands against you.
+
+| Faction | Ships | Character |
 |--------|---------|----------|
-| **Royal Navy** | Hotspur · Lydia · Sutherland | Beste Geschützausbildung der Welt. Schießt in den **Rumpf** und nimmt den Gegner. |
-| **Marine Impériale** | Hirondelle · Amélie · Vengeur | Größer und schneller gebaut. Schießt in die **Takelage**, um sich abzusetzen. |
-| **Armada Española** | Descubierta · El Gamo · San Juan Nepomuceno | Spanten wie Kathedralenpfeiler — steckt am meisten weg, feuert am langsamsten. |
-| **Piraten** | Seeteufel · Rache · Schwarze Krone | Alles erbeutet: dünnhäutig, schnell, riesige Enterbesatzung, miserable Kanoniere. **Streichen nie die Flagge.** |
+| **Royal Navy** | Hotspur · Lydia · Sutherland | Best gunnery training in the world. Shoots the **hull** and takes the enemy. |
+| **Marine Impériale** | Hirondelle · Amélie · Vengeur | Built larger and faster. Shoots the **rigging** to break away. |
+| **Armada Española** | Descubierta · El Gamo · San Juan Nepomuceno | Ribs like cathedral pillars — takes the most punishment, fires the slowest. |
+| **Pirates** | Seeteufel · Rache · Schwarze Krone | Everything taken: thin-skinned, fast, huge boarding crew, miserable gunners. **Never strike the flag.** |
 
-Jede Partei stellt ein Schiff in drei Größenklassen: Korvette/Sloop, Fregatte,
-Linienschiff. Die Gefechtslagen sind über diese Klassen definiert, nicht über
-feste Schiffe — deshalb funktioniert jede Lage mit jeder Paarung. Wer als
-Spanier ins Einzelgefecht geht, bekommt einen gleich großen Briten vor den Bug.
+Each faction provides a ship in three size classes: corvette/sloop, frigate,
+ship of the line. The battle scenarios are defined over these classes, not
+fixed ships — so any scenario works with any pairing. A Spaniard entering a
+duel gets a British ship of the same class to deal with.
 
-Die Yacht *Nordwind* steht in jeder Partei als Übungsboot zur Verfügung.
+The yacht *Nordwind* is available in every faction as a training boat.
 
-Jede Partei führt ihre eigene Flagge (White Ensign, Tricolore, die spanische
-Rot-Gelb-Rot, den Totenkopf) und ihren eigenen Anstrich — das Nelson-Schachbrett
-in Ocker, den französischen roten Strake, spanisches Dunkelrot mit Gelb, und bei
-den Piraten verwittertes Schwarz mit dem Rest dessen, was der Vorbesitzer
-aufgemalt hatte. Im Pulverdampf erkennt man Freund und Feind daran auf einen Blick.
+Each faction flies its own flag (White Ensign, Tricolore, Spanish red-yellow-red,
+the Jolly Roger) and wears its own paint — Nelson's chequer in ochre, the French
+red strake, Spanish dark red with yellow, and for the pirates weathered black
+with whatever the previous owner had painted on top. In the gun smoke you can
+tell friend from foe at a glance.
 
 ---
 
-## Die Schiffe
+## The Ships
 
-Im Startmenü (und im Spiel mit **V**, innerhalb der eigenen Partei) wird das
-Schiff gewählt. Jedes hat eine
-eigene Polarkurve, No-Go-Zone, Drehrate, Trägheit und Krängungsneigung — die
-Unterschiede sind spürbar, nicht kosmetisch.
+The ship is chosen in the start menu (and in-game with **V**, within your own
+faction). Each has its own polar curve, no-go zone, turn rate, inertia and
+heeling tendency — the differences are felt, not cosmetic.
 
-Beispiel Royal Navy (die anderen Parteien entsprechend):
+Example Royal Navy (the other factions accordingly):
 
-| Schiff | Rate | LüA | Am Wind | Breitseite | Charakter |
+| Ship | Rate | LOA | Close-hauled | Broadside | Character |
 |--------|------|-----|---------|-----------|-----------|
-| **Nordwind** | Bermuda-Sloop | 11 m | 32° | — | Leicht, kreuzt hoch, dreht auf dem Teller |
-| **HMS Hotspur** | 20-Kanonen-Sloop-of-War | 28 m | 62° | 90 lb | Kleinster Rahsegler, flink und dünnhäutig |
-| **HMS Lydia** | 36-Kanonen-Fregatte | 43 m | 65° | 234 lb | Der klassische Hornblower |
-| **HMS Sutherland** | 74-Kanonen-Zweidecker | 52 m | 68° | 700 lb | Träge wie eine Kirche, zwei Decks Eisen |
+| **Nordwind** | Bermuda sloop | 11 m | 32° | — | Light, points high, turns on a dime |
+| **HMS Hotspur** | 20-gun sloop-of-war | 28 m | 62° | 90 lb | Smallest square-rigger, nimble and thin-skinned |
+| **HMS Lydia** | 36-gun frigate | 43 m | 65° | 234 lb | The classic Hornblower |
+| **HMS Sutherland** | 74-gun two-decker | 52 m | 68° | 700 lb | Sluggish as a church, two decks of iron |
 
-### Warum sich ein Rahsegler anders anfühlt
+### Why a square-rigger feels different
 
-- **Er kommt nicht hoch an den Wind.** Bei etwa **sechs Strich** (62–68° je nach
-  Schiff) ist Schluss; darunter liegen die Segel back und die Fahrt läuft aus.
-  Das ist keine Willkür, sondern folgt direkt aus dem Brassen (siehe unten).
-- **Sein schnellster Kurs liegt achterlicher.** Während die Yacht am Beam (~105°)
-  am besten läuft, ist es bei den Rahseglern die **Backstagsbrise** bei ~140°.
-- **Masse bedeutet Trägheit.** Die Fregatte braucht gut zwei Minuten bis zur
-  vollen Fahrt, das Linienschiff noch länger. Anluven, Abfallen und Wenden
-  dauern — man muss vorausdenken. Beim Durchgehen durch den Wind behält das
-  Schiff „Fahrt im Schiff", sonst käme es nie herum.
-- **Er kentert praktisch nicht.** Breiter Rumpf, viel Ballast: selbst bei 34 kn
-  bleibt die Fregatte steif. Dafür macht sie deutlich mehr Leeweg.
-- **W / S setzt und refft die Segel.** Weniger Tuch heißt weniger Fahrt, aber
-  auch weniger Krängung — im Sturm die richtige Antwort.
+- **It doesn't point high.** At about **six points** (62–68° depending on the
+  ship) that's it; any closer and the sails luff and the way runs off.
+  This isn't arbitrary — it follows directly from bracing the yards (see below).
+- **Its fastest course is further downwind.** While the yacht is fastest on a
+  beam (~105°), for square-riggers it's a **broad reach** at ~140°.
+- **Mass means inertia.** The frigate takes over two minutes to reach full
+  speed, the ship of the line even longer. Luffing up, bearing away and tacking
+  take time — you have to think ahead. When going through the wind the ship
+  retains "way on" — otherwise she would never come about.
+- **It practically doesn't capsize.** Broad hull, lots of ballast: even at 34 kn
+  the frigate stays stiff. But she makes considerably more leeway.
+- **W / S sets and reefs the sails.** Less canvas means less speed, but also
+  less heeling — the right answer in a storm.
 
-### Brassen (warum die Rahen so stehen, wie sie stehen)
+### Bracing the yards (why the yards sit the way they do)
 
-Die Rahen drehen sich mit dem scheinbaren Wind nach der Regel
+The yards rotate with the apparent wind by the rule
 
 ```
-Rahwinkel = 90° − |AwA| / 2,   begrenzt auf 45°
+yard angle = 90° − |AwA| / 2,   clamped to 45°
 ```
 
-Vor dem Wind (AwA 180°) stehen die Rahen **quer**, am Beam (90°) sind sie mit
-45° **am Anschlag** — schärfer ließ die Takelage sich nicht brassen. Genau
-dieser Anschlag ist der physikalische Grund für die große No-Go-Zone: unter
-etwa 65° AwA kann das Segel nicht mehr angestellt werden und fällt back.
-Die luvseitige Rahnock geht dabei nach achtern, das Tuch wölbt sich nach Lee.
+Before the wind (AwA 180°) the yards stand **square**, on a beam (90°) they are
+at 45° **hard against the stop** — the rigging would brace no sharper. Exactly
+this stop is the physical reason for the large no-go zone: below about 65° AwA
+the sail can no longer be trimmed and falls aback. The weather yardarm goes aft,
+the canvas bellies to leeward.
 
-### Die Geschütze
+### The Guns
 
-**Q** feuert die Backbord-, **E** die Steuerbord-, **F** beide Breitseiten.
+**Q** fires the port, **E** the starboard, **F** both broadsides.
 
-- Die Bedienungen lösen **versetzt** aus — der Donner rollt vom Bug nach achtern.
-- Jedes Rohr erzeugt Mündungsfeuer, eine Pulverwolke und eine Kugel, die
-  ballistisch fällt und eine **Einschlagfontäne** setzt.
-- Der Rauch **treibt mit dem Wind ab**: zu Lee steht man schnell im eigenen Qualm.
-- Der Rückstoß gibt einen kurzen **Krängungsstoß** zur Gegenseite, die Rohre
-  fahren zurück und werden wieder ausgerannt.
-- **Nachladen** dauert 60 s (Sloop, Fregatte) bis 75 s (Linienschiff), je Seite getrennt; französische Bedienungen brauchen 80 bis 100 s.
-  Der Balken im HUD zeigt den Fortschritt.
+- The crews fire **in sequence** — the thunder rolls from bow to stern.
+- Each barrel produces muzzle flash, a powder cloud and a ball that
+  falls ballistically and kicks up an **impact splash**.
+- The smoke **drifts downwind**: to leeward you quickly stand in your own fog.
+- The recoil gives a brief **heeling kick** to the opposite side, the guns
+  run back and are run out again.
+- **Reloading** takes 60 s (sloop, frigate) to 75 s (ship of the line), per side
+  separately; French crews need 80 to 100 s.
+  The bar in the HUD shows the progress.
 
 ---
 
-## Gefecht und Schäden
+## Battle and Damage
 
-Im Modus **Gefecht** wählt man zusätzlich die Lage: Einzelgefecht, Übermacht
-(zwei Gegner) oder gegen ein Linienschiff. Der Gegner ist KI-geführt und kann
-nur, was der Spieler auch kann — er segelt nicht gegen den Wind und läuft nicht
-schneller als seine Polarkurve.
+In **Battle** mode you additionally choose the scenario: single duel,
+outnumbered (two opponents) or against a ship of the line. The opponent is
+AI-controlled and can only do what the player can — it doesn't sail into the
+wind and doesn't run faster than its polar curve.
 
-### Munition (Taste **Z**)
+### Ammunition (key **Z**)
 
-| Ladung | Wirkung | Reichweite |
+| Load | Effect | Range |
 |--------|---------|-----------|
-| **Vollkugel** | Durchschlägt die Bordwand, schlägt Rohre aus, reißt Lecks | voll (~550 m) |
-| **Kettenkugel** | Mäht Takelage und Segel nieder, lässt den Rumpf heil | kurz (~300 m) |
-| **Kartätsche** | Schwarm kleiner Kugeln, fegt das Deck und die Bedienungen | sehr kurz (~150 m) |
+| **Solid shot** | Pierces the hull, dismounts guns, opens leaks | full (~550 m) |
+| **Chain shot** | Mows through rigging and sails, leaves the hull intact | short (~300 m) |
+| **Grape** | Swarm of small balls, sweeps the deck and the crews | very short (~150 m) |
 
-Die Royal Navy schoss auf den **Rumpf** (Gegner niederkämpfen), die französische
-Marine bevorzugt in die **Takelage** (manövrierunfähig machen und entkommen).
-Beide Doktrinen stecken in der KI und führen zu spürbar verschiedenen Gefechten.
+The Royal Navy shot at the **hull** (beat the enemy down), the French Navy
+preferred the **rigging** (disable and escape). Both doctrines are in the AI
+and produce noticeably different battles.
 
-### Warum auf Distanz kaum etwas trifft
+### Why almost nothing hits at range
 
-Die Rohre werden auf eine **geschätzte** Entfernung gerichtet, und der
-Schätzfehler wächst mit der Distanz. Dazu kommt die Rollbewegung im Moment des
-Abfeuerns — ein Grad Rollen ist auf 400 m schon ein Schiff daneben. Darum wurde
-„auf der Rolle" geschossen, und darum sehen die Trefferquoten so aus:
+The guns are aimed at an **estimated** range, and the estimation error grows
+with distance. Add the roll at the moment of firing — one degree of roll at
+400 m is a ship's width off. That's why gunners fired "on the roll", and that's
+why the hit rates look like this:
 
-| Entfernung | Vollkugel | Kettenkugel | Kartätsche |
+| Range | Solid shot | Chain shot | Grape |
 |-----------:|----------:|------------:|-----------:|
 | 50 m | ~100 % | ~100 % | ~95 % |
 | 200 m | ~66 % | ~99 % | ~85 % |
 | 300 m | ~36 % | ~98 % | ~20 % |
 | 600 m | ~11 % | — | — |
 
-### Was kaputtgehen kann
+### What can break
 
-- **Rumpf** — sechs Abschnitte (Bug/Mitte/Achterschiff × Backbord/Steuerbord).
-  Ein Schiff ist erledigt, wenn *eine* Seite aufgerissen ist. Die Bordwandstärke
-  skaliert mit der Größe: was eine Sloop durchschlägt, prallt am Zweidecker ab.
-  Im HUD zeigt ein **Rumpfplan** jeden Abschnitt einzeln — ein Mittelwert über
-  den ganzen Rumpf verschweigt genau das, worauf es ankommt: *wo* sie getroffen
-  ist. Eine zerschossene Breitseite ist etwas anderes als gleichmäßiger
-  Verschleiß. Die drei Masten und das Ruder sitzen als eigene Marken im selben
-  Plan, mit Zustand in Prozent.
-- **Lecks unter Wasser** — die Pumpen halten wenige in Schach, viele nicht.
-  Wasser im Schiff kostet Fahrt, legt sie auf die Seite und versenkt sie am Ende.
-- **Masten** — **kippen** über Bord: der gebrochene Mast bleibt am Mastfuß im
-  stehenden Gut hängen, dreht sich um seine Spur über die Bordwand, schlägt ins
-  Wasser und legt sich dort flach. Danach hängt er als **12-Tonnen-Wrack
-  längsseit**: das Schiff wird langsam und zieht ständig zur Wrackseite, bis
-  **X** die Wanten kappt.
-- **Besatzung** — Verluste an den Geschützen, in der Takelage und an den Pumpen
-  (siehe oben). Sie ist die vierte Baugruppe neben Rumpf, Rigg und Ruder.
-  Nicht nur Beschuss kostet Leute: ein **über Bord gehender Mast** nimmt die
-  Toppsgasten in seinen Wanten mit, und herabstürzendes Rundholz fegt das Deck.
-  Ein Zusammenstoß und eine Grundberührung ebenso. Dazu kommt der **Schock** —
-  nach einem solchen Ereignis bricht die Moral ein und erholt sich erst langsam.
-- **Segel** — reißen erst und fliegen dann weg. Mit sinkendem Tuchzustand
-  **platzen einzelne Bahnen auf**: es entstehen echte Löcher im Tuch, die
-  Ränder sacken aus und schlagen. Ist genug weg, fliegt das Segel **aus den
-  Lieken** und treibt in mehreren flatternden Bahnen nach Lee davon. Die oberen
-  Segel gehen zuerst — dort steht der meiste Wind und dorthin geht die
-  Kettenkugel; die Untersegel halten am längsten.
-- **Ruder** — Treffer achtern kosten die Kurskontrolle.
-- **Batterie** — ausgeschlagene Rohre verkleinern die eigene Breitseite sichtbar
-  (sie verschwinden aus den Stückpforten).
-- **Brand** — greift um sich, frisst Tuch und Tauwerk; im Extremfall fliegt sie
-  in die Luft.
-- **Flagge streichen** — ein geschlagener Gegner kämpft nicht bis zum Untergang.
+- **Hull** — six sections (bow/midship/quarter × port/starboard).
+  A ship is done when *one* side is torn open. Hull planking thickness scales
+  with size: what punches through a sloop bounces off a two-decker.
+  The HUD shows a **hull plan** with each section individually — an average over
+  the whole hull hides exactly what matters: *where* she was hit. A shot-up
+  broadside is different from even wear. The three masts and the rudder sit as
+  separate markers in the same plan, with condition in percent.
+- **Leaks below the waterline** — the pumps hold off a few, not many.
+  Water in the ship costs speed, lays her on her side and sinks her in the end.
+- **Masts** — **topple** overboard: the broken mast stays caught at its foot in
+  the standing rigging, pivots on its track over the gunwale, hits the water
+  and lies flat. Then it hangs as a **12-ton wreck alongside**: the ship becomes
+  slow and constantly pulls toward the wreck side, until **X** cuts the shrouds.
+- **Crew** — Losses at the guns, in the rigging and at the pumps
+  (see above). It is the fourth assembly group alongside hull, rig and rudder.
+  Not only gunfire costs men: a **mast going overboard** takes the topmen in its
+  shrouds with it, and falling spars sweep the deck.
+  A collision and a grounding too. Add the **shock** — after such an event morale
+  collapses and recovers only slowly.
+- **Sails** — first tear, then fly away. As the canvas condition drops,
+  **individual panels burst open**: real holes appear in the sailcloth, the
+  edges sag and flap. When enough is gone, the sail **blows out of the bolt ropes**
+  and drifts downwind in several flapping panels. The upper sails go first —
+  that's where the most wind is and where the chain shot goes; the lower sails
+  hold the longest.
+- **Rudder** — hits astern cost course control.
+- **Battery** — dismounted guns visibly shrink your own broadside
+  (they disappear from the gun ports).
+- **Fire** — spreads, eats canvas and cordage; in the extreme case she
+  blows up.
+- **Striking the flag** — a beaten opponent doesn't fight to the sinking.
 
-### Nicht nur Kugeln: Kräfte
+### Not just balls: forces
 
-- **Zu viel Tuch im Sturm.** Der Staudruck geht mit dem Quadrat der
-  Windgeschwindigkeit. Volles Zeug hält bis etwa 30 kn; bei 34 kn gehen die
-  Stengen nach ein paar Minuten über Bord, bei 42 kn in Sekunden. Gerefft hält
-  sie es aus — genau dafür gibt es **W / S**.
-- **Zusammenstöße.** Rümpfe werden als Kette von drei Kreisen genähert. Beim
-  Stoß werden Impuls und Schaden aus Annäherungsgeschwindigkeit und Verdrängung
-  berechnet; bei langsamer Berührung verhaken sich die Schiffe im Tauwerk.
-- **Grundberührung.** Der Meeresgrund ist eine analytische Funktion — dieselbe,
-  aus der das sichtbare Gelände gebaut wird. Man kann also nie auf etwas
-  auflaufen, das man nicht sieht. Die Brandung über den Riffen ist die Warnung.
+- **Too much canvas in a storm.** Stagnation pressure goes with the square of
+  wind speed. Full sail holds to about 30 kn; at 34 kn the topmasts go overboard
+  after a few minutes, at 42 kn in seconds. Reefed, they hold — that's what
+  **W / S** is for.
+- **Collisions.** Hulls are approximated as a chain of three circles. On impact,
+  momentum and damage are calculated from approach velocity and displacement;
+  at slow contact the ships foul in the rigging.
+- **Grounding.** The seabed is an analytical function — the same one the visible
+  terrain is built from. So you can never run aground on something you can't see.
+  The surf over the reefs is the warning.
 
-### Die Wrackteile
+### The wreckage
 
-`debris.js` ist eine kleine eigene Starrkörper-Simulation (kein Physik-Framework):
+`debris.js` is a small dedicated rigid-body simulation (no physics framework):
 
-- **Schwerkraft** greift im Schwerpunkt an — erzeugt also kein Drehmoment.
-- **Auftrieb** nach Archimedes, aber **verteilt über Stützpunkte längs des
-  Körpers**. Genau daraus entsteht das Drehmoment: solange ein Mast senkrecht
-  steht, sitzt sein Auftriebsschwerpunkt unter dem Massenschwerpunkt — ein
-  labiles Gleichgewicht. Er kippt um, bis er flach im Wasser liegt, ganz von
-  selbst. Mit einem einzigen Auftriebspunkt bliebe jeder Mast senkrecht stehen
-  wie eine Spierentonne; das war der erste Anlauf und sah entsprechend falsch aus.
-- Eiche (720 kg/m³) treibt auf, Kiefer schwimmt gut, ein Kanonenrohr sinkt sofort.
-- **Quadratischer Wasserwiderstand** an jedem Stützpunkt einzeln — bremst
-  dadurch auch die Kippbewegung.
-- **Freie Rotation** mit Quaternion-Integration; in der Luft bleibt der Drehimpuls
-  praktisch erhalten.
-- **Trossenzwang** für gefallene Masten: greift am Mastfuß an, mit korrekter
-  effektiver Masse am Angriffspunkt, damit sich der Zwang nicht aufschaukelt.
+- **Gravity** acts at the centre of mass — so it produces no torque.
+- **Buoyancy** per Archimedes, but **distributed over support points along the
+  body**. That's where the torque comes from: as long as a mast stands upright,
+  its centre of buoyancy sits below its centre of mass — an unstable equilibrium.
+  It tips over until it lies flat in the water, all by itself. With a single
+  buoyancy point every mast would stand upright like a spar buoy; that was the
+  first approach and looked accordingly wrong.
+- Oak (720 kg/m³) floats, pine floats well, a gun barrel sinks immediately.
+- **Quadratic water drag** at each support point individually — which also damps
+  the rotational motion.
+- **Free rotation** with quaternion integration; in the air angular momentum is
+  practically conserved.
+- **Tether constraint** for fallen masts: acts at the mast foot, with correct
+  effective mass at the attachment point, so the constraint doesn't oscillate.
 
 ---
 
-## Seegang
+## Sea State
 
-Die See hängt am Wind, und zwar **quadratisch**. Nach Pierson-Moskowitz gilt
-für eine voll entwickelte See `Hs = 0.21 · U² / g` — doppelter Wind heißt also
-rund vierfache Wellenhöhe:
+The sea depends on the wind, **quadratically**. Per Pierson-Moskowitz for a
+fully developed sea `Hs = 0.21 · U² / g` — double the wind means roughly four
+times the wave height:
 
-| Wind | Signifikante Höhe | Seezustand |
+| Wind | Significant height | Sea state |
 |-----:|------------------:|------------|
-| 5 kn | 0,1 m | ruhig |
-| 12 kn | 0,8 m | schwach bewegt |
-| 20 kn | 2,3 m | leicht bewegt |
-| 30 kn | 5,1 m | grob |
-| 35 kn | 6,9 m | sehr grob |
+| 5 kn | 0.1 m | calm |
+| 12 kn | 0.8 m | slight |
+| 20 kn | 2.3 m | moderate |
+| 30 kn | 5.1 m | rough |
+| 35 kn | 6.9 m | very rough |
 
-Mit dem Wind wachsen auch die **Wellenlängen** — aber nur mit der Wurzel, nicht
-linear. Sonst wird die See zwar hoch, aber so flach geneigt, dass sie wie eine
-glatte Dünung wirkt. So bleibt sie steil: eine Sturmsee ist steil.
+As the wind grows, so do the **wavelengths** — but only with the square root,
+not linearly. Otherwise the sea gets high but so shallow-sloped that it looks
+like a gentle swell. This way it stays steep: a storm sea is steep.
 
-Woran man die Windstärke aber wirklich erkennt, sind die **Weißkappen**. Sie
-setzen bei Bft 4 ein und bedecken die See mit zunehmendem Wind — bei Bft 6 ist
-sie flächig weiß gesprenkelt, bei Bft 8 durchgehend. Ohne sie wirkt selbst eine
-3,5-m-See flach, weil dem Auge der Maßstab fehlt.
+What really tells you the wind strength, though, is the **whitecaps**. They
+set in at Beaufort 4 and cover the sea increasingly with rising wind — at
+Beaufort 6 it's speckled white across the surface, at Beaufort 8 continuously.
+Without them even a 3.5 m sea looks flat, because the eye lacks the scale.
 
-Zwei Details, die den Unterschied machen:
+Two details that make the difference:
 
-- **Die See folgt dem Wind nur träge.** Sie baut sich über etwa eine Minute auf
-  und läuft langsamer wieder ab. Sonst würde jede Bö die Wellen pulsieren lassen.
-- **Shader und Physik rechnen mit derselben Oberfläche.** Die Wellenlängen-
-  streckung läuft über eine aufsummierte Phasenzeit statt über die Uhrzeit,
-  sonst würde das ganze Wellenfeld springen, sobald sich der Wind ändert.
+- **The sea follows the wind only sluggishly.** It builds up over about a minute
+  and subsides more slowly. Otherwise every gust would pulse the waves.
+- **Shader and physics compute with the same surface.** The wavelength
+  stretching runs over an accumulated phase time rather than wall-clock time,
+  otherwise the whole wave field jumps the moment the wind changes.
 
 ---
 
-## Die Besatzung
+## The Crew
 
-Ein Schiff dieser Zeit ist nichts ohne seine Leute. Die Mannschaft ist deshalb
-kein Zahlenschmuck, sondern hängt an allen drei Systemen — Geschütze, Segel,
-Pumpen.
+A ship of this era is nothing without its people. The crew is therefore not
+a number decoration, but tied into all three systems — guns, sails, pumps.
 
-| Rolle | Anteil | Wofür sie gebraucht wird |
+| Role | Share | What they're needed for |
 |-------|-------:|--------------------------|
-| Offiziere & Rudergänger | 7 % | Ruderwirkung, Befehlskette, Moral |
-| Geschützbedienungen | 49 % | wie viele Rohre bedient werden und wie schnell |
-| Toppsgasten | 22 % | Segel setzen und reffen |
-| Seesoldaten | 11 % | Musketenfeuer, Enterabwehr |
-| Zimmerleute & Pumpen | 6 % | Lecks stopfen, Wasser lenzen |
-| Pulverjungen | 5 % | Nachschub an die Batterie |
+| Officers & helmsmen | 7 % | Rudder effect, chain of command, morale |
+| Gun crews | 49 % | how many guns are served and how fast |
+| Topmen | 22 % | setting and reefing sails |
+| Marines | 11 % | Musket fire, boarding defence |
+| Carpenters & pumps | 6 % | plugging leaks, pumping water |
+| Powder boys | 5 % | supply to the battery |
 
-**Verluste.** Der große Töter an Bord war nicht die Kugel selbst, sondern der
-Holzsplitterhagel, den sie aus der Bordwand riss — und auf kurze Distanz die
-Kartätsche. Wo ein Treffer einschlägt, entscheidet, wen es erwischt: Splitter
-an der Bordwand treffen die Geschützbedienungen, Kartätsche fegt das offene
-Deck, Kettenkugeln holen Toppsgasten aus der Takelage. Rund ein Drittel der
-Getroffenen fällt, der Rest geht verwundet nach unten und fällt trotzdem aus.
-Ein hart ausgefochtenes Fregattengefecht kostet so 5–20 % der Besatzung.
+**Losses.** The great killer aboard was not the ball itself, but the hail of
+splinters it tore from the hull — and at close range, grape. Where a hit
+strikes decides whom it gets: splinters at the hull hit the gun crews, grape
+sweeps the open deck, chain shot takes topmen from the rigging. About a third
+of those hit are killed, the rest go below wounded and still fall out.
+A hard-fought frigate action thus costs 5–20 % of the crew.
 
-**Folgen.** Fehlende Bedienungen heißt: weniger Rohre und langsameres Nachladen.
-Fehlende Toppsgasten heißt: träges Segelmanöver. Fehlende Zimmerleute heißt:
-die Pumpen kommen gegen das Wasser nicht mehr an. Und wenn Verluste und
-Führungsverlust zusammenkommen, bricht die **Moral** — ein ausgeblutetes Schiff
-streicht die Flagge, auch wenn der Rumpf noch steht.
+**Consequences.** Missing gun crews means: fewer guns and slower reloads.
+Missing topmen means: sluggish sail handling. Missing carpenters means: the
+pumps can't keep up with the water. And when losses and loss of leadership
+combine, **morale** breaks — a bled-out ship strikes its flag even if the hull
+still holds.
 
-**An Deck** stehen sie auch wirklich: `crewview.js` besetzt die Stationen mit
-Figuren — Bedienungen an jedem Rohr, die im Takt des Nachladens ausrennen und
-zurücktreten, Toppsgasten in den Wanten, wenn Segel bedient werden, ein
-Rudergänger am Rad, Zimmerleute an den Pumpen (die umso schneller arbeiten, je
-mehr Wasser im Schiff steht), Pulverjungen, die zwischen Luke und Batterie hin
-und her laufen. Wer gefallen ist, steht nicht mehr da. Die ganze Besatzung
-kostet zwei Zeichenaufrufe (zwei InstancedMeshes).
+**On deck** they actually stand there: `crewview.js` mans the stations with
+figures — gun crews at each gun, running out and pulling back in the reload
+rhythm, topmen in the shrouds when sails are being worked, a helmsman at the
+wheel, carpenters at the pumps (who work faster the more water is in the ship),
+powder boys running between hatch and battery. Who has fallen no longer stands
+there. The whole crew costs two draw calls (two InstancedMeshes).
 
 ---
 
-## Die Physik (semi-realistisch)
+## The Physics (semi-realistic)
 
-Im Kern (siehe `src/physics.js`, voll testbar unter `tests/`):
+At its core (see `src/physics.js`, fully testable under `tests/`):
 
-- **True Wind Angle (TWA)** aus Bootskurs und Windrichtung — mit Vorzeichen
-  (Port/Stbd-Tack). Kein direkter Wind (No-Go-Zone < 32° → **Backen/Luffing**).
-- **Scheinbarer Wind (AwA)** = Zusammensetzung von Echtem Wind und Bootsgeschwindigkeit
-  (Vektor-Addition).
-- **Polar-Kurve**: Boots-Speed als Funktion von TWA & Windstärke (Beaufort-skaliert).
-  Beam-Reach (~90°) ist der schnellste Windkurs; optimaler Upwind-VMG liegt bei ~45° TWA.
-- **VMG** (Velocity Made Good): Up- und Downwind-Fortschritt, im HUD sichtbar.
-- **Gier (Heel)** — steigt mit Wind und Upwind-Winkel; bei extremem Wind → **Kenter**
-  (Automatisches Aufrichten, oder mit Leertaste).
-- **Leeway**, **Ruderautorität** (geschwindigkeitabhängig), **Backen** mit Bug-Druck.
-- **Wind** mit Gusts & Veer (schwankende Stärke/Richtung), einstellbar.
+- **True Wind Angle (TWA)** from boat course and wind direction — with sign
+  (Port/Stbd tack). No direct wind (No-Go zone < 32° → **Luffing**).
+- **Apparent wind (AwA)** = composition of true wind and boat speed
+  (vector addition).
+- **Polar curve**: boat speed as a function of TWA & wind strength (Beaufort-scaled).
+  Beam reach (~90°) is the fastest wind angle; optimal upwind VMG is at ~45° TWA.
+- **VMG** (Velocity Made Good): up- and downwind progress, visible in the HUD.
+- **Heel** — increases with wind and upwind angle; in extreme wind → **Capsize**
+  (auto-righting, or with the space bar).
+- **Leeway**, **rudder authority** (speed-dependent), **luffing** with bow pressure.
+- **Wind** with gusts & veer (fluctuating strength/direction), adjustable.
 
-### 3D-Wasser & -Boot (an die Windphysik gekoppelt)
+### 3D Water & Boat (coupled to the wind physics)
 
-- **Gerstner-Wellenmeer** (`ocean.js`): echte trochoidale Wellen mit horizontaler
-  Verschiebung — scharfe Kämme, flache Täler, 6 überlagerte Wellenlängen, deren
-  Laufrichtung der **Windrichtung** folgt. Wellenhöhe skaliert mit der Windstärke.
-  JS und GLSL benutzen dieselbe Wellentabelle → das Boot sitzt **exakt** auf der
-  sichtbaren Welle (Auftrieb, Pitch & Roll aus echter Wellenneigung).
-  Shading: Fresnel-Himmelsspiegelung, Sonnenfunkeln, Streulicht durch die Kämme,
-  Schaum an gequetschten Wellenbergen (Jakobi-Determinante), Horizont-Dunst.
-- **Windgerechte Segel** (`boat.js`/`game.js`): der **Baumwinkel folgt dem
-  scheinbaren Wind** — eng am Wind fast mittschiffs, auf Raumwinden raus, vor dem
-  Wind quer (±~90°), **immer auf der Leeseite** (schlägt beim Wenden/Halsen über).
-  Großsegel hängt exakt am schwenkenden Baum, die Fock an ihrer Schot; das Tuch
-  wölbt sich nach Lee, wird auf Raumwinden voller, flattert in der **No-Go-Zone**.
-- **Echte Rumpfform**: aus Stationsquerschnitten gelofter Rumpf mit spitzem Bug,
-  klassischer Scheuerlinie, Spiegelheck, Wasserpass-Band und Antifouling unter
-  der Wasserlinie; dazu Flossenkiel mit Rumpfbirne, Ruderblatt, Vorstag/Backstag/
-  Wanten, Reling und Cockpit.
+- **Gerstner wave sea** (`ocean.js`): true trochoidal waves with horizontal
+  displacement — sharp crests, flat troughs, 6 superimposed wavelengths whose
+  travel direction follows the **wind direction**. Wave height scales with wind
+  strength. JS and GLSL use the same wave table → the boat sits **exactly** on
+  the visible wave (buoyancy, pitch & roll from real wave slope).
+  Shading: Fresnel sky reflection, sun glitter, scatter light through the
+  crests, foam at compressed wave peaks (Jacobian determinant), horizon haze.
+- **Wind-correct sails** (`boat.js`/`game.js`): the **boom angle follows the
+  apparent wind** — close-hauled nearly amidships, on reaches out, before the
+  wind square (±~90°), **always on the leeward side** (swings across when
+  tacking/jibing). Mainsail hangs exactly on the swivelling boom, the jib on
+  its sheet; the canvas bellies to leeward, fills on reaches, flutters in the
+  **No-Go zone**.
+- **True hull form**: hull lofted from station cross-sections with a sharp bow,
+  classic sheer line, transom stern, bootstripe band and antifouling below the
+  waterline; plus fin keel with bulb, rudder blade, forestay/backstay/shrouds,
+  railing and cockpit.
 
 ### Rendering style: naval aquatint
 
@@ -444,32 +439,33 @@ exactly as before the aquatint work.
 
 ---
 
-## Projektstruktur
+## Project Structure
 
-Seit Phase 0 der Mehrspieler-Umstellung ([Issue #23](https://github.com/latentspace-lab/sailing/issues/23))
-liegt das Projekt als npm-Workspace vor. Die Trennlinie ist streng: `shared/`
-enthaelt reine Logik ohne DOM und ohne Renderer, `client/` alles Sichtbare.
+Since Phase 0 of the multiplayer refactor ([Issue #23](https://github.com/latentspace-lab/sailing/issues/23))
+the project is an npm workspace. The dividing line is strict: `shared/`
+contains pure logic without DOM and without a renderer, `client/` everything
+visible.
 
 ```
 segel-simulator/
 ├─ packages/
-│  ├─ shared/            # @segel/shared — reine Logik (TypeScript, kein Three.js-Renderer)
+│  ├─ shared/            # @segel/shared — pure logic (TypeScript, no Three.js renderer)
 │  │  └─ src/
-│  │     ├─ utils.ts         # Winkel, Interpolation, approach() (dt-invariante Glaettung)
-│  │     ├─ rng.ts           # mulberry32, abgeleitete Stroeme, gauss()
-│  │     ├─ timestep.ts      # SIM_DT (30 Hz) + Akkumulator fuer die Spielschleife
-│  │     ├─ types.ts         # Protokoll: ShipState, SeaSync, InputCommand, WorldParams
-│  │     ├─ physics.ts       # Segelphysik, BoatDynamics (fester Schritt)
-│  │     ├─ wind.ts          # Wind — reine Funktion der Simulationszeit
-│  │     ├─ ocean-math.ts    # Gerstner-Wellen, SeaState (nachlaufender Seegang + Phase)
-│  │     ├─ terrain-math.ts  # Seekarte aus einem Seed: World, Tiefe, Riffe
-│  │     ├─ pose.ts          # Rumpflage auf der Welle + Interpolation fuers Bild
-│  │     ├─ ballistics.ts    # Wurfbahn, Salvenwurf, Trefferpruefung
-│  │     ├─ damage.ts        # Strukturmodell: Rumpf, Masten, Ruder, Lecks, Brand
-│  │     ├─ crew.ts          # Besatzung: Rollen, Verluste, Wirkung auf alle Systeme
-│  │     ├─ collide.ts       # Schiff gegen Schiff, Grundberuehrung
-│  │     ├─ vessels.ts       # Schiffskatalog: Masse, Polarkurven, Dynamik, Batterien
-│  │     └─ factions.ts      # Parteien: Doktrin, Ausbildungsstand, Flagge
+│  │     ├─ utils.ts         # Angles, interpolation, approach() (dt-invariant smoothing)
+│  │     ├─ rng.ts           # mulberry32, derived streams, gauss()
+│  │     ├─ timestep.ts      # SIM_DT (30 Hz) + accumulator for the game loop
+│  │     ├─ types.ts         # Protocol: ShipState, SeaSync, InputCommand, WorldParams
+│  │     ├─ physics.ts       # Sailing physics, BoatDynamics (fixed step)
+│  │     ├─ wind.ts          # Wind — pure function of simulation time
+│  │     ├─ ocean-math.ts    # Gerstner waves, SeaState (lagging sea state + phase)
+│  │     ├─ terrain-math.ts  # Sea chart from a seed: World, depth, reefs
+│  │     ├─ pose.ts          # Hull position on the wave + interpolation for the frame
+│  │     ├─ ballistics.ts    # Trajectory, salvo launch, hit test
+│  │     ├─ damage.ts        # Structure model: hull, masts, rudder, leaks, fire
+│  │     ├─ crew.ts          # Crew: roles, losses, effect on all systems
+│  │     ├─ collide.ts       # Ship vs. ship, grounding
+│  │     ├─ vessels.ts       # Ship catalogue: mass, polar curves, dynamics, batteries
+│  │     └─ factions.ts      # Factions: doctrine, training level, flag
 │  │
 │  ├─ server/            # @segel/server — the game server (Colyseus 0.18)
 │  │  ├─ src/index.ts        # startServer(): HTTP + WebSocket transport, room registry
@@ -481,114 +477,113 @@ segel-simulator/
 │  │  ├─ src/sim/Captain.ts       # AI captain (port of the client's fleet.js)
 │  │  └─ src/headless.ts          # CLI: run a simulation headless and print timings
 │  │
-│  └─ client/            # @segel/client — Browser: Three.js, Eingabe, HUD
+│  └─ client/            # @segel/client — Browser: Three.js, input, HUD
 │     ├─ index.html
 │     ├─ vite.config.js
 │     └─ src/
-│        ├─ main.js          # Spielschleife: feste Simulation, freie Darstellung
-│        ├─ game.js          # stepFixed() (Simulation) + render(alpha) (Bild)
-│        ├─ ship.js          # Schiff als Einheit: Modell + Fahrt + Schaden + Batterie
-│        ├─ guns.js          # Breitseiten-DARSTELLUNG (Ballistik in @segel/shared)
-│        ├─ ocean.js         # Wellen-Mesh und Shader (Mathematik in @segel/shared)
-│        ├─ terrain.js       # Gelaendemesh und Brandung (Seekarte in @segel/shared)
-│        ├─ scene.js         # Szene: Himmel, Sonne, Lichter, Wolken
-│        ├─ boat.js          # 3D-Yacht: gelofteter Rumpf, Rigg, windgetriebene Segel
-│        ├─ warship.js       # 3D-Rahsegler: Rumpf mit Stueckpforten, Masten, Rahsegel
-│        ├─ debris.js        # Starrkoerper-Simulation der Wrackteile (Auftrieb, Drall)
-│        ├─ fleet.js         # Gegner und ihre Kapitaene (Doktrin, Manoever, Feuer)
-│        ├─ crewview.js      # die Leute an Deck (zwei InstancedMeshes, animiert)
-│        ├─ fx.js            # gemeinsame Effekt-Texturen (Rauch, Feuer, Loecher)
-│        ├─ camera.js        # Kamera-Regie (4 Modi + Maus-Orbit)
-│        ├─ controls.js      # Tastatur-/Maussteuerung
-│        ├─ marks.js         # Regatta-Kurs: Bojen, Start- & Ziellinie, Runden
-│        ├─ trainer.js       # Trainings-Herausforderungen (Edge- & Zeit-Logik)
-│        ├─ ui.js            # 2D-HUD + 2D-Kompass + Menue + Trainings-Panel
-│        ├─ audio.js         # Sprachansagen je Nation
-│        ├─ styles.css       # Optik
-│        └─ physics.js …     # Re-Exporte aus @segel/shared (alte Importpfade)
-└─ tests/                # siehe unten
+│        ├─ main.js          # Game loop: fixed simulation, free rendering
+│        ├─ game.js          # stepFixed() (simulation) + render(alpha) (frame)
+│        ├─ ship.js          # Ship as a unit: model + dynamics + damage + battery
+│        ├─ guns.js          # Broadside RENDERING (ballistics in @segel/shared)
+│        ├─ ocean.js         # Wave mesh and shader (mathematics in @segel/shared)
+│        ├─ terrain.js       # Terrain mesh and surf (sea chart in @segel/shared)
+│        ├─ scene.js         # Scene: sky, sun, lights, clouds
+│        ├─ boat.js          # 3D yacht: lofted hull, rigging, wind-driven sails
+│        ├─ warship.js       # 3D square-rigger: hull with gun ports, masts, square sails
+│        ├─ debris.js        # Rigid-body simulation of wreckage (buoyancy, spin)
+│        ├─ fleet.js         # Opponents and their captains (doctrine, manoeuvre, fire)
+│        ├─ crewview.js      # the people on deck (two InstancedMeshes, animated)
+│        ├─ fx.js            # shared effect textures (smoke, fire, holes)
+│        ├─ camera.js        # Camera direction (4 modes + mouse orbit)
+│        ├─ controls.js      # keyboard/mouse controls
+│        ├─ marks.js         # Regatta course: marks, start & finish line, laps
+│        ├─ trainer.js       # Training challenges (edge & time logic)
+│        ├─ ui.js            # 2D HUD + 2D compass + menu + training panel
+│        ├─ audio.js         # voice announcements per nation
+│        ├─ styles.css       # visuals
+│        └─ physics.js …     # Re-exports from @segel/shared (old import paths)
+└─ tests/                # see below
 ```
 
-### Feste Simulationsrate
+### Fixed simulation rate
 
-Die Simulation laeuft mit **30 Hz** (`SIM_DT`), gerendert wird mit
-Bildschirmrate. `main.js` sammelt die vergangene Zeit in einem Akkumulator und
-gibt sie in ganzen Schritten aus; der Rest (`alpha`) interpoliert die
-Schiffslagen zwischen den letzten beiden Schritten.
+The simulation runs at **30 Hz** (`SIM_DT`), rendering at display rate.
+`main.js` collects elapsed time in an accumulator and dispenses it in whole
+steps; the remainder (`alpha`) interpolates ship positions between the last
+two steps.
 
-Der Grund ist nicht Eleganz, sondern Notwendigkeit: die Physik enthaelt
-Glaettungsterme, und `f(dt₁)` gefolgt von `f(dt₂)` ist nicht dasselbe wie
-`f(dt₁+dt₂)`. Client-Prediction verlangt aber genau das — der Client rechnet
-Eingaben nach, die der Server schon gerechnet hat. Deshalb gibt es fuer die
-Ruderglaettung seit Phase 0B' auch nur noch **einen** Smoother, und der sitzt
-in `BoatDynamics.step()`.
+The reason is not elegance but necessity: the physics contains smoothing
+terms, and `f(dt₁)` followed by `f(dt₂)` is not the same as `f(dt₁+dt₂)`.
+But client prediction demands exactly that — the client replays inputs the
+server has already computed. That's why since Phase 0B' there is only **one**
+smoother, and it sits in `BoatDynamics.step()`.
 
 ---
 
 ## Tests
 
-Drei Ebenen, weil sie verschiedene Fragen beantworten.
+Three levels, because they answer different questions.
 
 ```bash
-npm test                  # alles (Build + 699 Checks, ~60 s)
+npm test                  # everything (Build + 699 checks, ~60 s)
 
-npm run test:unit         # ein Modul, eine Zusicherung      (~0.1 s)
-npm run test:regression   # was sich nicht aendern darf      (~0.2 s)
-npm run test:integration  # mehrere Module ueber Zeit        (~55 s)
-npm run test:pending      # zusaetzlich die offenen Faelle
+npm run test:unit         # one module, one assertion      (~0.1 s)
+npm run test:regression   # what must not change      (~0.2 s)
+npm run test:integration  # multiple modules over time        (~55 s)
+npm run test:pending      # additionally the open cases
 
-node tests/run.js ocean ballistics   # nur Suiten, deren Pfad das enthaelt
-node tests/unit/pose.test.js         # eine Suite direkt, ohne Runner
+node tests/run.js ocean ballistics   # only suites whose path contains that
+node tests/unit/pose.test.js         # one suite directly, without runner
 ```
 
-| Ebene | Was sie prueft |
+| Level | What it checks |
 |---|---|
-| `tests/unit/` | Einzelne Module: Winkel, Zufall, Akkumulator, Wellen, Seekarte, Rumpflage, Ballistik, Schaden, Mannschaft, Segelphysik. Schnell und deterministisch — faellt hier etwas um, weiss man sofort, wo. |
-| `tests/regression/` | Die Zusagen, auf denen der Mehrspieler-Umbau steht: **dt-Invarianz**, **Determinismus** (gleicher Seed → gleiches Gefecht, inklusive eines Laufs mit abgeklemmtem `Math.random`) und eine **Golden-Spur** gegen `tests/fixtures/golden-trace.json`. |
-| `tests/integration/` | Mehrere Module ueber Zeit: Segeln, Schiffe und Rigg, Geometrie, ein vollstaendiges Gefecht, die Headless-Simulation und die Render-Interpolation. Dazu ein **Boot-Smoke-Test**, der das gebaute Spiel in Chromium startet — der faengt fehlende Importe, die kein Modultest sieht. |
-| `tests/pending/` | Faelle fuer Funktionen, die es noch nicht gibt. Laeuft nur mit `--pending` und zaehlt nicht gegen den Exit-Code. |
+| `tests/unit/` | Individual modules: angles, random, accumulator, waves, sea chart, hull position, ballistics, damage, crew, sailing physics. Fast and deterministic — if something falls over here, you know immediately where. |
+| `tests/regression/` | The guarantees the multiplayer refactor stands on: **dt invariance**, **determinism** (same seed → same battle, including a run with `Math.random` clamped) and a **golden trace** against `tests/fixtures/golden-trace.json`. |
+| `tests/integration/` | Multiple modules over time: sailing, ships and rig, geometry, a complete battle, the headless simulation and render interpolation. Plus a **boot smoke test** that starts the built game in Chromium — it catches missing imports that no module test sees. |
+| `tests/pending/` | Cases for features that don't exist yet. Runs only with `--pending` and doesn't count against the exit code. |
 
-Die Golden-Spur neu festschreiben — nur, wenn die Aenderung gewollt ist:
+Re-fixing the golden trace — only when the change is intended:
 
 ```bash
 node tests/regression/golden-trace.test.js --update
 ```
 
-Der Boot-Smoke-Test braucht einen Build und Chromium
-(`npx playwright install chromium`); fehlt eines davon, ueberspringt er sich
-selbst. Alles andere laeuft mit reinem Node.
+The boot smoke test needs a build and Chromium
+(`npx playwright install chromium`); if either is missing, it skips itself.
+Everything else runs on plain Node.
 
 ---
 
-## Erweiterbar
+## Extensible
 
-- **Segeltypen** (Genua, Spinnaker): neue Segel-Meshes in `boat.js`, Trim-Verhalten in `physics.js`.
-- **Kursvarianten**: `marks.js` — `legs[]`-Array erweitern (z. B. Offset-Boje, Gate-Kreuzung).
-- **Training**: `trainer.js` — neue Challenge-Objekte `{title,desc,dur,ok(edge)}`.
-- **Wetter**: `wind.js` `variability/gust/veer` anheben; `scene.js` Sonne/Beaufort.
-- **Polar-Kurve**: `POLAR_15KTS` in `physics.js` anpassen.
-- **Neues Schiff**: Eintrag in `VESSELS` (`vessels.js`) — Rumpfmaße, Polarkurve,
-  `noGo`, Dynamik und optional `guns`. Rigg `"square"` baut automatisch einen
-  Rahsegler, alles andere die Yacht. Menü, HUD, Kamera und Trainer ziehen nach.
-- **Bewaffnung**: `guns.decks[]` — jedes Deck bekommt Höhe (Bruchteil des
-  Freibords), Anzahl Rohre je Seite, Längsbereich und Kaliber.
+- **Sail types** (genoa, spinnaker): new sail meshes in `boat.js`, trim behaviour in `physics.js`.
+- **Course variants**: `marks.js` — extend the `legs[]` array (e.g. offset mark, gate crossing).
+- **Training**: `trainer.js` — new challenge objects `{title,desc,dur,ok(edge)}`.
+- **Weather**: `wind.js` `variability/gust/veer` increase; `scene.js` sun/Beaufort.
+- **Polar curve**: adjust `POLAR_15KTS` in `physics.js`.
+- **New ship**: entry in `VESSELS` (`vessels.js`) — hull dimensions, polar curve,
+  `noGo`, dynamics and optional `guns`. Rigging `"square"` automatically builds
+  a square-rigger, everything else the yacht. Menu, HUD, camera and trainer follow.
+- **Armament**: `guns.decks[]` — each deck gets height (fraction of freeboard),
+  number of guns per side, longitudinal range and calibre.
 
 ---
 
-## Hinweise / Grenzen (semi-realistisch, bewusst vereinfacht)
+## Notes / Limitations (semi-realistic, deliberately simplified)
 
-- Alle Schiffe sind geloftete 3D-Rümpfe aus Stationsquerschnitten (prozedural, kein importiertes Mesh).
-- Wrackteile kollidieren nicht untereinander und nicht mit den Schiffen — sie
-  reagieren auf Wasser, Wind und Schwerkraft, nicht aufeinander. Für Splitter,
-  Planken und treibende Masten ist das ausreichend und spart sehr viel Rechenzeit.
-- Einschlaglöcher im **Rumpf** sind aufgesetzte Decals, keine echten Löcher in der
-  Geometrie. Die Risse im **Segeltuch** dagegen sind echt: dort werden die
-  betroffenen Dreiecke zusammengezogen.
-- Entern ist nicht implementiert — die Schiffe verhaken sich, mehr passiert nicht.
-- Leeweg (Drift) und Ruderautorität sind vereinfacht, aber die **Qualitative** des
-  Verhaltens (Krausen, Wenden, Gieren, VMG, Kenter) ist realistisch.
-- Kein Wellen-Boot-Kontakt-Rendering (Boot „schwimmt" auf der berechneten Wasserhöhe,
-  die exakt dem Wasser-Shader entspricht → keine Auf-/Abreißer an der Waterline).
+- All ships are lofted 3D hulls from station cross-sections (procedural, no imported mesh).
+- Wreckage pieces don't collide with each other or with the ships — they
+  react to water, wind and gravity, not to each other. For splinters,
+  planks and drifting masts that's adequate and saves a lot of compute.
+- Impact holes in the **hull** are applied decals, not real holes in the
+  geometry. The tears in the **sailcloth** on the other hand are real: the
+  affected triangles are contracted there.
+- Boarding is not implemented — the ships foul, nothing more happens.
+- Leeway (drift) and rudder authority are simplified, but the **qualitative**
+  behaviour (luffing, tacking, heeling, VMG, capsize) is realistic.
+- No wave-boat contact rendering (the boat "floats" on the computed water
+  height, which exactly matches the water shader → no gaps at the waterline).
 
-## Lizenz
-Frei zum Experimentieren, Umbauen und Lernen.
+## License
+Free to experiment, modify and learn.

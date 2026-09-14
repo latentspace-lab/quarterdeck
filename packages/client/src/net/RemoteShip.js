@@ -93,7 +93,7 @@ export class RemoteShip {
 
    /**
     * Draw the ship as of `now` (ms). `ctx` is the Simulator's world context
-    * for this frame: { wind, t, waveT, waveRad, amp, lambda, seaFull }.
+    * for this frame: { wind, t, waveT, wavewheel, amp, lambda, seaFull }.
     */
    render(now, ctx, frameDt = SIM_DT) {
       const s = this.buffer.sample(now);

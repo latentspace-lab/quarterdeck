@@ -1,18 +1,18 @@
-// physics.ts - Semi-realistische Segel-Physik (reine Funktionen + Zustandsklasse)
+// physics.ts - Semi-realistic sailing physics (pure functions + state class)
 //
-// Grundidee (klassisches "point-and-go" Modell):
-//    - Der Spieler steuert den Kurs (Ruder).
-//    - Der Segelkurs (TWA = True Wind Angle) ergibt sich aus Bootskurs und Windrichtung.
-//    - Boots- und Segelgeschwindigkeit folgt einer Polarkurve in Abhaengigkeit von
-//      TWA, Windstaerke (Knoten), Segeltrimmung und Gier (Heel).
-//    - VMG (Velocity Made Good) zeigt, wie gut der Fortschritt in Richtung Wind ist.
+// Basic idea (classic "point-and-go" model):
+//    - The player steers the course (rudder).
+//    - The point of sail (TWA = True wind Angle) follows from boat course and wind direction.
+//    - Boat and sail speed follows a polar curve depending on
+//      TWA, wind strength (knots), sail trim and heel.
+//    - VMG (Velocity Made Good) shows how well progress is made toward the wind.
 //
-// Einheiten: Winkel in Grad, Speed in Knoten. Welt: X=Ost, Z=Nord, Y=hoch.
+// Units: angles in degrees, speed in knots. World: X=east, Z=north, Y=up.
 //
-// Multiplayer-Hinweis: step() wird ausschliesslich mit FESTEM dt aufgerufen
-// (SIM_DT, siehe timestep.ts). Saemtliche Glaettung laeuft ueber approach() und
-// haengt allein an dt - nicht an der Zahl der Aufrufe. Nur so liefert eine
-// Nachsimulation auf dem Server dieselbe Spur wie die Vorhersage im Client.
+// Multiplayer note: step() is called exclusively with FIXED dt
+// (SIM_DT, see timestep.ts). All smoothing runs via approach() and
+// depends only on dt — not on the number of calls. Only this way does a
+// replay on the server produce the same trace as the prediction in the client.
 
 import {
    DEG,
@@ -29,21 +29,21 @@ import {
 } from "./utils.ts";
 import type { Vessel, DynSpec, Rig } from "./vessels.ts";
 
-// ---- Konstanten -------------------------------------------------------------
-export const NO_GO_DEG = 32; // No-Go-Zone: < 32° TWA kann man nicht hinaufsegeln
+// ---- Constants -------------------------------------------------------------
+export const NO_GO_DEG = 32; // No-Go zone: < 32° TWA you cannot sail closer
 
 /**
- * Zeitkonstanten der Eingabe-Glaettung. Frueher lagen sie verteilt in
- * `Controls.read()` (lerp mit dt*8) und `BoatDynamics.setRudder()` (lerp mit
- * festem 0.3 je Aufruf). Der zweite Term war rein aufrufabhaengig und damit
- * genau die Sorte Nichtdeterminismus, die Client-Prediction unbrauchbar macht.
- * Jetzt gibt es genau EINEN Smoother, hier, innerhalb von step().
+ * Time constants for input smoothing. Previously they were scattered across
+ * `Controls.read()` (lerp with dt*8) and `BoatDynamics.setRudder()` (lerp with
+ * fixed 0.3 per call). The second term was purely call-dependent and thus
+ * exactly the kind of non-determinism that makes client prediction useless.
+ * Now there is exactly ONE smoother, here, inside step().
  */
-export const RUDDER_TAU = 0.18; // s - Ruderlegen des Rudergaengers
-export const HEEL_TAU = 0.667;  // s - entspricht dem alten dt*1.5
-export const LEEWAY_TAU = 0.833; // s - entspricht dem alten dt*1.2
+export const RUDDER_TAU = 0.18; // s - helmsman putting over the rudder
+export const HEEL_TAU = 0.667;  // s - corresponds to the old dt*1.5
+export const LEEWAY_TAU = 0.833; // s - corresponds to the old dt*1.2
 
-// Polar-Kurve bei 15 Knoten Wind (Speed in Knoten, TWA in Grad).
+// Polar curve at 15 knots of wind (speed in knots, TWA in degrees).
 export const POLAR_15KTS: Table = [
    [0, 0.0], [10, 0.0], [20, 0.6], [30, 2.5], [35, 4.8], [40, 6.2], [45, 7.2],
    [50, 8.0], [60, 9.4], [75, 10.4], [90, 10.8], [105, 11.2], [115, 11.0],
@@ -52,20 +52,20 @@ export const POLAR_15KTS: Table = [
 
 export type Tack = "PORT" | "STBD";
 
-/** Windzustand, wie ihn die Fahrdynamik braucht. */
+/** wind state as needed by the dynamics. */
 export interface WindSample {
-   /** Richtung, aus der es weht (Grad) */
+   /** Direction it blows from (degrees) */
    dir: number;
    speedKts: number;
 }
 
-// Windförderskala: unter 15 kn sublinear, darüber moderat wachsend.
+// wind boost scale: below 15 kn sublinear, above that moderately growing.
 export function windScale(W: number): number {
    if (W <= 15) return Math.pow(clamp(W / 15, 0.05, 1), 0.6);
    return clamp(1 + (W - 15) * 0.028, 1, 2.45);
 }
 
-// ---- Polarauswertung --------------------------------------------------------
+// ---- Polar evaluation --------------------------------------------------------
 export function polarSpeedAt(
    twaDeg: number,
    windKts: number,
@@ -78,7 +78,7 @@ export function polarSpeedAt(
    return clamp(ref * windScale(windKts) * trimEff * heelPen, 0, 42);
 }
 
-// Optimale Segeltrimmung 0 (ausgeholt) .. 1 (geholt)
+// Optimal sail trim 0 (eased) .. 1 (hauled)
 export function optimalTrim(twaDeg: number, noGo = NO_GO_DEG): number {
    return clamp(
       lerp(1.0, 0.0, (Math.abs(normDeg(twaDeg)) - noGo + 2) / (180 - noGo + 2)),
@@ -90,10 +90,10 @@ export function trimEfficiency(actualTrim: number, optTrim: number): number {
    return clamp(1 - Math.abs(actualTrim - optTrim) * 0.7, 0.45, 1);
 }
 
-// ---- Apparent Wind (Sichtbarer Wind) ---------------------------------------
+// ---- Apparent wind -------------------------------------------------------
 export interface ApparentWind {
    speed: number;
-   /** Richtung, aus der der scheinbare Wind kommt (Grad) */
+   /** Direction the apparent wind comes from (degrees) */
    from: number;
 }
 
@@ -109,7 +109,7 @@ export function apparentWind(
    const boatVel = { x: bF.x * boatSpeedKts, z: bF.z * boatSpeedKts };
    const rel = { x: windToward.x - boatVel.x, z: windToward.z - boatVel.z };
    const speed = Math.hypot(rel.x, rel.z);
-   // "from"-Richtung = Gegenvorrichtung zum Luftstrom (woher der Wind kommt)
+   // "from" direction = opposite of the airflow (where the wind comes from)
    const fromVec = { x: boatVel.x - windToward.x, z: boatVel.z - windToward.z };
    const from = normDeg(Math.atan2(fromVec.x, fromVec.z) * RAD);
    return { speed, from };
@@ -120,11 +120,11 @@ export function twa(boatHeading: number, trueWindDeg: number): number {
    return diffDeg(boatHeading, trueWindDeg); // diffDeg(a,b) = b - a
 }
 export function tackFromTwa(twaSigned: number): Tack {
-   // Wind over the port side = port tack.
+   // wind over the port side = port tack.
    return twaSigned > 0 ? "PORT" : "STBD";
 }
 
-// ---- Segelkurse / Punkte von Sail ------------------------------------------
+// ---- Points of Sail --------------------------------------------------------
 export function pointOfSail(
    twaDeg: number,
    luffing = false,
@@ -133,29 +133,29 @@ export function pointOfSail(
 ): string {
    const t = Math.abs(twaDeg);
    if (rig === "square") {
-      if (luffing || t < noGo) return "Im Wind / back (kein Vortrieb)";
-      if (t < noGo + 14) return "Hart am Wind (Close-Hauled)";
-      if (t < 100) return "Halber Wind (Soldier's Wind)";
-      if (t < 140) return "Backstagsbrise (Broad Reach)";
-      if (t < 168) return "Raumschots (Running)";
-      return "Platt vor dem Laken";
+      if (luffing || t < noGo) return "In irons / aback (no drive)";
+      if (t < noGo + 14) return "Close-Hauled";
+      if (t < 100) return "Beam Reach (Soldier's Wind)";
+      if (t < 140) return "Broad Reach";
+      if (t < 168) return "Running (Broad Reach)";
+      return "Before the wind";
    }
-   if (luffing || t < noGo) return "No-Go-Zone (Backen)";
-   if (t < 55) return "Krausen (Close-Hauled)";
-   if (t < 85) return "Nahraumschot (Naher Reach)";
-   if (t < 110) return "Breitraumschot (Breiter Reach)";
-   if (t < 150) return "Groesserer Raumschot";
-   if (t < 172) return "Vollraumschot (Running)";
-   return "Vor dem Wind";
+   if (luffing || t < noGo) return "No-Go Zone (Luffing)";
+   if (t < 55) return "Close-Hauled";
+   if (t < 85) return "Close Reach";
+   if (t < 110) return "Beam Reach";
+   if (t < 150) return "Broad Reach";
+   if (t < 172) return "Running (Broad Reach)";
+   return "Before the wind";
 }
 
-// Backen (Luffing): Wind in No-Go-Zone oder zu wenig Wind -> kein Vortrieb
+// Luffing: wind in No-Go zone or too little wind -> no drive
 export function isLuffing(twaDeg: number, windKts = -1, noGo = NO_GO_DEG): boolean {
    if (windKts >= 0 && windKts < 0.4) return true;
    return Math.abs(twaDeg) < noGo;
 }
 
-// VMG in Up-/Downwind-Richtung
+// VMG in upwind/downwind direction
 export function vmgUp(twaDeg: number, speedKts: number): number {
    const t = Math.abs(twaDeg);
    return t < 90 ? speedKts * Math.cos(t * DEG) : 0;
@@ -165,7 +165,7 @@ export function vmgDown(twaDeg: number, speedKts: number): number {
    return t > 91 ? speedKts * Math.abs(Math.cos(t * DEG)) : 0;
 }
 
-// Gier (Heel)
+// Heel
 const HEEL_TABLE: Table = [
    [0, 0.15], [20, 0.2], [35, 0.7], [45, 1.0], [55, 0.95],
    [70, 0.75], [90, 0.55], [130, 0.4], [160, 0.25], [180, 0.12],
@@ -180,12 +180,12 @@ export function heelPenalty(heelDeg: number, capsizeHeel = 32): number {
    return clamp(1 - 0.6 * ((heelDeg - 12) / (capsizeHeel - 12)), 0.2, 1);
 }
 
-// ---- Ruder-/Kursdynamik ----------------------------------------------------
+// ---- Rudder/Course dynamics ----------------------------------------------------
 export function rudderAuthority(speedKts: number, refKts = 4): number {
    return clamp(speedKts / refKts, 0.12, 1);
 }
 
-/** Vollstaendiges Dynamikprofil - DEFAULT_PROFILE plus Vessel-Ueberschreibungen. */
+/** Complete dynamics profile - DEFAULT_PROFILE plus Vessel overrides. */
 export interface DynProfile extends Required<DynSpec> {
    rig: Rig | string;
    noGo: number;
@@ -193,7 +193,7 @@ export interface DynProfile extends Required<DynSpec> {
    tackAssist: number;
 }
 
-// Standard-Profil (moderne Yacht) - wird von einem Vessel-Eintrag ueberschrieben.
+// Default profile (modern yacht) - overridden by a Vessel entry.
 export const DEFAULT_PROFILE: DynProfile = {
    rig: "bermuda",
    noGo: NO_GO_DEG,
@@ -210,7 +210,7 @@ export const DEFAULT_PROFILE: DynProfile = {
    tackAssist: 0,
 };
 
-// Aus einem Vessel-Eintrag (vessels.ts) ein Dynamik-Profil machen.
+// Build a dynamics profile from a Vessel entry (vessels.ts).
 export function profileFromVessel(v: Vessel | null | undefined): DynProfile {
    if (!v) return { ...DEFAULT_PROFILE };
    return {
@@ -242,9 +242,9 @@ export class BoatDynamics {
    speed = 0;
    heel = 0;
    heelLerp = 0;
-   /** Tatsaechliche Ruderlage (geglaettet) */
+   /** Actual rudder position (smoothed) */
    rudder = 0;
-   /** Vom Spieler/der KI angeforderte Ruderlage - das Ziel des Smoothers */
+   /** Rudder position requested by the player/AI - the smoother target */
    rudderCmd = 0;
    trim: number;
    twa = 0;
@@ -259,21 +259,21 @@ export class BoatDynamics {
    groundHeading: number;
    optTrim = 0.5;
    heelMaxSeen = 0;
-   // Segelflaeche 0.25..1 (Reffen). Nur bei Rahseglern wirksam - eine Yacht
-   // trimmt statt zu reffen.
+   // Sail area 0.25..1 (reefing). Only effective on square-riggers - a yacht
+   // trims instead of reefing.
    sailSet = 1;
-   // Von aussen gesetzte Faktoren aus dem Schadensmodell (1 = unbeschaedigt):
-   //   driveMul  - verbliebene Segelkraft (Masten, Tuch, Tauwerk)
-   //   rudderMul - Ruderwirkung
-   //   dragMul   - zusaetzlicher Widerstand (Wasser im Schiff, Wrack im Schlepp)
-   //   turnBias  - staendiges Gieren, z. B. durch ein Wrack an einer Seite
-   //   heelBias  - Schlagseite durch Wassereinbruch (Grad)
+   // External factors from the damage model (1 = undamaged):
+   //   driveMul  - remaining sail force (masts, canvas, cordage)
+   //   rudderMul - rudder effectiveness
+   //   dragMul   - additional drag (water in the ship, wreck in tow)
+   //   turnBias  - constant yaw, e.g. from a wreck on one side
+   //   heelBias  - list from water ingress (degrees)
    driveMul = 1;
    rudderMul = 1;
    dragMul = 1;
    turnBias = 0;
    heelBias = 0;
-   stopped = false; // aufgelaufen / manoevrierunfaehig
+   stopped = false; // aground / unable to manoeuvre
    config: { maxHeel: number; capsizeHeel: number; autoTrim: boolean };
 
    constructor(opts: BoatDynamicsOptions = {}) {
@@ -292,7 +292,7 @@ export class BoatDynamics {
       };
    }
 
-   // Schiff im laufenden Betrieb wechseln
+   // Switch ship during play
    setVessel(v: Vessel): this {
       this.vessel = v;
       this.profile = profileFromVessel(v);
@@ -317,9 +317,9 @@ export class BoatDynamics {
       if (this.isCapsized) return this._capsizeStep(dt);
       if (dt <= 0) return true;
 
-      // 0. Ruder: EINE dt-invariante Glaettung fuer die gesamte Kette
-      //    Eingabe -> Ruderlage. Identische Kommandofolge bei identischem dt
-      //    ergibt damit dieselbe Ruderspur auf Client und Server.
+      // 0. Rudder: ONE dt-invariant smoothing for the entire chain
+      //    Input -> rudder position. Identical command sequence at identical dt
+      //    thus gives the same rudder trace on client and server.
       this.rudder = approach(this.rudder, clamp(this.rudderCmd, -1, 1), dt, RUDDER_TAU);
 
       // 1. TWA
@@ -329,15 +329,15 @@ export class BoatDynamics {
 
       const P = this.profile;
 
-      // 2. Trimmung
+      // 2. Trim
       this.optTrim = optimalTrim(this.twa, P.noGo);
       const useTrim = this.config.autoTrim
          ? this.optTrim
          : clamp(manualTrim ?? this.trim, 0, 1);
       const trimEff = trimEfficiency(useTrim, this.optTrim);
 
-      // 3. Gier
-      // Gesetzte Segelflaeche (Reffen) - weniger Tuch, weniger Fahrt und Krengung
+      // 3. Heel
+      // Set sail area (reefing) - less canvas, less speed and heel
       const setF = P.rig === "square" ? clamp(this.sailSet, 0.25, 1) : 1;
 
       const targetHeel =
@@ -356,19 +356,19 @@ export class BoatDynamics {
          this.capsizeTimer = 0;
       }
 
-      // 4. Backen-Check
+      // 4. Luffing check
       this.luffing = isLuffing(this.twa, wind.speedKts, P.noGo);
       const hp = heelPenalty(this.heel, this.config.capsizeHeel);
 
-      // 5. Ziel-Boots-Speed
+      // 5. Target boat speed
       let targetSpeed = this.luffing
          ? 0
          : polarSpeedAt(this.twa, wind.speedKts, trimEff, hp, P.polar) * (0.3 + 0.7 * setF);
-      // Schaden: weniger Segelkraft, mehr Widerstand
+      // Damage: less sail force, more drag
       targetSpeed *= clamp(this.driveMul, 0, 1) / Math.max(this.dragMul, 0.2);
       if (this.stopped) targetSpeed = 0;
-      // Ein Rahsegler behaelt beim Durchgehen durch den Wind Schwung ("Fahrt im
-      // Schiff") - sonst kaeme er nie durch eine Wende.
+      // A square-rigger retains momentum when going through the wind ("way on
+      // ship") - otherwise she would never come through a tack.
       if (this.luffing && P.tackAssist > 0) {
          targetSpeed = this.speed * P.tackAssist;
       }
@@ -380,14 +380,14 @@ export class BoatDynamics {
       this.speed += (targetSpeed - this.speed) * clamp(accel * dt, 0, 1);
       this.speed = Math.max(0, this.speed);
 
-      // 6. Ruder -> Gier
+      // 6. Rudder -> yaw
       const rauth = rudderAuthority(this.speed, P.rudderRef);
       const turnRate =
          this.rudder * P.turnRate * rauth * clamp(this.rudderMul, 0, 1) +
          this.turnBias * rauth; // deg/s
       this.heading = normDeg(this.heading - turnRate * dt);
 
-      // 7. Leeway + Bodengang
+      // 7. leewardway + ground track
       const leeFrac = clamp(this.heel / this.config.capsizeHeel, 0, 1);
       const windFrac = clamp(15 / Math.max(wind.speedKts, 0.5), 0.4, 1);
       const updown = this.twa < 90 ? 1 : 0.45;
@@ -408,9 +408,9 @@ export class BoatDynamics {
    }
 
    /**
-    * Ruderkommando setzen. Glaettet NICHT mehr selbst - das passiert
-    * dt-invariant in step(). Wer ein Kommando ohne Nachlauf braucht (Reset,
-    * Zustandsuebernahme vom Server), nimmt snapRudder().
+    * Set rudder command. Does NOT smooth anymore - that happens
+    * dt-invariantly in step(). Whoever needs a command without
+    * follow-through (reset, state takeover from the server) uses snapRudder().
     */
    setRudder(v: number): void {
       this.rudderCmd = clamp(v, -1, 1);

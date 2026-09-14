@@ -1,9 +1,9 @@
-// wind.ts - Wind-System (Richtung + Staerke) mit leichten Schwankungen
-// Richtung dir: Grad (woher der Wind weht, 0 = Nord).
-// Staerke speed: Knoten.
+// wind.ts - wind-System (direction + strength) mit leichten Schwankungen
+// direction dir: degrees (woher der wind weht, 0 = Nord).
+// strength speed: knots.
 //
-// Der Wind ist eine reine Funktion der Simulationszeit t - kein Zufall, kein
-// Zustand ausser t. Damit sieht jeder Teilnehmer denselben Wind, sobald er
+// Der wind ist eine reine Funktion der Simulationszeit t - kein Zufall, kein
+// state ausser t. Damit sieht jeder Teilnehmer denselben wind, sobald er
 // dieselbe Tickzahl erreicht hat; es muss nichts uebertragen werden ausser den
 // Basiswerten.
 import { normDeg } from "./utils.ts";
@@ -23,7 +23,7 @@ export class Wind {
    speed: number;
    /** 0..1 */
    gustFactor: number;
-   /** +1 rechtdrehend (Stbd), -1 linksdrehend (Backbord) */
+   /** +1 veering (Stbd), -1 backing (port) */
    veer: number;
    variability: number;
    t = 0;
