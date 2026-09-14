@@ -8,7 +8,7 @@ import { Ship } from "./ship.js";
 import { Fleet, SCENARIOS, scenarioFor } from "./fleet.js";
 import { battleWind, battleSpawns } from "./battleStart.js";
 import { DebrisField } from "./debris.js";
-import { createTerrain } from "./terrain.js";
+import { createTerrain, isOpenWater, findOpenWater } from "./terrain.js";
 import * as collide from "./collide.js";
 import { AMMO, AMMO_ORDER } from "./damage.js";
 import { BoatDynamics, pointOfSail, vmgUp, vmgDown, polarSpeedAt } from "./physics.js";
@@ -1007,6 +1007,18 @@ export class Simulator {
          enemies: list, player: this.player.pos, windDir: this.wind.baseDir,
          random: this.randomStart, rng: this._battle.rng,
       });
+      for (const s of spawns) {
+         if (!isOpenWater(s.x, s.z)) {
+            const safe = findOpenWater({
+               rng: this._battle.rng,
+               near: { x: s.x, z: s.z },
+               minDist: 0,
+               maxDist: 800,
+            });
+            s.x = safe.x;
+            s.z = safe.z;
+         }
+      }
       for (const { id, ...o } of spawns) this.fleet.spawn(id, o);
       const names = this.fleet.ships.map((s) => s.name).join(" and ");
       this.ui.showMessage("Sails in sight: " + names + " — clear ship for action!");
