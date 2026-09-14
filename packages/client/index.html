@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="de">
+<html lang="de" data-style="aquatint">
    <head>
       <meta charset="UTF-8" />
       <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
@@ -11,9 +11,6 @@
             margin: 0;
             padding: 0;
             overflow: hidden;
-            background: #061019;
-            font-family: "Segoe UI", system-ui, sans-serif;
-            color: #eef;
             user-select: none;
             -webkit-user-select: none;
             touch-action: none;
@@ -24,12 +21,12 @@
       <!-- 3D Renderer -->
       <div id="viewport" style="position:fixed;inset:0"></div>
 
-      <!-- HUD (Wird von ui.js befuellt; Panels werden dynamisch erzeugt) -->
+      <!-- HUD (filled by ui.js; the panels are built dynamically) -->
       <div id="hud" style="position:fixed;inset:0;pointer-events:none"></div>
-      <!-- 2D Compass-Overlay -->
+      <!-- 2D compass overlay -->
       <canvas id="compass" style="position:fixed;right:14px;top:14px;width:160px;height:160px;opacity:.95;pointer-events:none"></canvas>
 
-      <!-- Menue-Panel (Startmenue / Pause) -->
+      <!-- Menu panel (start menu / pause) -->
       <div id="menu" style="display:none"></div>
 
       <script type="module" src="./src/main.js"></script>

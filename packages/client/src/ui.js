@@ -1,6 +1,7 @@
 // ui.js - 2D HUD + compass + menu + training panel
 import { normDeg } from "./utils.js";
 import { VESSELS, vesselLabel, broadsideWeight, gunCount } from "./vessels.js";
+import { palette } from "./style.js";
 
 export class UI {
    constructor(rootHud, compassCanvas, menuEl, bodyEl) {
@@ -393,7 +394,7 @@ export class UI {
          R.trainHint.textContent =
             "Fortschritt: " + Math.round((this.training.progress || 0) * 100) + "%";
          R.trainFill.style.width = Math.round((this.training.progress || 0) * 100) + "%";
-         R.trainFill.style.background = this.training.done ? "#3bd671" : "#ff5d5d";
+         R.trainFill.classList.toggle("is-done", !!this.training.done);
       } else {
          R.train.style.display = "none";
       }
@@ -419,20 +420,18 @@ export class UI {
       const ready = s.guns.gunsReady || { PORT: s.guns.guns, STBD: s.guns.guns };
       const set = (fill, state, g, nReady) => {
          const pct = Math.round(g.progress * 100);
-         // Eine Seite ohne bediente Rohre ist nicht "klar", sondern erledigt
-         if (nReady <= 0) {
+         // A side without manned guns is not "ready", it is finished. The
+         // colours live in the stylesheet (is-out / is-ready / loading).
+         const out = nReady <= 0;
+         fill.className = "gun-fill" + (out ? " is-out" : g.ready ? " is-ready" : "");
+         state.className = "gun-state" + (out ? " is-out" : g.ready ? " is-ready" : "");
+         if (out) {
             fill.style.width = "100%";
-            fill.style.background = "linear-gradient(90deg,#5a2320,#8a3a30)";
             state.textContent = "KNOCKED OUT";
-            state.style.color = "#ff7b7b";
             return;
          }
          fill.style.width = pct + "%";
-         fill.style.background = g.ready
-            ? "linear-gradient(90deg,#ffb03d,#ff5d5d)"
-            : "linear-gradient(90deg,#2d4f6b,#4b7fa6)";
          state.textContent = g.ready ? "READY" : "LOADING " + pct + "%";
-         state.style.color = g.ready ? "#ffcf5d" : "rgba(210,230,250,0.6)";
       };
       set(R.gunFillP, R.gunStateP, s.guns.PORT, ready.PORT);
       set(R.gunFillS, R.gunStateS, s.guns.STBD, ready.STBD);
@@ -464,11 +463,7 @@ export class UI {
          const pct = Math.round(val * 100);
          fill.style.width = pct + "%";
          const good = invert ? 1 - val : val;
-         fill.style.background = good > 0.6
-            ? "linear-gradient(90deg,#3bd671,#8ee06a)"
-            : good > 0.3
-               ? "linear-gradient(90deg,#ffb03d,#ffe066)"
-               : "linear-gradient(90deg,#ff5d5d,#ff8f5d)";
+         setLevel(fill, good);
          v.textContent = pct + "%";
       };
       bar(R.dHull, d.hull, R.dHullV);
@@ -483,7 +478,7 @@ export class UI {
       if (d.sections) {
          for (const k in R.plan.sections) {
             const el = R.plan.sections[k];
-            if (el) el.setAttribute("fill", damageColor(d.sections[k]));
+            if (el) el.style.fill = damageColor(d.sections[k]);
          }
       }
       for (const m of ["fore", "main", "mizzen"]) {
@@ -491,17 +486,13 @@ export class UI {
          const el = R.plan.masts[m];
          const x = R.plan.xs[m];
          if (!el) continue;
-         if (st.state === "gone") {
-            el.setAttribute("fill", "#2a1a18");
-            el.setAttribute("stroke", "#ff5d5d");
-            if (x) x.style.display = "block";
-         } else {
-            el.setAttribute("fill", damageColor(st.integrity));
-            el.setAttribute("stroke", st.state === "wounded" ? "#ffb03d" : "rgba(180,215,240,0.55)");
-            if (x) x.style.display = "none";
-         }
+         const gone = st.state === "gone";
+         el.style.fill = gone ? "var(--plan-gone)" : damageColor(st.integrity);
+         el.classList.toggle("is-gone", gone);
+         el.classList.toggle("is-hurt", !gone && st.state === "wounded");
+         if (x) x.style.display = gone ? "block" : "none";
       }
-      if (R.plan.rudder) R.plan.rudder.setAttribute("fill", damageColor(d.rudder));
+      if (R.plan.rudder) R.plan.rudder.style.fill = damageColor(d.rudder);
 
       const M = [['fore', 'Fore'], ['main', 'Main'], ['mizzen', 'Mizzen']];
       R.dMasts.innerHTML = M.map(([k, n]) => {
@@ -531,19 +522,16 @@ export class UI {
          + (c.wounded ? "  ✚" + c.wounded : "") + (c.dead ? "  †" + c.dead : "");
       R.crewList.innerHTML = c.roles.map((r) => {
          const pct = Math.round(r.frac * 100);
-         const col = r.frac > 0.7 ? "#8ee06a" : r.frac > 0.4 ? "#ffcf5d" : "#ff7b7b";
+         const cls = r.frac > 0.7 ? "" : r.frac > 0.4 ? " is-warn" : " is-bad";
          return `<div class="crew-row">
             <span class="cl">${r.short}</span>
-            <div class="crew-track"><div class="crew-fill" style="width:${pct}%;background:${col}"></div></div>
+            <div class="crew-track"><div class="crew-fill${cls}" style="width:${pct}%"></div></div>
             <span class="cv">${r.fit}</span>
          </div>`;
       }).join("");
       const m = c.morale;
       R.crewMoral.style.width = Math.round(m * 100) + "%";
-      R.crewMoral.style.background = m > 0.6
-         ? "linear-gradient(90deg,#3bd671,#8ee06a)"
-         : m > 0.3 ? "linear-gradient(90deg,#ffb03d,#ffe066)"
-                   : "linear-gradient(90deg,#ff5d5d,#ff8f5d)";
+      setLevel(R.crewMoral, m);
       R.crewMoralV.textContent = Math.round(m * 100) + "%";
    }
 
@@ -586,8 +574,14 @@ export class UI {
       requestAnimationFrame(tick);
    }
 
+   /**
+    * The compass rose. Colours and lettering come from the style's HUD
+    * palette; the aquatint skin draws an engraved 16-point rose with
+    * lozenge points, the plain skin the original ticked disc.
+    */
    drawCompass(s) {
       const ctx = this.ctx;
+      const P = palette().hud;
       const size = this.compass.width;
       const cx = size / 2;
       const cy = size / 2;
@@ -599,24 +593,69 @@ export class UI {
 
       ctx.beginPath();
       ctx.arc(0, 0, RR, 0, Math.PI * 2);
-      ctx.fillStyle = "rgba(8,20,32,0.85)";
+      ctx.fillStyle = P.rose;
       ctx.fill();
       ctx.lineWidth = 2;
-      ctx.strokeStyle = "rgba(120,180,220,0.45)";
+      ctx.strokeStyle = P.rim;
       ctx.stroke();
 
-      for (let a = 0; a < 360; a += 30) {
-         const rad = (a * Math.PI) / 180;
-         const x1 = Math.sin(rad) * RR;
-         const z1 = Math.cos(rad) * RR;
-         const x2 = Math.sin(rad) * (RR - 8);
-         const z2 = Math.cos(rad) * (RR - 8);
+      if (P.engraved) {
+         // inner rule and 10-degree graduation, as on a printed rose
          ctx.beginPath();
-         ctx.moveTo(x1, -z1);
-         ctx.lineTo(x2, -z2);
-         ctx.lineWidth = a % 90 === 0 ? 2 : 1;
-         ctx.strokeStyle = a % 90 === 0 ? "rgba(0,0,0,0)" : "rgba(200,220,240,0.4)";
+         ctx.arc(0, 0, RR - 7, 0, Math.PI * 2);
+         ctx.lineWidth = 0.8;
+         ctx.strokeStyle = P.tick;
          ctx.stroke();
+         for (let a = 0; a < 360; a += 10) {
+            const rad = (a * Math.PI) / 180;
+            const len = a % 30 === 0 ? 7 : 3.5;
+            ctx.beginPath();
+            ctx.moveTo(Math.sin(rad) * RR, -Math.cos(rad) * RR);
+            ctx.lineTo(Math.sin(rad) * (RR - len), -Math.cos(rad) * (RR - len));
+            ctx.lineWidth = a % 90 === 0 ? 1.4 : 0.8;
+            ctx.strokeStyle = P.tick;
+            ctx.stroke();
+         }
+         // sixteen lozenge points: long for the cardinals, shorter for the
+         // half and quarter winds, each split light/dark down the middle
+         const lozenge = (ang, len, half, dark, light) => {
+            ctx.save();
+            ctx.rotate(ang);
+            ctx.beginPath();
+            ctx.moveTo(0, -len); ctx.lineTo(half, -len * 0.28); ctx.lineTo(0, 0); ctx.closePath();
+            ctx.fillStyle = dark; ctx.fill();
+            ctx.beginPath();
+            ctx.moveTo(0, -len); ctx.lineTo(-half, -len * 0.28); ctx.lineTo(0, 0); ctx.closePath();
+            ctx.fillStyle = light; ctx.fill();
+            ctx.beginPath();
+            ctx.moveTo(0, -len); ctx.lineTo(half, -len * 0.28); ctx.lineTo(0, 0);
+            ctx.lineTo(-half, -len * 0.28); ctx.closePath();
+            ctx.lineWidth = 0.6; ctx.strokeStyle = P.letter; ctx.stroke();
+            ctx.restore();
+         };
+         for (let i = 0; i < 16; i++) {
+            const ang = (i * Math.PI) / 8;
+            if (i % 4 === 0) continue;                       // cardinals last, on top
+            if (i % 2 === 0) lozenge(ang, RR - 30, 3.2, P.tick, "rgba(255,255,255,0.35)");
+            else lozenge(ang, RR - 42, 2.4, P.tick, "rgba(255,255,255,0.3)");
+         }
+         for (let i = 0; i < 4; i++) {
+            lozenge((i * Math.PI) / 2, RR - 20, 4.5, i === 0 ? P.north : P.letter, "rgba(255,255,255,0.45)");
+         }
+      } else {
+         for (let a = 0; a < 360; a += 30) {
+            const rad = (a * Math.PI) / 180;
+            const x1 = Math.sin(rad) * RR;
+            const z1 = Math.cos(rad) * RR;
+            const x2 = Math.sin(rad) * (RR - 8);
+            const z2 = Math.cos(rad) * (RR - 8);
+            ctx.beginPath();
+            ctx.moveTo(x1, -z1);
+            ctx.lineTo(x2, -z2);
+            ctx.lineWidth = a % 90 === 0 ? 2 : 1;
+            ctx.strokeStyle = a % 90 === 0 ? "rgba(0,0,0,0)" : P.tick;
+            ctx.stroke();
+         }
       }
 
       const dirs = [
@@ -627,13 +666,26 @@ export class UI {
       ];
       for (const [lbl, ang] of dirs) {
          const rad = (ang * Math.PI) / 180;
-         const x = Math.sin(rad) * (RR - 22);
-         const z = Math.cos(rad) * (RR - 22);
-         ctx.font = lbl === "N" ? "bold 15px system-ui" : "12px system-ui";
-         ctx.fillStyle = lbl === "N" ? "#ff5d5d" : "rgba(210,230,250,0.85)";
+         const r = P.engraved ? RR - 13 : RR - 22;
+         const x = Math.sin(rad) * r;
+         const z = Math.cos(rad) * r;
+         ctx.font = (lbl === "N" && !P.engraved ? "bold 15px " : P.engraved ? "13px " : "12px ") + P.font;
+         ctx.fillStyle = lbl === "N" ? P.north : P.letter;
          ctx.textAlign = "center";
          ctx.textBaseline = "middle";
-         ctx.fillText(lbl, x, -z + 1);
+         if (P.engraved) {
+            // letters stay upright on the ring, on a small paper patch
+            ctx.save();
+            ctx.translate(x, -z + 1);
+            ctx.rotate((s.boat.heading * Math.PI) / 180);
+            ctx.fillStyle = P.rose;
+            ctx.fillRect(-6, -7, 12, 14);
+            ctx.fillStyle = lbl === "N" ? P.north : P.letter;
+            ctx.fillText(lbl, 0, 0);
+            ctx.restore();
+         } else {
+            ctx.fillText(lbl, x, -z + 1);
+         }
       }
       ctx.restore();
 
@@ -648,9 +700,9 @@ export class UI {
       ctx.moveTo(0, 0);
       ctx.lineTo(x, -y);
       ctx.lineWidth = 3;
-      ctx.strokeStyle = "#4ea3ff";
+      ctx.strokeStyle = P.trueWind;
       ctx.stroke();
-      ctx.fillStyle = "#4ea3ff";
+      ctx.fillStyle = P.trueWind;
       ctx.beginPath();
       ctx.arc(x, -y, 4, 0, Math.PI * 2);
       ctx.fill();
@@ -661,8 +713,9 @@ export class UI {
       ctx.lineTo(0, 5);
       ctx.lineTo(-6, 10);
       ctx.closePath();
-      ctx.fillStyle = s.boat.luffing ? "#ffcc44" : "#ff4444";
+      ctx.fillStyle = s.boat.luffing ? P.shipLuff : P.ship;
       ctx.fill();
+      if (P.engraved) { ctx.lineWidth = 0.8; ctx.strokeStyle = P.letter; ctx.stroke(); }
 
       if (s.awa.from) {
          let ra = normDeg(s.awa.from - s.boat.heading);
@@ -674,7 +727,7 @@ export class UI {
          ctx.moveTo(0, 0);
          ctx.lineTo(x, -y);
          ctx.lineWidth = 2;
-         ctx.strokeStyle = "#44ffcc";
+         ctx.strokeStyle = P.apparent;
          ctx.stroke();
       }
       ctx.restore();
@@ -1013,15 +1066,11 @@ export class UI {
    }
 }
 
-// Zustandsfarbe: gruen -> gelb -> rot -> ausgeschossen
+// Condition colour for the hull plan: sound -> worn -> shot through -> gone.
+// The stops come from the style's HUD palette.
 function damageColor(v) {
    const t = Math.max(0, Math.min(1, v === undefined ? 1 : v));
-   const stops = [
-      [0.00, [42, 20, 18]],
-      [0.30, [150, 52, 38]],
-      [0.60, [176, 130, 40]],
-      [1.00, [46, 122, 72]],
-   ];
+   const stops = palette().hud.damageStops;
    for (let i = 0; i < stops.length - 1; i++) {
       const [a, ca] = stops[i], [b, cb] = stops[i + 1];
       if (t >= a && t <= b) {
@@ -1030,21 +1079,29 @@ function damageColor(v) {
          return `rgb(${c[0]},${c[1]},${c[2]})`;
       }
    }
-   return "rgb(46,122,72)";
+   const last = stops[stops.length - 1][1];
+   return `rgb(${last[0]},${last[1]},${last[2]})`;
+}
+
+// Bar fill by condition: the classes pick the skin's colours.
+function setLevel(el, good) {
+   el.classList.toggle("is-warn", good <= 0.6 && good > 0.3);
+   el.classList.toggle("is-bad", good <= 0.3);
 }
 
 function escapeAttr(s) {
    return String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
 }
 
+// Point-of-sail dot: the stylesheet tokens carry the colours of both skins.
 function pointColor(twa, luffing, noGo = 32) {
-   if (luffing) return "#ff5d5d";
+   if (luffing) return "var(--pos-luff)";
    const t = Math.abs(twa || 0) % 360;
-   if (t < noGo) return "#ff9e3d";
-   if (t < noGo + 23) return "#ffe66d";
-   if (t < 110) return "#5dff8a";
-   if (t < 150) return "#5d8bff";
-   return "#3d5dff";
+   if (t < noGo) return "var(--pos-nogo)";
+   if (t < noGo + 23) return "var(--pos-close)";
+   if (t < 110) return "var(--pos-reach)";
+   if (t < 150) return "var(--pos-broad)";
+   return "var(--pos-run)";
 }
 
 export default { UI };

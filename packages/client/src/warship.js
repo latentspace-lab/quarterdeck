@@ -25,6 +25,8 @@ import {
    gunLayout, barrelLengthOf, rigTopOf, rigHalfWidthOf,
 } from "@segel/shared";
 
+import { palette } from "./style.js";
+
 const UP = new THREE.Vector3(0, 1, 0);
 
 // ---------------- Materialien ----------------
@@ -189,16 +191,36 @@ void main() {
 }
 `;
 
+// Sailcloth. The colour the sail was designed with is kept on the material
+// so a style switch can re-tint it (aquatint: one buff for every sail) and
+// restore it again.
 function sailMaterial(color, wear = 0.35) {
-   return new THREE.ShaderMaterial({
+   const tint = palette().world.sail;
+   const mat = new THREE.ShaderMaterial({
       uniforms: {
-         uColor: { value: new THREE.Color(color) },
+         uColor: { value: new THREE.Color(tint ?? color) },
          uSunDir: { value: new THREE.Vector3(0.4, 0.6, 0.7) },
          uWear: { value: wear },
       },
       vertexShader: SAIL_VERT,
       fragmentShader: SAIL_FRAG,
       side: THREE.DoubleSide,
+   });
+   mat.userData.baseColor = color;
+   return mat;
+}
+
+/**
+ * Re-tint every sail of a ship model for a world palette: `world.sail` for
+ * all of them, or each sail's own colour when the palette leaves it null.
+ * Works for the yacht as well, whose sails use the same uniform.
+ */
+export function applySailPalette(model, world) {
+   if (!model) return;
+   model.traverse((o) => {
+      const m = o.material;
+      if (!m || !m.uniforms || !m.uniforms.uColor || m.userData.baseColor === undefined) return;
+      m.uniforms.uColor.value.set(world.sail ?? m.userData.baseColor);
    });
 }
 

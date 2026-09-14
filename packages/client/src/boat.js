@@ -5,6 +5,7 @@
 // der Schot (Fock), Bauch zeigt immer zur Leeseite, Flattern in der No-Go-Zone.
 import * as THREE from "three";
 import { clamp, DEG } from "./utils.js";
+import { palette } from "./style.js";
 
 const UP = new THREE.Vector3(0, 1, 0);
 
@@ -210,15 +211,19 @@ function makeSail({ gridU = 18, gridV = 10, color = 0xf7f4ec } = {}) {
    geo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
    geo.setAttribute("uv", new THREE.BufferAttribute(uvs, 2));
    geo.setIndex(idx);
+   // Colour from the style palette when it prescribes one (aquatint), the
+   // designed colour otherwise; the latter is kept for a later style switch.
+   const tint = palette().world.sail;
    const mat = new THREE.ShaderMaterial({
       uniforms: {
-         uColor: { value: new THREE.Color(color) },
+         uColor: { value: new THREE.Color(tint ?? color) },
          uSunDir: { value: new THREE.Vector3(0.4, 0.6, 0.7) },
       },
       vertexShader: SAIL_VERT,
       fragmentShader: SAIL_FRAG,
       side: THREE.DoubleSide,
    });
+   mat.userData.baseColor = color;
    const mesh = new THREE.Mesh(geo, mat);
    mesh.frustumCulled = false;
    mesh.userData.U = U;

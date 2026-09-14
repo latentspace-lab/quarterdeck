@@ -17,6 +17,7 @@ import * as THREE from "three";
 import { clamp, dirVec } from "./utils.js";
 import { puffTexture, flashTexture } from "./fx.js";
 import { AMMO, AMMO_ORDER } from "./damage.js";
+import { palette } from "./style.js";
 import {
    spawnSalvo,
    dischargeShots,
@@ -397,7 +398,7 @@ export class Battery {
          for (let k = 0; k < puffs; k++) {
             const sp = new THREE.Sprite(new THREE.SpriteMaterial({
                map: this.texPuff, transparent: true, depthWrite: false,
-               opacity: 0.0, color: 0xf0efe9, fog: true,
+               opacity: 0.0, color: palette().world.smoke, fog: true,
             }));
             const s0 = 2.4 + Math.random() * 1.8;
             sp.scale.set(s0, s0, 1);
@@ -551,7 +552,7 @@ export class Battery {
       if (!this.texPuff) return;
       const sp = new THREE.Sprite(new THREE.SpriteMaterial({
          map: this.texPuff, transparent: true, depthWrite: false,
-         color: 0xdff0ff, opacity: 0.85, fog: true,
+         color: palette().world.splash, opacity: 0.85, fog: true,
       }));
       const size = 5.5 + Math.random() * 3.0;
       sp.scale.set(size * 0.5, size, 1);

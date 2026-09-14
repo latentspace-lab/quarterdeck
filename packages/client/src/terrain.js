@@ -33,11 +33,19 @@ export {
 } from "@segel/shared";
 
 // ---------------------------------------------------------------- Darstellung
-const COL_ROCK = [0.42, 0.40, 0.38];
-const COL_GRASS = [0.33, 0.42, 0.24];
-const COL_SAND = [0.80, 0.73, 0.55];
-const COL_SHALLOW = [0.45, 0.62, 0.60];
-const COL_DEEP = [0.16, 0.30, 0.40];
+// Land colours (linear triples) from the style palette; setPalette() swaps
+// them and recolours the mesh in place.
+import { palette, rgb } from "./style.js";
+let COL_ROCK, COL_GRASS, COL_SAND, COL_SHALLOW, COL_DEEP, COL_SURF;
+function loadPalette(t) {
+   COL_ROCK = rgb(t.rock);
+   COL_GRASS = rgb(t.grass);
+   COL_SAND = rgb(t.sand);
+   COL_SHALLOW = rgb(t.shallow);
+   COL_DEEP = rgb(t.deep);
+   COL_SURF = rgb(t.surf);
+}
+loadPalette(palette().world.terrain);
 
 function colorAt(h) {
    if (h > 46) return COL_ROCK;
@@ -80,13 +88,10 @@ export function createTerrain(scene, opts = {}) {
       const pos = geo.attributes.position;
       const colors = new Float32Array(pos.count * 3);
       for (let i = 0; i < pos.count; i++) {
-         const x = pos.getX(i), z = pos.getZ(i);
-         const h = groundHeight(x, z);
-         pos.setY(i, h);
-         const c = colorAt(h);
-         colors[i * 3] = c[0]; colors[i * 3 + 1] = c[1]; colors[i * 3 + 2] = c[2];
+         pos.setY(i, groundHeight(pos.getX(i), pos.getZ(i)));
       }
       geo.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+      paint(geo);
       geo.computeVertexNormals();
       mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
          vertexColors: true, roughness: 0.96, metalness: 0.0,
@@ -116,22 +121,33 @@ export function createTerrain(scene, opts = {}) {
       fGeo.setAttribute("alpha", new THREE.BufferAttribute(fAlpha, 1));
       foamMat = new THREE.ShaderMaterial({
          transparent: true, depthWrite: false,
-         uniforms: { uTime: { value: 0 } },
+         uniforms: { uTime: { value: 0 }, uColor: { value: new THREE.Color().setRGB(...COL_SURF) } },
          vertexShader: `
             attribute float alpha; varying float vA; varying vec3 vP;
             void main(){ vA = alpha; vP = position;
                gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
          fragmentShader: `
-            uniform float uTime; varying float vA; varying vec3 vP;
+            uniform float uTime; uniform vec3 uColor; varying float vA; varying vec3 vP;
             void main(){
                if (vA <= 0.001) discard;
                // Brecher laufen ueber das Riff
                float w = 0.55 + 0.45 * sin(vP.x * 0.055 + vP.z * 0.04 - uTime * 1.7);
-               gl_FragColor = vec4(1.0, 1.0, 1.0, vA * w * 0.85);
+               gl_FragColor = vec4(uColor, vA * w * 0.85);
             }`,
       });
       foam = new THREE.Mesh(fGeo, foamMat);
       group.add(foam);
+   }
+
+   // Write the height-based colour of every vertex into the colour attribute.
+   function paint(geo) {
+      const pos = geo.attributes.position;
+      const col = geo.attributes.color;
+      for (let i = 0; i < pos.count; i++) {
+         const c = colorAt(pos.getY(i));
+         col.setXYZ(i, c[0], c[1], c[2]);
+      }
+      col.needsUpdate = true;
    }
 
    function clear() {
@@ -156,6 +172,12 @@ export function createTerrain(scene, opts = {}) {
       visible: true,
       setVisible(v) { group.visible = !!v; this.visible = !!v; },
       update(t) { if (foamMat) foamMat.uniforms.uTime.value = t; },
+      /** Swap the land and surf colours for another style's palette. */
+      setPalette(t) {
+         loadPalette(t);
+         if (mesh) paint(mesh.geometry);
+         if (foamMat) foamMat.uniforms.uColor.value.setRGB(...COL_SURF);
+      },
       // Neue Seekarte auswuerfeln und Geometrie neu aufbauen.
       regenerate(seed) {
          const w = generateWorld(seed ?? ((Math.random() * 1e9) | 0));
