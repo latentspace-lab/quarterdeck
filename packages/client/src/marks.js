@@ -4,7 +4,7 @@
 import * as THREE from "three";
 import { courseLayout, newRace, raceStep, SIM_DT } from "@segel/shared";
 
-// ---------- Boje (Floater / Komitee) ----------
+// ---------- Buoy (floater / committee) ----------
 export function makeBuoy(color, type = "float") {
    const g = new THREE.Group();
    const bodyMat = new THREE.MeshStandardMaterial({
@@ -39,7 +39,7 @@ export function makeBuoy(color, type = "float") {
    return g;
 }
 
-// Start-/Ziellinie zwischen zwei Bojen
+// Start/finish line between two buoys
 function makeLine(a, b, color, y = 0.1) {
    const dx = b.x - a.x;
    const dz = b.z - a.z;
@@ -108,7 +108,7 @@ export class Course {
       return this;
    }
 
-   // Bojen und Linien aus- bzw. einblenden (im Freeride/Training stoeren sie)
+   // Show/hide buoys and lines (they get in the way in Freeride/Training)
    setVisible(v) {
       this.root.visible = !!v;
       return this;

@@ -1,11 +1,11 @@
-// wind.ts - Wind-System (Richtung + Staerke) mit leichten Schwankungen
-// Richtung dir: Grad (woher der Wind weht, 0 = Nord).
-// Staerke speed: Knoten.
+// wind.ts - wind system (direction + strength) with light fluctuations
+// Direction dir: degrees (where the wind blows from, 0 = North).
+// Strength speed: knots.
 //
-// Der Wind ist eine reine Funktion der Simulationszeit t - kein Zufall, kein
-// Zustand ausser t. Damit sieht jeder Teilnehmer denselben Wind, sobald er
-// dieselbe Tickzahl erreicht hat; es muss nichts uebertragen werden ausser den
-// Basiswerten.
+// The wind is a pure function of simulation time t - no randomness, no
+// state other than t. This way every participant sees the same wind once
+// they've reached the same tick count; nothing needs to be transmitted
+// except the base values.
 import { normDeg } from "./utils.ts";
 
 export interface WindOptions {
@@ -23,7 +23,7 @@ export class Wind {
    speed: number;
    /** 0..1 */
    gustFactor: number;
-   /** +1 rechtdrehend (Stbd), -1 linksdrehend (Backbord) */
+   /** +1 veering (Stbd), -1 backing (Port) */
    veer: number;
    variability: number;
    t = 0;
@@ -75,18 +75,18 @@ export function beaufortOf(kts: number): number {
 
 export function beaufortName(kts: number): string {
    const names = [
-      "Windstille",
-      "Leichte Brise",
-      "Leichte Brise",
-      "Schwacher Wind",
-      "Maessiger Wind",
-      "Frischer Wind",
-      "Starker Wind",
-      "Stuermischer Wind",
-      "Sturm",
-      "Schwerer Sturm",
-      "Orkan",
-      "Starker Orkan",
+      "Calm",
+      "Light Breeze",
+      "Light Breeze",
+      "Gentle Wind",
+      "Moderate Wind",
+      "Fresh Wind",
+      "Strong Wind",
+      "Stormy Wind",
+      "Storm",
+      "Severe Storm",
+      "Hurricane",
+      "Violent Hurricane",
    ];
-   return names[beaufortOf(kts)] || "Windschwaecher";
+   return names[beaufortOf(kts)] || "Off the Scale";
 }

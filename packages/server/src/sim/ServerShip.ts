@@ -315,7 +315,7 @@ export class ServerShip implements CollidableShip {
       if (this.wreckage.has(key)) return;
       this.wreckage.add(key);
       const aloft = Math.round(this.crew.total * (0.008 + this.rng() * 0.014));
-      if (aloft > 0) this.crew.hit(aloft, "rigg");
+      if (aloft > 0) this.crew.hit(aloft, "rigging");
       const onDeck = Math.round(this.crew.total * (0.003 + this.rng() * 0.007));
       if (onDeck > 0) this.crew.hit(onDeck, "deck");
       this.crew.shock(0.3);

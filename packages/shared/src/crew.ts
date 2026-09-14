@@ -10,10 +10,10 @@
 // Wounded vastly outnumber the dead; they are removed from action because
 // they go below to the surgeon.
 //
-// Zufall: jede Ziehung laeuft ueber den injizierten Generator (opts.rng).
-// Ohne Generator faellt die Klasse auf Math.random zurueck - das ist der
-// Einspielerpfad und bleibt bewusst erlaubt, damit ein vergessener Parameter
-// nicht das Spiel bricht. Server und Tests uebergeben immer einen Seed.
+// Randomness: every draw runs through the injected generator (opts.rng).
+// Without a generator the class falls back to Math.random - that is the
+// single-player path and is deliberately allowed, so a forgotten parameter
+// does not break the game. The server and tests always pass a seed.
 
 import { clamp } from "./utils.ts";
 import { systemRng, type Rng } from "./rng.ts";
@@ -29,26 +29,26 @@ export interface RoleDef {
 export const ROLES: RoleDef[] = [
    { id: "officer", name: "Officers & Helmsmen", short: "Officers", share: 0.07 },
    { id: "gun", name: "Gunnery Crew", short: "Guns", share: 0.49 },
-   { id: "top", name: "Toppsgasten", short: "Toppsgasten", share: 0.22 },
-   { id: "marine", name: "Seesoldaten", short: "Seesoldaten", share: 0.11 },
-   { id: "carpenter", name: "Zimmerleute & Pumpen", short: "Zimmerleute", share: 0.06 },
-   { id: "powder", name: "Pulverjungen", short: "Pulverjungen", share: 0.05 },
+   { id: "top", name: "Topmen", short: "Topmen", share: 0.22 },
+   { id: "marine", name: "Marines", short: "Marines", share: 0.11 },
+   { id: "carpenter", name: "Carpenters & Pumps", short: "Carpenters", share: 0.06 },
+   { id: "powder", name: "Powder Monkeys", short: "Powder Monkeys", share: 0.05 },
 ];
 
-/** Wo sich eine Rolle aufhaelt - das entscheidet, wen es trifft. */
-export type Where = "bord" | "deck" | "rigg" | "unten";
+/** Where a role is stationed - this decides who gets hit. */
+export type Where = "hull" | "deck" | "rigging" | "below";
 
-// bord  = at the hull (splinters from the struck section)
-// deck  = on open deck (grape, musketry)
-// rigg  = aloft in the rigging (chain shot)
-// unten = below deck (relatively safe)
+// hull    = at the hull (splinters from the struck section)
+// deck    = on open deck (grape, musketry)
+// rigging = aloft in the rigging (chain shot)
+// below   = below deck (relatively safe)
 const EXPOSURE: Record<string, Record<Where, number>> = {
-   officer: { bord: 0.6, deck: 1.4, rigg: 0.2, unten: 0.3 },
-   gun: { bord: 1.8, deck: 0.9, rigg: 0.1, unten: 0.5 },
-   top: { bord: 0.4, deck: 1.1, rigg: 2.6, unten: 0.2 },
-   marine: { bord: 0.5, deck: 1.6, rigg: 0.5, unten: 0.2 },
-   carpenter: { bord: 0.7, deck: 0.4, rigg: 0.1, unten: 1.4 },
-   powder: { bord: 0.9, deck: 0.5, rigg: 0.1, unten: 1.0 },
+   officer: { hull: 0.6, deck: 1.4, rigging: 0.2, below: 0.3 },
+   gun: { hull: 1.8, deck: 0.9, rigging: 0.1, below: 0.5 },
+   top: { hull: 0.4, deck: 1.1, rigging: 2.6, below: 0.2 },
+   marine: { hull: 0.5, deck: 1.6, rigging: 0.5, below: 0.2 },
+   carpenter: { hull: 0.7, deck: 0.4, rigging: 0.1, below: 1.4 },
+   powder: { hull: 0.9, deck: 0.5, rigging: 0.1, below: 1.0 },
 };
 
 export interface RoleState {
@@ -94,7 +94,7 @@ export class Crew {
       for (let i = 0; i < ROLES.length; i++) {
          const r = ROLES[i];
          let n = Math.round(this.total * r.share);
-         if (i === ROLES.length - 1) n = this.total - assigned; // Rest
+         if (i === ROLES.length - 1) n = this.total - assigned; // remainder
          n = Math.max(n, 0);
          assigned += n;
          this.roles[r.id] = { start: n, fit: n, wounded: 0, dead: 0 };
@@ -102,7 +102,7 @@ export class Crew {
       this.isPlayer = !!opts.isPlayer;
    }
 
-   /** Zufallsquelle nachtraeglich setzen (z. B. beim Uebernehmen eines Raums). */
+   /** Set the randomness source after the fact (e.g. when taking over a room). */
    setRng(rng: Rng): void {
       this.rng = rng;
    }
@@ -138,16 +138,16 @@ export class Crew {
    }
 
    // ------------------------------------------------------------------
-   // Verluste
-   // n      = Zahl der Getroffenen
-   // where  = "bord" | "deck" | "rigg" | "unten"
+   // Casualties
+   // n      = number of men hit
+   // where  = "hull" | "deck" | "rigging" | "below"
    // Returns: { hurt, killed, worst } — worst = role most affected
    // ------------------------------------------------------------------
-   hit(n: number, where: Where = "bord"): CasualtyResult {
+   hit(n: number, where: Where = "hull"): CasualtyResult {
       n = Math.max(0, Math.round(n));
       if (!n) return { hurt: 0, killed: 0, worst: null };
 
-      // Gewichte aus Aufenthaltsort und noch vorhandener Mannschaft
+      // Weights from where they are stationed and the crew still on hand
       const ids: string[] = [];
       const w: number[] = [];
       let sum = 0;
@@ -166,7 +166,7 @@ export class Crew {
       let killed = 0;
       const perRole: Record<string, number> = {};
       for (let k = 0; k < n; k++) {
-         // Rolle ziehen
+         // Draw a role
          let x = this.rng() * sum;
          let pick = ids[0];
          for (let i = 0; i < ids.length; i++) {
@@ -204,32 +204,32 @@ export class Crew {
    }
 
    // ------------------------------------------------------------------
-   // Auswirkungen
+   // Effects
    // ------------------------------------------------------------------
-   // Wie viele Rohre lassen sich noch bedienen, und wie schnell?
-   // Unter etwa 60 % Bedienung werden Rohre zusammengelegt: weniger Rohre,
-   // dafuer bleiben die uebrigen halbwegs schnell.
+   // How many guns can still be served, and how fast?
+   // Below about 60% manning, guns get combined: fewer guns, but the
+   // remaining ones stay reasonably fast.
    gunnery(): { served: number; rate: number } {
       const f = this.fraction("gun");
       const powder = this.fraction("powder");
       const served = clamp(f < 0.6 ? f / 0.6 : 1, 0.12, 1);
-      // Nachladezeit: fehlende Leute und fehlender Pulvernachschub bremsen
+      // Reload time: missing men and missing powder supply slow it down
       const rate = clamp(0.45 + 0.4 * Math.min(f / 0.6, 1) + 0.15 * powder, 0.35, 1);
       return { served, rate };
    }
-   /** Segelmanoever: Toppsgasten setzen und reffen */
+   /** Sail handling: setting and reefing by the topmen */
    sailHandling(): number {
       return clamp(0.25 + 0.75 * this.fraction("top"), 0.2, 1);
    }
-   /** Pumpen und Lecks stopfen */
+   /** Pumping and stopping leaks */
    pumping(): number {
       return clamp(0.2 + 0.8 * this.fraction("carpenter"), 0.15, 1);
    }
-   /** Ruder und Befehlskette */
+   /** Helm and chain of command */
    command(): number {
       return clamp(0.4 + 0.6 * this.fraction("officer"), 0.35, 1);
    }
-   /** Kampfmoral: stuerzt ab, wenn Verluste und Fuehrungsverlust zusammenkommen */
+   /** Combat morale: collapses when casualties and loss of leadership combine */
    morale(): number {
       const loss = 1 - this.fit / this.total;
       return clamp(
@@ -238,7 +238,7 @@ export class Crew {
          1,
       );
    }
-   /** Erschuetterung durch ein schweres Ereignis */
+   /** Shock from a severe event */
    shock(a: number): void {
       this.shaken = clamp(this.shaken + a, 0, 1);
    }

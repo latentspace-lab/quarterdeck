@@ -1,33 +1,33 @@
-// ocean-math.ts - Gerstner-Wellenmeer, reiner Rechenteil.
+// ocean-math.ts - Gerstner wave ocean, pure computation.
 //
-// Hier steht alles, was Client UND Server brauchen: die Wellentabelle, die
-// Hoehenfunktion und der Seegangszustand. Was Three.js braucht (Mesh, Shader,
-// Uniforms), bleibt im Client in ocean.js und liest von hier.
+// Everything the client AND the server need lives here: the wave table, the
+// height function, and the sea state. What Three.js needs (mesh, shader,
+// uniforms) stays in the client's ocean.js and reads from here.
 //
-// Warum der Server das Wasser besitzen muss:
-// Die Trefferpruefung entscheidet anhand der Rumpflage, ob ein Schuss unter
-// der Wasserlinie, in die Bordwand oder ins Rigg geht. Die Rumpflage haengt an
-// der Wellenhoehe unter dem Schiff. Rechnete jeder seine eigene Welle, kaeme
-// jeder auf ein anderes Trefferbild. Deshalb ist die Wellenphase Teil des
-// Serverzustands (SeaSync) und wird mit festem Schritt integriert.
+// Why the server must own the water:
+// Hit testing decides, from the hull's pose, whether a shot goes in below
+// the waterline, into the side, or into the rig. The hull's pose depends on
+// the wave height under the ship. If everyone computed their own wave, each
+// would get a different hit picture. That's why the wave phase is part of
+// the server state (SeaSync) and is integrated with a fixed step.
 
-const G = 9.81; // Erdbeschleunigung (Tiefwasser-Dispersionsrelation)
+const G = 9.81; // gravitational acceleration (deep-water dispersion relation)
 
 export interface WaveComponent {
    /** Amplitude (m) */
    a: number;
-   /** Wellenlaenge (m) */
+   /** Wavelength (m) */
    L: number;
-   /** Richtung relativ zur Wind-Laufrichtung (Grad) */
+   /** Direction relative to the wind's travel direction (degrees) */
    off: number;
-   /** Gerstner-Steilheit */
+   /** Gerstner steepness */
    q: number;
    /** Phase */
    ph: number;
 }
 
-// Wellen: a = Amplitude (m), L = Wellenlaenge (m), off = Richtung relativ zur
-// Wind-Laufrichtung (Grad), q = Gerstner-Steilheit, ph = Phase
+// Waves: a = amplitude (m), L = wavelength (m), off = direction relative to
+// the wind's travel direction (degrees), q = Gerstner steepness, ph = phase
 export const WAVES: WaveComponent[] = [
    { a: 1.30, L: 165, off: 0, q: 0.62, ph: 0.0 },
    { a: 0.80, L: 92, off: 21, q: 0.66, ph: 2.1 },
@@ -38,20 +38,20 @@ export const WAVES: WaveComponent[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// Seegang aus Windstaerke
+// Sea state from wind strength
 //
-// Voll entwickelte See nach Pierson-Moskowitz: die signifikante Wellenhoehe
-// waechst mit dem QUADRAT der Windgeschwindigkeit,
+// Fully developed sea per Pierson-Moskowitz: the significant wave height
+// grows with the SQUARE of the wind speed,
 //
 //     Hs = 0.21 * U^2 / g        (U in m/s)
 //
-// Das ist der Grund, warum aus 12 kn (knapp 1 m) bei 30 kn ueber 5 m werden.
-// Gleichzeitig werden die Wellen LAENGER - eine Sturmsee ist keine vergroesserte
-// Kabbelwelle, sondern langer, schwerer Seegang.
+// That's why 12 kn (just under 1 m) becomes over 5 m at 30 kn. At the same
+// time the waves get LONGER - a storm sea is not an enlarged chop, it's
+// long, heavy swell.
 // ---------------------------------------------------------------------------
 
-// Signifikante Hoehe, die sich aus der Wellentabelle bei Amplitudenfaktor 1
-// ergibt: Hs = 4 * sigma, sigma^2 = Summe(a_i^2)/2
+// Significant height that results from the wave table at amplitude factor 1:
+// Hs = 4 * sigma, sigma^2 = sum(a_i^2)/2
 const H_PER_AMP = (() => {
    let v = 0;
    for (const w of WAVES) v += w.a * w.a;
@@ -59,34 +59,34 @@ const H_PER_AMP = (() => {
 })();
 
 const KN_TO_MS = 0.514444;
-const HS_MAX = 11.5; // Deckel, damit aus einem Orkan kein Tsunami wird
+const HS_MAX = 11.5; // cap, so a hurricane doesn't turn into a tsunami
 
-// Signifikante Wellenhoehe in Metern
+// Significant wave height in metres
 export function waveHeightForWind(kts: number): number {
    const U = Math.max(kts, 0) * KN_TO_MS;
    return Math.min((0.21 * U * U) / G, HS_MAX);
 }
 
-// Amplitudenfaktor fuer die Wellentabelle
+// Amplitude factor for the wave table
 export function ampForWind(kts: number): number {
    return waveHeightForWind(kts) / H_PER_AMP;
 }
 
-// Streckung der Wellenlaengen. Bezugspunkt sind die Tabellenwerte bei 12 kn.
+// Stretching of the wavelengths. Reference point is the table values at 12 kn.
 export function lambdaForWind(kts: number): number {
-   // Die Wellenlaenge waechst langsamer als die Hoehe - sonst wird die See zwar
-   // hoch, aber so flach geneigt, dass sie wie eine glatte Duenung wirkt.
-   // Mit der Wurzel bleibt die Steilheit erhalten: eine Sturmsee ist steil.
+   // The wavelength grows more slowly than the height - otherwise the sea
+   // would get high but so gently sloped that it reads as smooth swell.
+   // Using the square root keeps the steepness: a storm sea is steep.
    const r = Math.max(kts, 1) / 12;
    return Math.min(Math.max(Math.sqrt(r), 0.55), 1.75);
 }
 
-// Weisskappen: fangen bei Bft 4 an und bedecken die See mit zunehmendem Wind.
+// Whitecaps: start at Bft 4 and cover more of the sea as the wind rises.
 export function whitecapsForWind(kts: number): number {
    return Math.min(Math.max((kts - 7) / 26, 0), 1);
 }
 
-// Seezustand nach Douglas-Skala (fuer die Anzeige)
+// Sea state per the Douglas scale (for the display)
 const SEA_NAMES: Array<[number, string]> = [
    [0.0, "calm"], [0.1, "smooth"], [0.5, "slight"],
    [1.25, "moderate"], [2.5, "rough"], [4.0, "very rough"],
@@ -107,8 +107,8 @@ export interface WaveSample {
    dz: number;
 }
 
-// Gerstner-Summe an Flaechenparameter (px, pz), unskaliert:
-// h = Hoehe, dx/dz = horizontale Verschiebung
+// Gerstner sum at surface parameter (px, pz), unscaled:
+// h = height, dx/dz = horizontal displacement
 function waveSum(px: number, pz: number, t: number, windRad: number, lambda = 1): WaveSample {
    let h = 0;
    let dx = 0;
@@ -117,7 +117,7 @@ function waveSum(px: number, pz: number, t: number, windRad: number, lambda = 1)
    for (let i = 0; i < WAVES.length; i++) {
       const w = WAVES[i];
       const k = (2 * Math.PI) / (w.L * lambda);
-      // Tiefwasser: omega = sqrt(g*k). Gestreckte Wellen laufen langsamer.
+      // Deep water: omega = sqrt(g*k). Stretched waves travel slower.
       const om = Math.sqrt(G * ((2 * Math.PI) / w.L)) * invSqrtL;
       const ang = windRad + w.off * (Math.PI / 180);
       const dX = Math.sin(ang);
@@ -132,9 +132,9 @@ function waveSum(px: number, pz: number, t: number, windRad: number, lambda = 1)
    return { h, dx, dz };
 }
 
-// Wasserhoehe an Weltposition (x, z). Gerstner verschiebt die Flaeche auch
-// horizontal, daher wird der Flaechenparameter per Fixpunkt-Iteration
-// invertiert -> das Boot sitzt exakt auf der sichtbaren Welle.
+// Water height at world position (x, z). Gerstner also displaces the surface
+// horizontally, so the surface parameter is inverted by fixed-point
+// iteration -> the boat sits exactly on the visible wave.
 export function seaHeight(
    x: number,
    z: number,
@@ -153,52 +153,52 @@ export function seaHeight(
    return waveSum(px, pz, t, windRad, lambda).h * amp;
 }
 
-/** Abfragbare Wasserflaeche - alles, was eine Hoehe an (x,z) braucht. */
+/** Queryable water surface - anything that needs a height at (x,z). */
 export type SeaHeightFn = (x: number, z: number) => number;
 
 // ---------------------------------------------------------------------------
-// Seegangszustand
+// Sea state
 //
-// Zwei Groessen, die NICHT aus der Zeit allein folgen und deshalb integriert
-// werden muessen:
+// Two quantities that do NOT follow from time alone and therefore must be
+// integrated:
 //
-//   seaWind - die See folgt dem Wind traege. Sie baut sich schneller auf, als
-//             sie abklingt (tau 45 s gegen 95 s). Frueher lag dieser Wert in
-//             game.js (Zeile 392) und wurde mit variablem dt fortgeschrieben.
-//   phaseT  - aufsummierte Wellenphase. Laengere Wellen laufen langsamer
-//             (omega ~ 1/sqrt(lambda)); wuerde man die Phase aus der absoluten
-//             Zeit berechnen, verschoebe sich das ganze Wellenfeld
-//             sprunghaft, sobald der Wind auffrischt.
+//   seaWind - the sea follows the wind sluggishly. It builds up faster than
+//             it subsides (tau 45 s vs. 95 s). This value used to live in
+//             game.js (line 392) and was advanced with a variable dt.
+//   phaseT  - accumulated wave phase. Longer waves travel slower
+//             (omega ~ 1/sqrt(lambda)); computing the phase from absolute
+//             time would make the whole wave field jump the instant the
+//             wind freshens.
 //
-// Beide zusammen sind der uebertragbare Wasserzustand (SeaSync in types.ts).
+// Together, both make up the transferable water state (SeaSync in types.ts).
 // ---------------------------------------------------------------------------
 export class SeaState {
-   /** Nachlaufende Windstaerke, aus der sich der Seegang ergibt (kn) */
+   /** Lagging wind strength that the sea state follows (kn) */
    seaWind: number;
-   /** Aufsummierte Wellenphase (s) */
+   /** Accumulated wave phase (s) */
    phaseT = 0;
-   /** Ausbreitungsrichtung der Wellen (rad) */
+   /** Direction the waves travel (rad) */
    windRad = Math.PI;
 
    constructor(windKts = 12) {
       this.seaWind = windKts;
    }
 
-   /** Auf eine Windstaerke setzen, ohne Nachlauf (Start, Szenenwechsel). */
+   /** Set to a wind strength without lag (start, scene change). */
    snapTo(windKts: number): void {
       this.seaWind = windKts;
    }
 
    /**
-    * Einen festen Schritt integrieren.
-    * @param windKts aktuelle wahre Windstaerke
-    * @param windDirDeg Richtung, aus der es weht (Grad)
+    * Integrate one fixed step.
+    * @param windKts current true wind strength
+    * @param windDirDeg direction the wind blows from (degrees)
     */
    step(dt: number, windKts: number, windDirDeg: number): void {
-      // Seegang dem Wind nachfuehren (Aufbau schneller als Abklingen)
+      // Make the sea state follow the wind (builds up faster than it subsides)
       const tau = windKts > this.seaWind ? 45 : 95;
       this.seaWind += (windKts - this.seaWind) * (1 - Math.exp(-dt / tau));
-      // Wellen laufen mit dem Wind, also dorthin, wohin er weht
+      // Waves travel with the wind, i.e. toward where it is blowing
       this.windRad = ((((windDirDeg + 180) % 360) + 360) % 360) * (Math.PI / 180);
       this.phaseT += dt / Math.sqrt(this.lambda);
    }
@@ -216,20 +216,20 @@ export class SeaState {
       return whitecapsForWind(this.seaWind);
    }
 
-   /** Hoehe der sichtbaren Wasseroberflaeche an (x, z). */
+   /** Height of the visible water surface at (x, z). */
    heightAt(x: number, z: number): number {
       return seaHeight(x, z, this.phaseT, this.windRad, this.amp, this.lambda);
    }
 
    /**
-    * Eingefrorene Abfragefunktion fuer genau einen Tick: Phase, Amplitude und
-    * Streckung werden beim Erzeugen festgehalten. Damit rechnen alle Systeme
-    * eines Schrittes auf derselben Flaeche, auch wenn die See danach
-    * weiterlaeuft.
+    * A frozen query function for exactly one tick: phase, amplitude and
+    * stretch are fixed at creation time. That way every system in a step
+    * computes against the same surface, even as the sea keeps moving
+    * afterward.
     *
-    * `scale` ist eine Absenkung der abgefragten Flaeche. Wrack und Geschosse
-    * benutzen 0.9 (sie tauchen etwas frueher ein als der sichtbare Kamm), die
-    * Rumpflage in shipPose() rechnet mit der vollen Flaeche (scale 1).
+    * `scale` lowers the queried surface. Wrecks and projectiles use 0.9
+    * (they dip in a little earlier than the visible crest); the hull's pose
+    * in shipPose() uses the full surface (scale 1).
     */
    sampler(scale = 0.9): SeaHeightFn {
       const t = this.phaseT;
@@ -239,7 +239,7 @@ export class SeaState {
       return (x: number, z: number) => seaHeight(x, z, t, wr, a, l) * scale;
    }
 
-   /** Uebertragbarer Zustand. */
+   /** Transferable state. */
    toSync(): { seaWind: number; phaseT: number } {
       return { seaWind: this.seaWind, phaseT: this.phaseT };
    }

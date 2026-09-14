@@ -2,10 +2,10 @@
 import { defineConfig } from "vite";
 import { fileURLToPath } from "node:url";
 
-// @segel/shared wird im Dev- und Build-Lauf direkt aus den TypeScript-Quellen
-// aufgeloest. Dadurch braucht der Client keinen vorgeschalteten tsc-Lauf und
-// HMR greift bis in die geteilten Module hinein. Node-Konsumenten (Tests,
-// Server) benutzen stattdessen das kompilierte dist/ aus package.json.
+// @segel/shared is resolved directly from the TypeScript sources during dev
+// and build. This means the client needs no separate tsc pass beforehand,
+// and HMR reaches all the way into the shared modules too. Node consumers
+// (tests, server) use the compiled dist/ from package.json instead.
 const sharedSrc = fileURLToPath(new URL("../shared/src", import.meta.url));
 
 export default defineConfig({

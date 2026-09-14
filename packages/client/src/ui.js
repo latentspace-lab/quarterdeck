@@ -30,10 +30,10 @@ export class UI {
            </div>
            <div class="panel tr windbox">
               <div class="wind-title">WIND</div>
-              <div class="wind-dir"><span id="windDir">0</span>° · <span id="windName">Windstille</span></div>
+              <div class="wind-dir"><span id="windDir">0</span>° · <span id="windName">Calm</span></div>
               <div class="wind-speed"><span id="windSpeed">0.0</span> kn · <span id="beaufort">Bft 0</span></div>
               <div class="awa">AwA <span id="awaFrom">--</span>° · <span id="awaSpeed">--</span> kn</div>
-              <div class="small" id="seaState">See: --</div>
+              <div class="small" id="seaState">Sea: --</div>
               <div class="small" id="hudGust">Gusts: on</div>
            </div>
            <div class="panel bl">
@@ -158,12 +158,12 @@ export class UI {
               <div class="gun-row">
                  <span class="gun-side">Q ◄ PORT</span>
                  <div class="gun-track"><div class="gun-fill" id="gunFillP"></div></div>
-                 <span class="gun-state" id="gunStateP">KLAR</span>
+                 <span class="gun-state" id="gunStateP">READY</span>
               </div>
               <div class="gun-row">
                  <span class="gun-side">E ► STBD</span>
                  <div class="gun-track"><div class="gun-fill" id="gunFillS"></div></div>
-                 <span class="gun-state" id="gunStateS">KLAR</span>
+                 <span class="gun-state" id="gunStateS">READY</span>
               </div>
               <div class="small" id="gunInfo">— guns per side · F = both sides</div>
            </div>
@@ -336,9 +336,9 @@ export class UI {
       this._updateFoes(s);
 
       if (s.course) {
-         R.lap.textContent = "Runde " + s.course.lap;
+         R.lap.textContent = "Lap " + s.course.lap;
          R.time.textContent =
-            s.course.time.toFixed(1) + "s · Beste: " +
+            s.course.time.toFixed(1) + "s · Best: " +
             (s.course.best ? s.course.best.toFixed(1) + "s" : "--");
          R.course.textContent =
             "Leg " +
@@ -347,7 +347,7 @@ export class UI {
             (s.course.legName || "Mark buoy") +
             " · " +
             Math.round(s.course.dist) +
-            " m · Rgk " +
+            " m · Brg " +
             Math.round(s.course.bearing) +
             "°";
          R.progress.style.visibility = "visible";
@@ -378,7 +378,7 @@ export class UI {
          Math.round(s.boat.twa) +
          "° · " +
          (s.boat.tack === "STBD" ? "Stbd" : "Port") +
-         (s.boat.capsize ? "  KENTER!" : "");
+         (s.boat.capsize ? "  CAPSIZED!" : "");
       R.tack.textContent = s.boat.tack === "STBD" ? "Stbd" : "Port";
 
       const rr = Math.max(-1, Math.min(1, s.boat.rudder || 0));
@@ -392,7 +392,7 @@ export class UI {
          R.trainTitle.textContent = this.training.title || "";
          R.trainDesc.textContent = this.training.desc || "";
          R.trainHint.textContent =
-            "Fortschritt: " + Math.round((this.training.progress || 0) * 100) + "%";
+            "Progress: " + Math.round((this.training.progress || 0) * 100) + "%";
          R.trainFill.style.width = Math.round((this.training.progress || 0) * 100) + "%";
          R.trainFill.classList.toggle("is-done", !!this.training.done);
       } else {
@@ -471,10 +471,9 @@ export class UI {
       bar(R.dRud, d.rudder, R.dRudV);
       bar(R.dFlood, d.flooding, R.dFloodV, true);
 
-      // Rumpfplan: jeder der sechs Abschnitte einzeln. Ein Mittelwert ueber
-      // den ganzen Rumpf verschweigt genau das, was zaehlt - naemlich WO sie
-      // getroffen ist. Eine zerschossene Breitseite ist etwas anderes als
-      // gleichmaessiger Verschleiss.
+      // Hull plan: each of the six sections individually. An average across
+      // the whole hull would hide exactly what matters - namely WHERE she was
+      // hit. A shot-through broadside is something different from even wear.
       if (d.sections) {
          for (const k in R.plan.sections) {
             const el = R.plan.sections[k];
@@ -507,7 +506,7 @@ export class UI {
       if (s.wreck) warn.push("Wreck in tow — X to cut");
       if (d.flooding > 0.25) warn.push("Water in the ship");
       if (s.depth !== null && s.depth !== undefined && s.depth < 12) {
-         warn.push("FLACHWASSER " + s.depth.toFixed(1) + " m");
+         warn.push("SHALLOW WATER " + s.depth.toFixed(1) + " m");
       }
       R.dWarn.textContent = warn.join(" · ");
       R.dWarn.style.display = warn.length ? "block" : "none";
@@ -550,7 +549,7 @@ export class UI {
             <div class="foe-name">${e.name}<span class="foe-dist">${st}</span></div>
             <div class="foe-sub">${e.rate}</div>
             <div class="foe-bar"><div class="foe-fill" style="width:${bar}%"></div></div>
-            <div class="foe-sub">Rgk ${Math.round(e.bearing)}° · Masten ${e.masts}/3</div>
+            <div class="foe-sub">Brg ${Math.round(e.bearing)}° · Masts ${e.masts}/3</div>
          </div>`;
       }).join("");
    }
@@ -826,10 +825,10 @@ export class UI {
 
    renderMenu(m) {
       const modes = [
-         ["Freeride", "Frei auf See, Windspielen"],
-         ["Gefecht", "Seegefecht gegen die Franzosen"],
-         ["Regatta", "Runden-Kurs mit Wendebojen"],
-         ["Training", "Segeltechnische Übungen"],
+         ["Freeride", "Open sea, play with the wind"],
+         ["Battle", "Sea battle against the French"],
+         ["Regatta", "Lap course with turning buoys"],
+         ["Training", "Sail-handling exercises"],
          ["Multiplayer", "Join a battle on a server"],
       ];
       const isMp = m.mode === "Multiplayer";
@@ -855,23 +854,23 @@ export class UI {
                   <div class="sb-desc">${v.desc}</div>
                   <div class="sb-stats">
                      <span>${v.hull.loa.toFixed(0)} m LOA</span>
-                     <span>${v.crew} Mann</span>
-                     <span>Am Wind ${v.sail.noGo}°</span>
+                     <span>${v.crew} crew</span>
+                     <span>Close-hauled ${v.sail.noGo}°</span>
                   </div>
                   <div class="sb-foot">${guns}</div>
                </button>`;
       }).join("");
       const selected = VESSELS.find((v) => v.id === m.vesselId) || VESSELS[0];
 
-      // Battle nur zeigen, wenn auch gekaempft wird
+      // Only show Battle when there is actually combat
       let scenarioHtml = "";
-      if ((m.mode === "Gefecht" || (isMp && (m.mp.mode || "battle") !== "regatta")) && m.scenarios.length) {
+      if ((m.mode === "Battle" || (isMp && (m.mp.mode || "battle") !== "regatta")) && m.scenarios.length) {
          const unarmed = !selected.guns;
          const cards = m.scenarios.map((sc) => {
             const force = (sc.forces[m.vesselId] || []);
             const label = unarmed || !force.length
                ? "no opponent for this ship"
-               : force.length + (force.length === 1 ? " Gegner" : " Gegner");
+               : force.length + (force.length === 1 ? " opponent" : " opponents");
             return `<button class="sc-btn${m.scenarioId === sc.id ? " active" : ""}${unarmed ? " off" : ""}" data-sc="${sc.id}">
                   <div class="sc-title">${sc.title}</div>
                   <div class="sc-desc">${sc.desc}</div>

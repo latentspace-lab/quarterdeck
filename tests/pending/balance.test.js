@@ -1,12 +1,12 @@
-// tests/pending/balance.test.js - OFFENE BALANCE-FRAGEN
+// tests/pending/balance.test.js - OPEN BALANCE QUESTIONS
 //
-// Diese Faelle standen als Zusicherungen in der regulaeren Suite und sind dort
-// (auch auf main) immer rot gewesen. Sie behaupten kein Ist, sondern ein Soll,
-// das die Simulation derzeit nicht erreicht. Ob das Soll oder das Modell
-// geaendert werden soll, ist eine Design-Entscheidung - deshalb liegen sie
-// hier und nicht in der Standard-Suite.
+// These cases used to be assertions in the regular suite and were always red
+// there (on main too). They do not claim an IS, but a SHOULD that the
+// simulation currently does not reach. Whether the SHOULD or the model needs
+// to change is a design decision - that is why they live here and not in the
+// standard suite.
 //
-// Ausfuehren:  node tests/run.js --pending
+// Run:  node tests/run.js --pending
 import * as THREE from "three";
 import { DamageModel, AMMO } from "../../packages/client/src/damage.js";
 import { getVessel } from "../../packages/client/src/vessels.js";
@@ -17,16 +17,16 @@ import { Captain } from "../../packages/client/src/fleet.js";
 import { seaHeight, ampForWind } from "../../packages/client/src/ocean.js";
 import { createSuite } from "../lib/harness.js";
 
-const suite = createSuite("Balance (offen)");
+const suite = createSuite("Balance (open)");
 const { ok } = suite;
 
 const LY = getVessel("lydia");
 
-suite.section("1) Wirkt eine Breitseite stark genug?");
+suite.section("1) Does a broadside hit hard enough?");
 {
-   // Rumpfschaden je Treffer: dmg = (lb/18) * reach * ammo.hull * 0.03 / scantling
-   // Fuer die Lydia (scantling 0.82) sind das exakt 0.015625 Gefechtskraft je
-   // Vollkugel auf 0.25 Reichweite - unabhaengig vom Zufall.
+   // Hull damage per hit: dmg = (lb/18) * reach * ammo.hull * 0.03 / scantling
+   // For the Lydia (scantling 0.82) that is exactly 0.015625 fighting power
+   // per round shot at 0.25 range - independent of randomness.
    const pound = (n) => {
       const rng = makeRng(1);
       const d = new DamageModel(LY, { rng });
@@ -38,19 +38,19 @@ suite.section("1) Wirkt eine Breitseite stark genug?");
    };
    const eight = pound(8).integrity();
    const twenty = pound(20).integrity();
-   suite.note(`gemessen: 8 Treffer -> ${eight.toFixed(4)}, 20 Treffer -> ${twenty.toFixed(4)}`);
-   ok(eight < 0.85, "SOLL: eine Breitseite (8 Treffer) kostet rund ein Viertel",
-      "ist " + eight.toFixed(3));
-   ok(twenty < 0.40, "SOLL: zweieinhalb Breitseiten (20 Treffer) machen sie gefechtsunfaehig",
-      "ist " + twenty.toFixed(3));
-   suite.note("Um das Soll zu treffen, muesste der Faktor 0.055 in damage.ts auf rund 0.11 steigen");
-   suite.note("- oder die Faelle beschreiben ein Gefecht mit mehr als 8 Treffern je Breitseite.");
+   suite.note(`measured: 8 hits -> ${eight.toFixed(4)}, 20 hits -> ${twenty.toFixed(4)}`);
+   ok(eight < 0.85, "SHOULD: one broadside (8 hits) costs roughly a quarter",
+      "is " + eight.toFixed(3));
+   ok(twenty < 0.40, "SHOULD: two and a half broadsides (20 hits) put her out of the fight",
+      "is " + twenty.toFixed(3));
+   suite.note("To hit the SHOULD, the factor 0.055 in damage.ts would need to rise to about 0.11");
+   suite.note("- or the cases describe a battle with more than 8 hits per broadside.");
 }
 
-suite.section("2) Schliessen die Kapitaene auf Gefechtsentfernung auf?");
+suite.section("2) Do the captains close to fighting range?");
 {
-   // Captain.engage ist die gewuenschte Kampfentfernung. Der Manoeverteil
-   // haelt sie nicht ein: beide bleiben weit ausserhalb stehen.
+   // Captain.engage is the desired fighting range. The manoeuvring part does
+   // not hold it: both stay well outside.
    const scene = new THREE.Scene();
    const debris = new DebrisField(scene, { max: 400 });
    const all = [];
@@ -79,11 +79,11 @@ suite.section("2) Schliessen die Kapitaene auf Gefechtsentfernung auf?");
       minDist = Math.min(minDist, Math.hypot(A.pos.x - B.pos.x, A.pos.z - B.pos.z));
       t += dt;
    }
-   suite.note(`gemessen: geringste Entfernung ${minDist.toFixed(0)} m bei engage ${ENGAGE_A} m, Dauer ${t.toFixed(0)} s`);
-   ok(minDist < ENGAGE_A * 1.35, "SOLL: die Kapitaene kommen auf Gefechtsentfernung heran",
+   suite.note(`measured: closest distance ${minDist.toFixed(0)} m at engage ${ENGAGE_A} m, duration ${t.toFixed(0)} s`);
+   ok(minDist < ENGAGE_A * 1.35, "SHOULD: the captains close to fighting range",
       minDist.toFixed(0) + " m");
-   ok(t < 1200, "SOLL: das Gefecht wird binnen 20 Minuten entschieden", t.toFixed(0) + " s");
-   suite.note("Captain._steer() haelt die Entfernung nicht - Ansatzpunkt: fleet.js Zeile ~91/94");
+   ok(t < 1200, "SHOULD: the battle is decided within 20 minutes", t.toFixed(0) + " s");
+   suite.note("Captain._steer() does not hold the range - starting point: fleet.js line ~91/94");
 }
 
 export default () => suite.done();

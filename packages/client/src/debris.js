@@ -1,25 +1,25 @@
-// debris.js - Starrkoerper-Simulation fuer Wrackteile.
+// debris.js - rigid-body simulation for wreckage.
 //
-// Kein Physik-Framework, sondern ein kleiner eigener Integrator - das reicht
-// vollkommen, weil Wrackteile untereinander nicht kollidieren muessen. Was
-// zaehlt, ist das Verhalten gegenueber Schwerkraft, Wasser und Luft:
+// Not a physics framework, just a small custom integrator - that is entirely
+// sufficient, because pieces of wreckage never need to collide with each
+// other. What matters is how they behave against gravity, water and air:
 //
-//   * Schwerkraft            greift im Schwerpunkt an -> kein Drehmoment
-//   * Auftrieb               F = rho_Wasser * g * V_eingetaucht   (Archimedes),
-//                            aber VERTEILT ueber Stuetzpunkte laengs des Koerpers.
-//                            Genau daraus entsteht das Drehmoment: solange ein
-//                            Mast senkrecht steht, sitzt der Auftriebsschwerpunkt
-//                            unter dem Massenschwerpunkt - das ist ein labiles
-//                            Gleichgewicht, und er kippt um, bis er flach im
-//                            Wasser liegt. Ein einzelner Auftriebspunkt kann das
-//                            nicht: damit bliebe jeder Mast senkrecht stehen.
-//   * Wasserwiderstand       quadratisch, mit dem eingetauchten Anteil skaliert,
-//                            an jedem Stuetzpunkt einzeln -> bremst auch die Drehung
-//   * Drehimpuls             freie Rotation, Quaternion-Integration
-//   * Trosse (tether)        gefallene Masten haengen im stehenden Gut und
-//                            schleppen laengsseit mit, bis sie gekappt werden
+//   * Gravity                acts at the centre of mass -> no torque
+//   * Buoyancy               F = rho_water * g * V_submerged   (Archimedes),
+//                            but DISTRIBUTED over probe points along the body.
+//                            This is exactly what produces the torque: as long
+//                            as a mast stands upright, the centre of buoyancy
+//                            sits below the centre of mass - an unstable
+//                            equilibrium, so it tips over until it lies flat
+//                            in the water. A single buoyancy point cannot do
+//                            this: every mast would stay standing upright.
+//   * Water drag             quadratic, scaled by the submerged fraction,
+//                            applied at each probe point individually -> also brakes rotation
+//   * Angular momentum       free rotation, quaternion integration
+//   * Tether                 fallen masts hang in the standing rigging and
+//                            drag alongside until the tether is cut
 //
-// Einheiten: SI (Meter, Sekunden, Kilogramm). Welt: X=Ost, Z=Nord, Y=hoch.
+// Units: SI (metres, seconds, kilograms). World: X=east, Z=north, Y=up.
 
 import * as THREE from "three";
 import { clamp } from "./utils.js";
@@ -27,27 +27,27 @@ import { puffTexture } from "./fx.js";
 import { palette } from "./style.js";
 
 const G = 9.81;
-const RHO_WATER = 1025;      // kg/m3, Seewasser
+const RHO_WATER = 1025;      // kg/m3, seawater
 const ZERO = new THREE.Vector3();
 
-// Materialdichten (kg/m3)
+// Material densities (kg/m3)
 export const RHO = {
-   oak: 720,        // Eiche, Rumpfplanken - schwimmt knapp
-   pine: 520,       // Kiefer/Fichte, Rundhoelzer - schwimmt gut
-   canvas: 900,     // nasses Segeltuch - treibt knapp unter der Oberflaeche
-   iron: 7600,      // Kanonenrohre, Beschlaege - sinkt sofort
+   oak: 720,        // oak, hull planking - floats just barely
+   pine: 520,       // pine/spruce, spars - floats well
+   canvas: 900,     // wet sailcloth - drifts just under the surface
+   iron: 7600,      // gun barrels, fittings - sinks immediately
    rope: 950,
 };
 
-// ---------------------------------------------------------------- Geometrie
-// Ein paar unregelmaessige Splitterformen, die sich alle Teile teilen.
+// ---------------------------------------------------------------- Geometry
+// A handful of irregular splinter shapes shared by all pieces.
 function makeSplinterGeos() {
    const geos = [];
    for (let v = 0; v < 4; v++) {
       const g = new THREE.BoxGeometry(1, 1, 1, 1, 1, 1);
       const p = g.attributes.position;
       for (let i = 0; i < p.count; i++) {
-         // laenglich ziehen und die Ecken verziehen -> Holzsplitter statt Wuerfel
+         // stretch it lengthwise and distort the corners -> wood splinter instead of a cube
          p.setX(i, p.getX(i) * (0.9 + Math.random() * 0.5));
          p.setY(i, p.getY(i) * (0.35 + Math.random() * 0.35));
          p.setZ(i, p.getZ(i) * (2.2 + Math.random() * 2.6));
@@ -58,7 +58,7 @@ function makeSplinterGeos() {
    return geos;
 }
 
-// ---------------------------------------------------------------- Feld
+// ---------------------------------------------------------------- Field
 export class DebrisField {
    constructor(scene, opts = {}) {
       this.scene = scene;
@@ -75,12 +75,12 @@ export class DebrisField {
       this._splinterGeos = makeSplinterGeos();
       this._plankGeo = new THREE.BoxGeometry(1, 1, 1);
       this._sparGeo = new THREE.CylinderGeometry(1, 1, 1, 7);
-      this._sparGeo.rotateX(Math.PI / 2); // Achse entlang +Z
+      this._sparGeo.rotateX(Math.PI / 2); // axis along +Z
       this._scrapGeo = new THREE.PlaneGeometry(1, 1, 2, 2);
 
       this._matCache = new Map();
 
-      // Arbeitsvektoren
+      // Working vectors
       this._v = new THREE.Vector3();
       this._n = new THREE.Vector3();
       this._axis = new THREE.Vector3();
@@ -108,10 +108,10 @@ export class DebrisField {
 
    count() { return this.pieces.length; }
 
-   // ------------------------------------------------------------ Einfuegen
+   // ------------------------------------------------------------ Inserting
    _push(piece) {
       if (this.pieces.length >= this.max) {
-         // aeltestes freies Teil recyceln, angebundene Wracks nie
+         // recycle the oldest untethered piece, never tethered wreckage
          let idx = -1;
          for (let i = 0; i < this.pieces.length; i++) {
             if (!this.pieces[i].tether) { idx = i; break; }
@@ -134,9 +134,9 @@ export class DebrisField {
       this.pieces.splice(i, 1);
    }
 
-   // Stuetzpunkte laengs eines langgestreckten Koerpers (Mast, Rah, Planke).
-   // axis: lokale Richtung, from/to: Anfang und Ende laengs dieser Achse.
-   // taper(u) gewichtet das Volumen (Untermast dick, Bramstenge duenn).
+   // Probe points along an elongated body (mast, yard, plank).
+   // axis: local direction, from/to: start and end along this axis.
+   // taper(u) weights the volume (lower mast thick, topgallant mast thin).
    static probesAlongAxis(axis, from, to, volume, n = 9, taper = null, radius = null) {
       const probes = [];
       const L = to - from;
@@ -154,8 +154,8 @@ export class DebrisField {
          probes.push({
             p: axis.clone().multiplyScalar(d),
             vol: volume * w[i] / sum,
-            // r ist die halbe Dicke des Koerpers an dieser Stelle - sie
-            // bestimmt, wie tief er einsinkt. Ohne Angabe: halbe Segmentlaenge.
+            // r is half the body's thickness at this point - it determines
+            // how deep it sinks. If not given: half the segment length.
             r: radius != null ? Math.max(radius * (taper ? Math.sqrt(Math.max(taper(u), 0.04)) : 1), 0.05)
                               : Math.abs(seg) * 0.5,
          });
@@ -163,23 +163,23 @@ export class DebrisField {
       return probes;
    }
 
-   // Ein fertiges Mesh als Starrkoerper uebernehmen.
+   // Take over a finished mesh as a rigid body.
    // spec: { pos, quat, vel, omega, mass, volume, radius, cdWater, cdAir,
-   //         com    - Schwerpunkt im Mesh-System (Vector3, Standard 0)
-   //         probes - Auftriebs-Stuetzpunkte im Mesh-System
-   //         inertia- Traegheitsmoment (skalar), Standard aus Masse und Radius
+   //         com    - centre of mass in mesh space (Vector3, default 0)
+   //         probes - buoyancy probe points in mesh space
+   //         inertia- moment of inertia (scalar), default from mass and radius
    //         life, tether:{owner, local, len, attach} }
    addBody(mesh, spec = {}) {
       const com = spec.com ? spec.com.clone() : new THREE.Vector3();
       const quat = spec.quat ? spec.quat.clone() : mesh.quaternion.clone();
-      // pos bezeichnet ab hier IMMER den Schwerpunkt in Weltkoordinaten
+      // from here on, pos ALWAYS denotes the centre of mass in world coordinates
       const pos = spec.pos
          ? spec.pos.clone()
          : mesh.position.clone().add(com.clone().applyQuaternion(quat));
       const radius = Math.max(spec.radius ?? 0.3, 0.02);
       const volume = Math.max(spec.volume ?? 0.015, 1e-4);
       const mass = Math.max(spec.mass ?? 10, 0.05);
-      // Stuetzpunkte relativ zum Schwerpunkt ablegen
+      // store probe points relative to the centre of mass
       const probes = (spec.probes && spec.probes.length
          ? spec.probes.map((q) => ({ p: q.p.clone().sub(com), vol: q.vol, r: q.r }))
          : [{ p: new THREE.Vector3(), vol: volume, r: radius }]);
@@ -204,7 +204,7 @@ export class DebrisField {
          tether: spec.tether
             ? {
                ...spec.tether, pull: 0,
-               // Angriffspunkt am Koerper, relativ zum Schwerpunkt
+               // attach point on the body, relative to the centre of mass
                attach: (spec.tether.attach ? spec.tether.attach.clone() : new THREE.Vector3()).sub(com),
             }
             : null,
@@ -218,12 +218,12 @@ export class DebrisField {
       return this._push(piece);
    }
 
-   // Eine komplette Baugruppe (z. B. Mast mit Rahen und Segeln) uebernehmen.
-   // Die Welt-Transformation bleibt erhalten: das Teil bleibt genau dort
-   // stehen, wo es im Moment des Bruchs war.
+   // Take over a complete assembly (e.g. mast with yards and sails).
+   // The world transform is preserved: the piece stays exactly where it
+   // was at the moment it broke off.
    capture(group, spec = {}) {
       group.updateMatrixWorld(true);
-      this.group.attach(group); // three erhaelt dabei die Welt-Transformation
+      this.group.attach(group); // three preserves the world transform here
       const com = spec.com ? spec.com.clone() : new THREE.Vector3();
       return this.addBody(group, {
          ...spec,
@@ -232,8 +232,8 @@ export class DebrisField {
       });
    }
 
-   // Mesh an seinen Platz setzen: pos ist der Schwerpunkt, das Mesh-System
-   // sitzt um -com davon entfernt.
+   // Place the mesh at its position: pos is the centre of mass, the mesh
+   // origin sits offset from it by -com.
    _placeMesh(p) {
       if (p.com.lengthSq() > 1e-9) {
          this._v.copy(p.com).applyQuaternion(p.quat);
@@ -244,9 +244,9 @@ export class DebrisField {
       p.mesh.quaternion.copy(p.quat);
    }
 
-   // ---------------------------------------------------- Splitter & Trümmer
-   // Der eigentliche Killer an Bord war nicht die Kugel, sondern der
-   // Holzsplitterhagel, den sie aus der Bordwand schlug.
+   // ---------------------------------------------------- Splinters & wreckage
+   // The real killer on board was not the cannonball itself, but the hail
+   // of wood splinters it tore out of the hull.
    spawnSplinters(pos, dir, n = 12, opts = {}) {
       const color = opts.color ?? 0x9c7c4e;
       const spread = opts.spread ?? 0.75;
@@ -260,7 +260,7 @@ export class DebrisField {
          mesh.scale.set(L * 0.5, L * 0.28, L);
          const v = this._randomCone(dir, spread).multiplyScalar(speed * (0.45 + Math.random()));
          v.y += Math.random() * 5;
-         // Volumen aus den Abmessungen, Masse aus der Dichte
+         // volume from the dimensions, mass from the density
          const vol = (L * 0.5) * (L * 0.28) * L * 0.55;
          out.push(this.addBody(mesh, {
             pos,
@@ -278,7 +278,7 @@ export class DebrisField {
       return out;
    }
 
-   // Ein groesseres Plankenstueck / Wrackteil
+   // A larger piece of planking / wreckage
    spawnPlank(pos, dir, opts = {}) {
       const w = opts.w ?? 0.5, h = opts.h ?? 0.10, l = opts.l ?? 2.2;
       const mesh = new THREE.Mesh(this._plankGeo, this._mat(opts.color ?? 0x6b5433));
@@ -297,12 +297,12 @@ export class DebrisField {
       });
    }
 
-   // Abgeschossenes Rundholz (Rah, Stenge)
+   // A shot-away spar (yard, topmast)
    spawnSpar(pos, dir, len, radius, opts = {}) {
       const mesh = new THREE.Mesh(this._sparGeo, this._mat(opts.color ?? 0x6b4c28));
       mesh.scale.set(radius, radius, len);
       const vol = Math.PI * radius * radius * len;
-      // Rundholz-Achse ist +Z; verteilte Stuetzpunkte, damit es flach treibt
+      // spar axis is +Z; distributed probe points so it drifts lying flat
       const probes = DebrisField.probesAlongAxis(
          new THREE.Vector3(0, 0, 1), -len / 2, len / 2, vol, 5);
       return this.addBody(mesh, {
@@ -321,7 +321,7 @@ export class DebrisField {
       });
    }
 
-   // Weggeschossener Segelfetzen - treibt, saugt sich voll, sackt weg
+   // A shot-away scrap of sail - drifts, soaks up water, sinks away
    spawnCanvas(pos, dir, w, h, opts = {}) {
       const mesh = new THREE.Mesh(this._scrapGeo, this._mat(opts.color ?? 0xefe8d8, 0.95));
       mesh.scale.set(w, h, 1);
@@ -335,7 +335,7 @@ export class DebrisField {
          mass: vol * RHO.canvas,
          volume: vol,
          radius: Math.max(w, h) * 0.4,
-         cdAir: 0.85,   // Tuch bremst in der Luft stark
+         cdAir: 0.85,   // cloth brakes hard in the air
          cdWater: 4.5,
          angDrag: 1.6,
          life: opts.life ?? 40,
@@ -352,8 +352,8 @@ export class DebrisField {
       return out.normalize();
    }
 
-   // ------------------------------------------------------------- Trossen
-   // Wrack kappen: alle Teile, die noch am Schiff haengen, treiben ab.
+   // ------------------------------------------------------------- Tethers
+   // Cut the wreck loose: all pieces still hanging on the ship drift away.
    cutTethers(owner) {
       let n = 0;
       for (const p of this.pieces) {
@@ -366,14 +366,14 @@ export class DebrisField {
       return n;
    }
 
-   // Wie stark haengt das Wrack am Schiff? 0 = nichts, 1 = schwer behindert.
+   // How heavily does the wreck drag on the ship? 0 = nothing, 1 = badly hampered.
    tetherLoad(owner) {
       let load = 0;
       for (const p of this.pieces) {
          if (p.tether && p.tether.owner === owner) {
-            // Ein zwoelf Tonnen schweres Rundholz laengsseit bremst auch dann,
-            // wenn die Trosse gerade lose steht - deshalb ein Sockelbetrag
-            // plus der tatsaechliche Zug.
+            // A twelve-tonne spar lying alongside slows the ship even when
+            // the tether is currently slack - hence a baseline amount
+            // plus the actual pull.
             load += clamp(0.35 + 0.65 * clamp(p.tether.pull, 0, 1), 0, 1)
                   * clamp(p.mass / 9000, 0.15, 1);
          }
@@ -386,7 +386,7 @@ export class DebrisField {
       return false;
    }
 
-   // ------------------------------------------------------------- Schritt
+   // ------------------------------------------------------------- Step
    // ctx: { seaHeight(x,z), windDir, windSpeed, anchorOf(owner, localVec, out) }
    update(dt, ctx = {}) {
       if (dt <= 0) return;
@@ -398,13 +398,13 @@ export class DebrisField {
          const p = this.pieces[i];
          p.life += dt;
 
-         // --- Trossenzwang (gefallener Mast haengt im stehenden Gut) -------
+         // --- Tether constraint (fallen mast hangs in the standing rigging) -------
          if (p.tether && ctx.anchorOf) {
             const a = ctx.anchorOf(p.tether.owner, p.tether.local, this._anchor);
             if (a) {
-               // Die Trosse greift an einem Punkt des Koerpers an (beim Mast am
-               // Mastfuss). Dadurch zieht sie ihn nicht nur heran, sondern dreht
-               // ihn auch - der Mast pendelt um seine Spur ueber Bord.
+               // The tether pulls at a point on the body (at the mast, its
+               // foot). This does not just pull it in but also rotates it -
+               // the mast swings about its stump overboard.
                this._r.copy(p.tether.attach || ZERO).applyQuaternion(p.quat);
                this._wp.copy(p.pos).add(this._r);
                const d = this._wp.distanceTo(a);
@@ -412,13 +412,13 @@ export class DebrisField {
                   this._n.subVectors(a, this._wp).multiplyScalar(1 / Math.max(d, 1e-5));
                   const over = d - p.tether.len;
                   p.pos.addScaledVector(this._n, over * 0.35);
-                  // Geschwindigkeit am Angriffspunkt
+                  // velocity at the attach point
                   this._vp.copy(p.vel).add(this._tmp.crossVectors(p.omega, this._r));
                   const vn = this._vp.dot(this._n);
                   if (vn < 0) {
-                     // Effektive Masse am Angriffspunkt: ein Zug am Mastfuss
-                     // beschleunigt nicht die ganze Masse, sondern dreht den
-                     // Mast auch. Ohne diesen Term schaukelt sich der Zwang auf.
+                     // Effective mass at the attach point: a pull at the mast
+                     // foot does not accelerate the whole mass, it also
+                     // rotates the mast. Without this term the constraint blows up.
                      this._tmp.crossVectors(this._r, this._n);
                      const mEff = 1 / (1 / p.mass + this._tmp.lengthSq() * p.invI);
                      const j = -(1 + 0.10) * vn * mEff;
@@ -436,13 +436,13 @@ export class DebrisField {
             }
          }
 
-         // --- Schwerkraft ---------------------------------------------------
+         // --- Gravity ---------------------------------------------------
          p.vel.y -= G * dt;
 
-         // --- Wasser: verteilter Auftrieb, Widerstand, Drehmoment -----------
-         // Jeder Stuetzpunkt traegt seinen Anteil. Liegt der Auftriebs-
-         // schwerpunkt nicht senkrecht unter dem Massenschwerpunkt, entsteht
-         // ein Drehmoment - und genau das kippt einen schwimmenden Mast flach.
+         // --- Water: distributed buoyancy, drag, torque -----------
+         // Each probe point contributes its share. If the centre of buoyancy
+         // is not directly below the centre of mass, a torque results -
+         // and that is exactly what tips a floating mast flat.
          let subTotal = 0;
          let deepest = 0;
          this._tq.set(0, 0, 0);
@@ -458,13 +458,13 @@ export class DebrisField {
             subTotal += sb * pr.vol;
             deepest = Math.max(deepest, sb);
 
-            // Auftriebskraft an diesem Punkt
+            // buoyancy force at this point
             const Fb = RHO_WATER * pr.vol * sb * G;
             this._f.y += Fb;
             this._tmp.set(0, Fb, 0);
             this._tq.add(this._v.crossVectors(this._r, this._tmp));
 
-            // Wasserwiderstand am Punkt (bremst Fahrt UND Drehung)
+            // water drag at the point (brakes both motion AND rotation)
             this._vp.copy(p.vel).add(this._tmp.crossVectors(p.omega, this._r));
             const kd = p.cdWater * sb * pr.vol * RHO_WATER * 0.45
                * (0.5 + 0.09 * this._vp.length());
@@ -481,17 +481,17 @@ export class DebrisField {
                   clamp(-p.vel.y * 0.10 + p.r, 0.5, 5));
                p.splashed = true;
             }
-            // Kraefte -> Beschleunigung (Schwerkraft wirkt bereits im Schwerpunkt)
+            // forces -> acceleration (gravity already acts at the centre of mass)
             p.vel.addScaledVector(this._f, dt / p.mass);
             p.omega.addScaledVector(this._tq, dt * p.invI);
-            // Restdaempfung, damit nichts aufschaukelt
+            // residual damping, so nothing spirals out of control
             p.omega.multiplyScalar(1 / (1 + p.angDrag * 0.9 * deepest * dt));
 
-            // Oberflaechendrift: Treibgut zieht mit Wind und Welle
+            // surface drift: flotsam is drawn along with wind and waves
             p.pos.x += wv.x * windMs * 2.1 * subFrac * dt * dt;
             p.pos.z += wv.z * windMs * 2.1 * subFrac * dt * dt;
 
-            // Zur Ruhe kommen, wenn es flach und langsam treibt
+            // come to rest once it drifts flat and slowly
             const sp = p.vel.length();
             if (sp < 1.2 && p.omega.length() < 0.35 && !p.tether) {
                p.settled = Math.min(1, p.settled + dt * 0.6);
@@ -508,8 +508,8 @@ export class DebrisField {
          }
 
          // --- Integration ---------------------------------------------------
-         // Notbremse: kein Wrackteil bewegt sich schneller als ein Geschoss
-         // oder dreht sich schneller als ein Propeller.
+         // Safety clamp: no piece of wreckage moves faster than a cannonball
+         // or spins faster than a propeller.
          const vmax = 90, wmax = 12;
          if (p.vel.lengthSq() > vmax * vmax) p.vel.setLength(vmax);
          if (p.omega.lengthSq() > wmax * wmax) p.omega.setLength(wmax);
@@ -523,12 +523,12 @@ export class DebrisField {
          }
          this._placeMesh(p);
 
-         // --- Aussortieren ---------------------------------------------------
+         // --- Culling ---------------------------------------------------
          if (p.pos.y < -40 || (!p.tether && p.life > p.maxLife)) {
             this._retire(i);
             continue;
          }
-         // sanft ausblenden
+         // fade out smoothly
          if (!p.tether && p.life > p.maxLife - p.fade) {
             const a = clamp((p.maxLife - p.life) / p.fade, 0, 1);
             p.mesh.traverse((o) => {

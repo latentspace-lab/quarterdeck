@@ -1,8 +1,8 @@
-// tests/lib/harness.js - gemeinsames Geruest fuer alle Suiten.
+// tests/lib/harness.js - shared scaffolding for all suites.
 //
-// Bewusst winzig und ohne Abhaengigkeiten: `node tests/<datei>` soll eine
-// einzelne Suite direkt ausfuehren koennen, ohne Runner, ohne Installation.
-// Der Runner (tests/run.js) sammelt nur die Ergebnisse ein.
+// Deliberately tiny and without dependencies: `node tests/<file>` should be
+// able to run a single suite directly, without a runner, without installing
+// anything. The runner (tests/run.js) just collects the results.
 
 const COL = {
    ok: "\x1b[32m",
@@ -34,42 +34,42 @@ export function createSuite(name) {
 
    const api = {
       name,
-      /** Abschnittsueberschrift. */
+      /** Section heading. */
       section(title) {
          console.log("\n" + c("head", "== " + title + " =="));
       },
-      /** Grundbaustein: Bedingung muss wahr sein. */
+      /** Basic building block: the condition must be true. */
       ok: record,
-      /** Strikte Gleichheit. */
+      /** Strict equality. */
       eq(actual, expected, msg) {
          return record(
             Object.is(actual, expected),
             msg,
-            Object.is(actual, expected) ? undefined : `erwartet ${fmt(expected)}, war ${fmt(actual)}`,
+            Object.is(actual, expected) ? undefined : `expected ${fmt(expected)}, got ${fmt(actual)}`,
          );
       },
-      /** Gleichheit im Rahmen einer Toleranz - fuer alles, was gerechnet wird. */
+      /** Equality within a tolerance - for anything that's computed. */
       near(actual, expected, eps, msg) {
          const d = Math.abs(actual - expected);
          return record(
             d <= eps,
             msg,
-            d <= eps ? d.toExponential(1) : `erwartet ${fmt(expected)} +-${eps}, war ${fmt(actual)} (Abw. ${d.toExponential(2)})`,
+            d <= eps ? d.toExponential(1) : `expected ${fmt(expected)} +-${eps}, got ${fmt(actual)} (diff ${d.toExponential(2)})`,
          );
       },
-      /** Tiefe Gleichheit ueber JSON - fuer Zustands-Schnappschuesse. */
+      /** Deep equality via JSON - for state snapshots. */
       deepEq(actual, expected, msg) {
          const a = JSON.stringify(actual);
          const b = JSON.stringify(expected);
-         return record(a === b, msg, a === b ? undefined : `erwartet ${trunc(b)}, war ${trunc(a)}`);
+         return record(a === b, msg, a === b ? undefined : `expected ${trunc(b)}, got ${trunc(a)}`);
       },
-      /** Der Aufruf muss werfen. */
+      /** The call must throw. */
       throws(fn, msg) {
          let threw = false;
          try { fn(); } catch { threw = true; }
          return record(threw, msg);
       },
-      /** Reine Notiz, zaehlt nicht als Zusicherung. */
+      /** Pure note, does not count as an assertion. */
       note(text) {
          console.log("        " + c("dim", text));
       },
@@ -77,11 +77,11 @@ export function createSuite(name) {
          return { pass, fail, failures };
       },
       /**
-       * Abschluss. Als Einzelaufruf setzt es den Exit-Code; unter dem Runner
-       * liefert es nur die Zahlen zurueck.
+       * Wrap-up. As a standalone call it sets the exit code; under the
+       * runner it just returns the numbers.
        */
       done() {
-         const line = `=== ${name}: ${pass} bestanden, ${fail} gescheitert ===`;
+         const line = `=== ${name}: ${pass} passed, ${fail} failed ===`;
          console.log("\n" + (fail ? c("fail", line) : c("ok", line)));
          if (!process.env.SEGEL_TEST_RUNNER && fail) process.exitCode = 1;
          return { name, pass, fail, failures };
@@ -99,10 +99,10 @@ function trunc(s, n = 160) {
 }
 
 /**
- * Kompakter Fingerabdruck eines Zustands. Fuer Golden-Tests: eine Zahlenfolge
- * wird auf eine kurze Hex-Signatur reduziert, die sich bei jeder Abweichung
- * aendert. FNV-1a ueber die auf 6 Nachkommastellen gerundeten Werte - damit
- * schlaegt nicht jedes Bit im letzten Digit an.
+ * Compact fingerprint of a state. For golden tests: a sequence of numbers
+ * is reduced to a short hex signature that changes on any deviation.
+ * FNV-1a over the values rounded to 6 decimal places - so not every bit in
+ * the last digit trips it.
  */
 export function fingerprint(values, digits = 6) {
    let h = 0x811c9dc5;

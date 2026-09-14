@@ -1,50 +1,50 @@
-// vessels.js - Schiffskatalog: moderne Yacht + drei Royal-Navy-Rahsegler
-// (Hornblower-Aera, ca. 1800). Jeder Eintrag beschreibt Rumpfmasse, Rigg,
-// Polarkurve, Manoevrierverhalten und - bei den Kriegsschiffen - die Batterie.
-//
-// Konventionen wie im Rest des Projekts: Winkel in Grad, Speed in Knoten,
-// Laengen in Metern, Welt X=Ost / Z=Nord / Y=hoch, Bug = +Z.
+// vessels.js - ship catalogue: a modern yacht + three Royal Navy square-riggers
+// (Hornblower era, c. 1800). Each entry describes hull dimensions, rig,
+// polar curve, manoeuvring behaviour and - for the warships - the battery.
+
+// Conventions as elsewhere in the project: angles in degrees, speed in
+// knots, lengths in metres, world X=East / Z=North / Y=up, bow = +Z.
 
 // ---------------------------------------------------------------------------
-// Polarkurven bei 15 kn wahrem Wind (TWA in Grad -> Speed in Knoten)
+// Polar curves at 15 kn true wind (TWA in degrees -> speed in knots)
 // ---------------------------------------------------------------------------
 
-// Bermuda-Sloop (moderne Yacht) - kreuzt hoch, schnellster Kurs am Beam.
+// Bermuda sloop (modern yacht) - points high, fastest at the beam.
 
 import type { Table } from "./utils.ts";
 
 // ---------------------------------------------------------------------------
-// Typen des Schiffskatalogs. Die Eintraege sind reine Daten - sie werden vom
-// Client (3D-Modellbau), vom Server (Simulation) und von den Tests gelesen.
+// Types of the ship catalogue. The entries are pure data - read by the
+// client (3D model building), the server (simulation), and the tests.
 // ---------------------------------------------------------------------------
 
-/** Rigg-Art. Bestimmt Polarkurve, Reffen und Manoeververhalten. */
+/** Rig type. Determines the polar curve, reefing and manoeuvring behaviour. */
 export type Rig = "bermuda" | "square";
 
 export interface HullSpec {
-   /** Laenge ueber alles (m) */
+   /** Length overall (m) */
    loa: number;
-   /** Groesste Breite (m) */
+   /** Greatest beam (m) */
    beam: number;
-   /** Tiefgang (m) */
+   /** Draft (m) */
    draft: number;
-   /** Verdraengung (t) */
+   /** Displacement (t) */
    displacement: number;
 }
 
 export interface SailSpec {
-   /** No-Go-Zone in Grad TWA */
+   /** No-go zone in degrees TWA */
    noGo: number;
    polar: Table;
-   /** Schwung, den ein Rahsegler durch die Wende mitnimmt (0..1) */
+   /** Momentum a square-rigger carries through a tack (0..1) */
    tackAssist?: number;
 }
 
-/** Ueberschreibt einzelne Felder von DEFAULT_PROFILE in physics.ts. */
+/** Overrides individual fields of DEFAULT_PROFILE in physics.ts. */
 export interface DynSpec {
-   /** Grad/s bei vollem Ruder und voller Ruderwirkung */
+   /** Degrees/s at full rudder and full rudder effectiveness */
    turnRate?: number;
-   /** Fahrt (kn), ab der das Ruder voll greift */
+   /** Speed (kn) above which the rudder bites fully */
    rudderRef?: number;
    accelUp?: number;
    accelDown?: number;
@@ -56,11 +56,11 @@ export interface DynSpec {
 }
 
 export interface GunDeck {
-   /** Hoehe der Pforten ueber der Wasserlinie, relativ zum Freibord */
+   /** Height of the ports above the waterline, relative to the freeboard */
    y: number;
-   /** Rohre je Seite auf diesem Deck */
+   /** Guns per side on this deck */
    count: number;
-   /** Laengsbereich der Pforten (0 = Bug, 1 = Spiegel) */
+   /** Longitudinal range of the ports (0 = bow, 1 = transom) */
    from: number;
    to: number;
    calibre: string;
@@ -68,24 +68,24 @@ export interface GunDeck {
 
 export interface GunSpec {
    decks: GunDeck[];
-   /** Sekunden fuer eine gut gedrillte Bedienung */
+   /** Seconds for a well-drilled crew */
    reload: number;
-   /** Streuung der Einzelschuesse einer Breitseite (s) */
+   /** Spread of the individual shots in a broadside (s) */
    spread: number;
-   /** Rohrrueckstoss (m) */
+   /** Gun recoil (m) */
    recoil: number;
-   /** Krengungsstoss (Grad) */
+   /** Roll kick (degrees) */
    rollKick: number;
-   /** Effektive Reichweite (m), fuer die Anzeige */
+   /** Effective range (m), for the display */
    range: number;
 }
 
 export interface StructureSpec {
-   /** Staerke der Bordwand */
+   /** Strength of the hull sides */
    scantling: number;
-   /** Staerke der Rundhoelzer */
+   /** Strength of the spars */
    mastStrength: number;
-   /** Reserveauftrieb - wie lange sie Wasser wegsteckt */
+   /** Reserve buoyancy - how long she keeps water out */
    reserve: number;
 }
 
@@ -123,7 +123,7 @@ export interface Vessel {
    guns: GunSpec | null;
    structure: StructureSpec;
    cam: CamSpec;
-   /** Nur bei Gegnern gesetzt */
+   /** Only set for enemies */
    nation?: string;
    paint?: PaintScheme;
 }
@@ -134,33 +134,33 @@ export const POLAR_BERMUDA: Table = [
    [130, 10.2], [145, 8.8], [160, 6.9], [175, 5.2], [180, 4.4],
 ];
 
-// Rahsegler-Sloop (Ship-rigged Sloop-of-War, ~20 Kanonen): klein, handig,
-// kann knapp 6 Strich (67.5 Grad) anliegen, laeuft am besten auf Backstagsbrise.
+// Square-rigged sloop (ship-rigged sloop-of-war, ~20 guns): small, handy,
+// can point to just under 6 points (67.5 degrees), sails best on a broad reach.
 export const POLAR_SLOOP_OF_WAR: Table = [
    [0, 0.0], [40, 0.0], [55, 0.5], [62, 1.9], [70, 3.9], [80, 5.2], [90, 6.4],
    [100, 7.3], [115, 8.3], [130, 8.9], [140, 9.1], [150, 8.9], [160, 8.3],
    [170, 7.7], [180, 7.3],
 ];
 
-// 36-Kanonen-Fregatte: mehr Segelflaeche, mehr Laenge, aber auch mehr Masse.
-// Spitzenlaeufer der Flotte - "the eyes of the fleet".
+// 36-gun frigate: more sail area, more length, but also more mass.
+// The fleet's front-runner - "the eyes of the fleet".
 export const POLAR_FRIGATE: Table = [
    [0, 0.0], [45, 0.0], [58, 0.5], [66, 2.2], [72, 3.8], [80, 5.0], [90, 6.3],
    [100, 7.2], [115, 8.2], [130, 8.8], [140, 9.0], [150, 8.8], [160, 8.2],
    [170, 7.6], [180, 7.2],
 ];
 
-// 38/44-Kanonen-Fregatte: Indefatigable (1784) — eines der schnellsten Rahsegel-
-// schiffe der Royal Navy. Bekannt durch Admiral Sir Edward Pellew. Leichter
-// als die Lydia auf allen Kursen.
+// 38/44-gun frigate: Indefatigable (1784) — one of the fastest square-rigged
+// ships in the Royal Navy. Famous under Admiral Sir Edward Pellew. Lighter
+// than the Lydia on every point of sail.
 export const POLAR_INDEFATIGABLE: Table = [
    [0, 0.0], [45, 0.0], [58, 0.5], [66, 2.3], [72, 4.0], [80, 5.2], [90, 6.6],
    [100, 7.6], [115, 8.6], [130, 9.2], [140, 9.5], [150, 9.2], [160, 8.6],
    [170, 8.0], [180, 7.6],
 ];
 
-// 74-Kanonen-Linienschiff: schwer, traege, kreuzt schlecht - dafuer
-// unerschuetterlich und mit doppelter Batterie.
+// 74-gun ship of the line: heavy, sluggish, points poorly - but
+// unshakeable, and with a double battery.
 export const POLAR_THIRD_RATE: Table = [
    [0, 0.0], [50, 0.0], [62, 0.4], [70, 1.7], [78, 3.1], [88, 4.2], [100, 5.3],
    [115, 6.3], [130, 7.0], [140, 7.2], [150, 7.1], [160, 6.7], [170, 6.2],
@@ -168,38 +168,38 @@ export const POLAR_THIRD_RATE: Table = [
 ];
 
 // ---------------------------------------------------------------------------
-// Farbschemata
+// Paint schemes
 // ---------------------------------------------------------------------------
 const NELSON: PaintScheme = {
-   copper: [0.46, 0.26, 0.15], // Kupferbeschlag unter Wasser
-   boot: [0.09, 0.09, 0.10],   // Barkholz / Wale
-   band: [0.86, 0.70, 0.30],   // Ocker-Band auf Hoehe der Batterie
-   dark: [0.10, 0.10, 0.12],   // Bordwand zwischen den Baendern
+   copper: [0.46, 0.26, 0.15], // copper sheathing below the waterline
+   boot: [0.09, 0.09, 0.10],   // boot topping / wales
+   band: [0.86, 0.70, 0.30],   // ochre band at battery height
+   dark: [0.10, 0.10, 0.12],   // hull side between the bands
    deck: 0xd8c9a4,
-   trim: 0x8c6a2f,             // vergoldete Zierleisten / Heckgalerie
+   trim: 0x8c6a2f,             // gilded trim / stern gallery
 };
 
 // ---------------------------------------------------------------------------
-// Schiffe
+// Ships
 // ---------------------------------------------------------------------------
 export const VESSELS: Vessel[] = [
    {
       id: "yacht",
       name: "Nordwind",
       prefix: "",
-      klass: "Moderne Segelyacht",
-      rate: "Bermuda-Sloop",
+      klass: "Modern Sailing Yacht",
+      rate: "Bermuda Sloop",
       rig: "bermuda",
-      era: "heute",
-      desc: "Leicht, kreuzt hoch am Wind, dreht auf dem Teller. Das Referenzboot.",
+      era: "today",
+      desc: "Light, points high into the wind, turns on a dime. The reference boat.",
       crew: 4,
       hull: { loa: 11.0, beam: 3.3, draft: 1.55, displacement: 6 },
       sail: { noGo: 32, polar: POLAR_BERMUDA, tackAssist: 0 },
       dyn: {
-         turnRate: 38,        // Grad/s bei vollem Ruder und voller Ruderwirkung
-         rudderRef: 4,        // Fahrt (kn), ab der das Ruder voll greift
-         accelUp: 0.45,       // Beschleunigung (1/s)
-         accelDown: 1.1,      // Abbremsen
+         turnRate: 38,        // degrees/s at full rudder and full rudder effectiveness
+         rudderRef: 4,        // speed (kn) above which the rudder bites fully
+         accelUp: 0.45,       // acceleration (1/s)
+         accelDown: 1.1,      // deceleration
          accelLuff: 1.6,
          maxHeel: 22,
          capsizeHeel: 30,
@@ -207,8 +207,8 @@ export const VESSELS: Vessel[] = [
          leewayMax: 7,
       },
       guns: null,
-      // scantling = Staerke der Bordwand, mastStrength = Rundhoelzer,
-      // reserve = Reserveauftrieb (wie lange sie Wasser wegsteckt)
+      // scantling = strength of the hull sides, mastStrength = spars,
+      // reserve = reserve buoyancy (how long she keeps water out)
       structure: { scantling: 0.30, mastStrength: 0.45, reserve: 0.5 },
       cam: { dist: 15, height: 6.5, cockpitZ: -1.2, cockpitY: 2.4, lead: 8, targetY: 2.0 },
    },
@@ -217,7 +217,7 @@ export const VESSELS: Vessel[] = [
       name: "Hotspur",
       prefix: "HMS",
       klass: "Sloop-of-War",
-      rate: "20-Kanonen-Rahsegler",
+      rate: "20-gun square-rigger",
       rig: "square",
       era: "1803",
       desc: "Smallest square-rigged ship with its own command — fast, nimble, thinly armed.",
@@ -227,7 +227,7 @@ export const VESSELS: Vessel[] = [
       dyn: {
          turnRate: 13,
          rudderRef: 3.2,
-         accelUp: 0.070,      // ~14 s Zeitkonstante - ein Schiff laeuft langsam an
+         accelUp: 0.070,      // ~14 s time constant - a ship gets under way slowly
          accelDown: 0.125,
          accelLuff: 0.34,
          maxHeel: 15,
@@ -238,10 +238,10 @@ export const VESSELS: Vessel[] = [
       guns: {
          decks: [{ y: 0.60, count: 10, from: 0.20, to: 0.80, calibre: "9-pounder" }],
          reload: 60.0,         // seconds per side for a well-drilled crew
-         spread: 0.28,         // Streuung der Einzelschuesse (s)
-         recoil: 0.55,         // m Rohrrueckstoss
-         rollKick: 1.7,        // Grad Krengungsstoss
-         range: 420,           // m effektive Reichweite (fuer die Anzeige)
+         spread: 0.28,         // spread of the individual shots (s)
+         recoil: 0.55,         // m gun recoil
+         rollKick: 1.7,        // degrees of roll kick
+         range: 420,           // m effective range (for the display)
       },
       structure: { scantling: 0.58, mastStrength: 0.70, reserve: 0.65 },
       cam: { dist: 58, height: 21, cockpitZ: -10.5, cockpitY: 7.0, lead: 12, targetY: 9 },
@@ -250,18 +250,18 @@ export const VESSELS: Vessel[] = [
       id: "lydia",
       name: "Lydia",
       prefix: "HMS",
-      klass: "Fregatte 5. Ranges",
-      rate: "36-Kanonen-Fregatte",
+      klass: "5th-Rate Frigate",
+      rate: "36-gun frigate",
       rig: "square",
       era: "1808",
-      desc: "Der klassische Hornblower: schnell genug zum Weglaufen, stark genug zum Bleiben.",
+      desc: "The classic Hornblower: fast enough to run, strong enough to stand and fight.",
       crew: 264,
       hull: { loa: 43.0, beam: 11.6, draft: 4.6, displacement: 950 },
       sail: { noGo: 65, polar: POLAR_FRIGATE, tackAssist: 0.5 },
       dyn: {
          turnRate: 9.5,
          rudderRef: 3.6,
-         accelUp: 0.048,      // ~21 s: gut zwei Minuten bis zur vollen Fahrt
+         accelUp: 0.048,      // ~21 s: a good two minutes to reach full speed
          accelDown: 0.088,
          accelLuff: 0.26,
          maxHeel: 14,
@@ -284,8 +284,8 @@ export const VESSELS: Vessel[] = [
       id: "indefatigable",
       name: "Indefatigable",
       prefix: "HMS",
-      klass: "Fregatte 4. Ranges",
-      rate: "38/44-Kanonen-Fregatte",
+      klass: "4th-Rate Frigate",
+      rate: "38/44-gun frigate",
       rig: "square",
       era: "1796",
       desc: "The Undaunted: famous under Admiral Pellew, one of the fastest Royal Navy sailing warships. Lighter than Lydia, faster on all points of sail.",
@@ -295,7 +295,7 @@ export const VESSELS: Vessel[] = [
       dyn: {
          turnRate: 9.0,
          rudderRef: 3.5,
-         accelUp: 0.055,      // ~18 s: etwas lebhafter als die Lydia
+         accelUp: 0.055,      // ~18 s: a bit livelier than the Lydia
          accelDown: 0.100,
          accelLuff: 0.28,
          maxHeel: 14,
@@ -318,13 +318,13 @@ export const VESSELS: Vessel[] = [
       cam: { dist: 82, height: 29, cockpitZ: -15.5, cockpitY: 9.0, lead: 16, targetY: 12 },
    },
    {
-      // Ohne id fiel getVessel("sutherland") stillschweigend auf die Yacht
-      // zurueck - die Sutherland war ueber das Schiffsmenue nie spielbar.
+      // Without an id, getVessel("sutherland") silently fell back to the
+      // yacht - the Sutherland was never playable via the ship menu.
       id: "sutherland",
       name: "Sutherland",
       prefix: "HMS",
-      klass: "Linienschiff 3. Ranges",
-      rate: "74-Kanonen-Zweidecker",
+      klass: "3rd-Rate Ship of the Line",
+      rate: "74-gun two-decker",
       rig: "square",
       era: "1810",
       desc: "Floating battery: slow as a church, but two full gun decks.",
@@ -334,7 +334,7 @@ export const VESSELS: Vessel[] = [
       dyn: {
          turnRate: 6.4,
          rudderRef: 4.2,
-         accelUp: 0.030,      // ~33 s: 1750 t wollen erst einmal in Gang kommen
+         accelUp: 0.030,      // ~33 s: 1750 t takes a while to get moving
          accelDown: 0.060,
          accelLuff: 0.20,
          maxHeel: 12,
@@ -353,16 +353,16 @@ export const VESSELS: Vessel[] = [
          rollKick: 3.4,
          range: 600,
       },
-      // Ein Zweidecker hat Spanten wie ein Haus: Vollkugeln der leichteren
-      // Kaliber prallen auf Distanz schlicht ab.
+      // A two-decker has frames like a house: round shot from the lighter
+      // calibres simply bounces off at range.
       structure: { scantling: 1.85, mastStrength: 1.55, reserve: 1.70 },
       cam: { dist: 106, height: 38, cockpitZ: -20.5, cockpitY: 11.8, lead: 21, targetY: 16 },
    },
 ];
 
-// Franzoesisches Anstrichschema: roter Streifen statt Ocker. Historisch gab es
-// beides; hier sorgt es dafuer, dass man Freund und Feind im Pulverdampf auf
-// einen Blick auseinanderhaelt.
+// French paint scheme: a red stripe instead of ochre. Historically both
+// existed; here it makes sure friend and foe can be told apart at a glance
+// through the powder smoke.
 const FRENCH: PaintScheme = {
    copper: [0.44, 0.25, 0.15],
    boot: [0.08, 0.08, 0.09],
@@ -373,7 +373,7 @@ const FRENCH: PaintScheme = {
 };
 
 // ---------------------------------------------------------------------------
-// Gegner (nicht im Schiffsmenue waehlbar, nur als Feind im Gefecht)
+// Enemies (not selectable in the ship menu, only encountered as foes in battle)
 // ---------------------------------------------------------------------------
 export const ENEMIES: Vessel[] = [
    {
@@ -383,10 +383,10 @@ export const ENEMIES: Vessel[] = [
       nation: "FR",
       paint: FRENCH,
       klass: "Corvette",
-      rate: "20-Kanonen-Korvette",
+      rate: "20-gun corvette",
       rig: "square",
       era: "1805",
-      desc: "Schnelle franzoesische Korvette - beisst kaum, laeuft aber davon.",
+      desc: "Fast French corvette - barely bites, but outruns you.",
       crew: 110,
       hull: { loa: 29.0, beam: 8.4, draft: 3.7, displacement: 440 },
       sail: { noGo: 61, polar: POLAR_SLOOP_OF_WAR, tackAssist: 0.55 },
@@ -405,11 +405,11 @@ export const ENEMIES: Vessel[] = [
       prefix: "",
       nation: "FR",
       paint: FRENCH,
-      klass: "Fregatte",
-      rate: "40-Kanonen-Fregatte",
+      klass: "Frigate",
+      rate: "40-gun frigate",
       rig: "square",
       era: "1806",
-      desc: "Franzoesische Fregatten waren groesser und schneller gebaut als die britischen.",
+      desc: "French frigates were built larger and faster than British ones.",
       crew: 320,
       hull: { loa: 46.0, beam: 12.0, draft: 4.8, displacement: 1100 },
       sail: { noGo: 64, polar: POLAR_FRIGATE, tackAssist: 0.5 },
@@ -428,11 +428,11 @@ export const ENEMIES: Vessel[] = [
       prefix: "",
       nation: "FR",
       paint: FRENCH,
-      klass: "Linienschiff 3. Ranges",
-      rate: "74-Kanonen-Zweidecker",
+      klass: "3rd-Rate Ship of the Line",
+      rate: "74-gun two-decker",
       rig: "square",
       era: "1808",
-      desc: "Ein franzoesischer Vierundsiebziger. Wer den anfaellt, braucht Rueckendeckung.",
+      desc: "A French seventy-four. Anyone who attacks her needs backup.",
       crew: 640,
       hull: { loa: 53.0, beam: 14.8, draft: 6.3, displacement: 1800 },
       sail: { noGo: 68, polar: POLAR_THIRD_RATE, tackAssist: 0.42 },
@@ -461,13 +461,13 @@ export function vesselLabel(v: Vessel): string {
    return (v.prefix ? v.prefix + " " : "") + v.name;
 }
 
-// Gesamtzahl der Rohre (beide Seiten)
+// Total number of guns (both sides)
 export function gunCount(v: Vessel): number {
    if (!v.guns) return 0;
    return v.guns.decks.reduce((n: number, d: GunDeck) => n + d.count, 0) * 2;
 }
 
-// Broadside-Gewicht in englischen Pfund (nur zur Anzeige)
+// Broadside weight in English pounds (for display only)
 const BALL_LB: Record<string, number> = { "8-pounder": 8, "9-pounder": 9, "18-pounder": 18, "32-pounder": 32, "36-pounder": 36 };
 export function broadsideWeight(v: Vessel): number {
    if (!v.guns) return 0;
