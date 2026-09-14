@@ -13,6 +13,7 @@ import { waterDepth, groundHeight, generateWorld, worldInfo, isOpenWater, findOp
 import { whitecapsForWind } from "../../packages/client/src/ocean.js";
 import { testPair, groundStep } from "../../packages/client/src/collide.js";
 import { seaHeight, ampForWind } from "../../packages/client/src/ocean.js";
+import { makeRng } from "@segel/shared";
 import { createSuite } from "../lib/harness.js";
 
 const suite = createSuite("Damage and battle");
@@ -206,7 +207,10 @@ function hitRate(dist, ammo, salvos = 22) {
       rigTop: foe.userData.rigTop, rigHalfWidth: foe.userData.rigHalfWidth,
    };
    let hits = 0;
-   const b = new Battery(scene, { sound: false, ownerId: "me", targets: () => [tg], onHit: () => hits++ });
+   const b = new Battery(scene, {
+      sound: false, ownerId: "me", targets: () => [tg], onHit: () => hits++,
+      rng: makeRng(dist * 1000 + salvos),
+   });
    b.setShip(me, LY); b.setAmmo(ammo);
    for (let s = 0; s < salvos; s++) {
       b.reload.STBD = 0; b.fire("STBD", {});
