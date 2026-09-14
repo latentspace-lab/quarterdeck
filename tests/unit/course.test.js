@@ -1,5 +1,5 @@
 // tests/unit/course.test.js - the regatta course judged in pure maths.
-import { courseLayout, newRace, raceStep, crossedLineNorth } from "@segel/shared";
+import { courseLayout, newRace, raceStep, crossedLineNorth } from "@quarterdeck/shared";
 import { createSuite } from "../lib/harness.js";
 
 const suite = createSuite("course");
@@ -93,4 +93,4 @@ suite.section("Wrong-way and time base");
 
 export default () => suite.done();
 
-if (!process.env.SEGEL_TEST_RUNNER) suite.done();
+if (!process.env.QUARTERDECK_TEST_RUNNER) suite.done();

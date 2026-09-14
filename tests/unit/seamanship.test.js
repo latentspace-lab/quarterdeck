@@ -2,7 +2,7 @@
 //
 // swampStep() changes flooding and crew, so it is gameplay that has to come
 // out the same on the client and on the server.
-import { swampStep, shipPose, getVessel, freeboardOf, makeRng } from "@segel/shared";
+import { swampStep, shipPose, getVessel, freeboardOf, makeRng } from "@quarterdeck/shared";
 import { createSuite } from "../lib/harness.js";
 
 const suite = createSuite("seamanship");
@@ -99,4 +99,4 @@ suite.section("Deterministic for a seed");
 
 export default () => suite.done();
 
-if (!process.env.SEGEL_TEST_RUNNER) suite.done();
+if (!process.env.QUARTERDECK_TEST_RUNNER) suite.done();

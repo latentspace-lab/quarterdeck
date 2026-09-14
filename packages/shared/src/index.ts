@@ -1,4 +1,4 @@
-// @segel/shared - pure simulation logic shared by client and server.
+// @quarterdeck/shared - pure simulation logic shared by client and server.
 //
 // Rule for this package: no DOM, no WebGL, no renderer. From `three`, only
 // the math classes under `three/src/math/` are used - they are pure

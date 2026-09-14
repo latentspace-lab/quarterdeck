@@ -13,7 +13,7 @@ import { waterDepth, groundHeight, generateWorld, worldInfo, isOpenWater, findOp
 import { whitecapsForWind } from "../../packages/client/src/ocean.js";
 import { testPair, groundStep } from "../../packages/client/src/collide.js";
 import { seaHeight, ampForWind } from "../../packages/client/src/ocean.js";
-import { makeRng } from "@segel/shared";
+import { makeRng } from "@quarterdeck/shared";
 import { createSuite } from "../lib/harness.js";
 
 const suite = createSuite("Damage and battle");
@@ -554,4 +554,4 @@ export default () => suite.done();
 
 // When run directly (`node tests/<file>`), the suite prints its own summary;
 // under the runner, the runner takes care of that.
-if (!process.env.SEGEL_TEST_RUNNER) suite.done();
+if (!process.env.QUARTERDECK_TEST_RUNNER) suite.done();

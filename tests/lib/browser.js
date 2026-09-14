@@ -11,7 +11,7 @@ import { dirname, join, extname, normalize } from "node:path";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 export const DIST = join(HERE, "..", "..", "packages", "client", "dist");
-export const BASE = "/sailing/";
+export const BASE = "/quarterdeck/";
 
 const MIME = {
    ".html": "text/html", ".js": "text/javascript", ".css": "text/css",

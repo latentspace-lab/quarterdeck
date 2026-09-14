@@ -8,7 +8,7 @@
 // Reloading: a well-drilled Royal Navy crew managed about three shots in
 // two minutes. Shortened here to vessel.guns.reload seconds per side.
 
-// The ballistics moved to @segel/shared/ballistics (Phase 0C): trajectory,
+// The ballistics moved to @quarterdeck/shared/ballistics (Phase 0C): trajectory,
 // spread, salvo throw and hit detection now run in the browser as on the
 // server, from the same source. What stays here is everything visible -
 // muzzle flash, smoke, projectile meshes, splashes, thunder - plus the
@@ -25,7 +25,7 @@ import {
    checkProjectileHits,
    rangeToTarget,
    systemRng,
-} from "@segel/shared";
+} from "@quarterdeck/shared";
 
 // Still exported from here so existing import paths keep working.
 export {
@@ -33,7 +33,7 @@ export {
    elevationForRange,
    segmentBox,
    gauss,
-} from "@segel/shared";
+} from "@quarterdeck/shared";
 
 const SIDES = ["PORT", "STBD"];
 
@@ -419,7 +419,7 @@ export class Battery {
    }
 
    // ------------------------------------------------------------------
-   // Hit detection. The decision is made in @segel/shared/ballistics;
+   // Hit detection. The decision is made in @quarterdeck/shared/ballistics;
    // here only the targets are supplied with an up-to-date world matrix.
    // ------------------------------------------------------------------
    _checkHits(shot) {

@@ -3,7 +3,7 @@ import {
    World, generateWorld, activeWorld, setActiveWorld, worldInfo,
    groundHeight, waterDepth, isOpenWater, findOpenWater, nearestShoal,
    makeRng, PLAY_RADIUS,
-} from "@segel/shared";
+} from "@quarterdeck/shared";
 import { createSuite, fingerprint } from "../lib/harness.js";
 
 const suite = createSuite("terrain-math");
@@ -113,4 +113,4 @@ suite.section("Active map (single-player path)");
 
 export default () => suite.done();
 
-if (!process.env.SEGEL_TEST_RUNNER) suite.done();
+if (!process.env.QUARTERDECK_TEST_RUNNER) suite.done();

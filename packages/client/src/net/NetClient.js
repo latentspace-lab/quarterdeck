@@ -1,13 +1,13 @@
 // NetClient.js - the connection to a game server.
 //
 // A thin wrapper over the Colyseus SDK that knows the room protocol from
-// @segel/shared/types: it joins a battle room, hands out the welcome, relays
+// @quarterdeck/shared/types: it joins a battle room, hands out the welcome, relays
 // server events, sends InputCommands and tells the session which ships
 // appeared or vanished. No Three.js, no DOM - the same class runs in the
 // browser and in the Node tests.
 
 import { Client } from "@colyseus/sdk";
-import { MSG, ROOMS } from "@segel/shared";
+import { MSG, ROOMS } from "@quarterdeck/shared";
 
 export const ROOM_BATTLE = ROOMS.battle;
 export const ROOM_PRACTICE = ROOMS.practice;

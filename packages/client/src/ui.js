@@ -929,7 +929,7 @@ export class UI {
 
       this.menuEl.innerHTML =
           `<div class="menu-card">
-            <h1>Age of Sail Simulator</h1>
+            <h1>Quarterdeck</h1>
             <p class="subm">Close-hauled · Luffing · Beam Reach — semi-realistic physics</p>
             <div class="sec-label">Ship</div>
             <div class="ship-grid">${shipHtml}</div>

@@ -287,7 +287,7 @@ unchanged or regenerated with a stated reason.
 
 - **Single-player parity.** The client `Ship` class and the server
   `ServerShip` both drive the shared model. The allocation solver and fire
-  logic must sit in `@segel/shared` so both paths stay identical.
+  logic must sit in `@quarterdeck/shared` so both paths stay identical.
 - **State size.** About fifteen new float fields per ship in the Colyseus
   schema. Fine for the room sizes we have, but the damage-detail fields
   should stay in the rarely-changing block.

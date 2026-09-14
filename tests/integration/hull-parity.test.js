@@ -1,7 +1,7 @@
 // tests/integration/hull-parity.test.js
 //
 // The server never sees a mesh. It places gun ports and hit boxes from
-// @segel/shared/hull and builds the heeler matrix from shipPose(). This suite
+// @quarterdeck/shared/hull and builds the heeler matrix from shipPose(). This suite
 // pins both to the real Three.js scene graph the client renders: same
 // muzzles, same freeboard, same rig box, same world matrix. If these drift,
 // the server hits what the player does not see.
@@ -12,7 +12,7 @@ import { DebrisField } from "../../packages/client/src/debris.js";
 import {
    VESSELS, getVessel, muzzlePositions, gunLayout, freeboardOf, rigTopOf, rigHalfWidthOf,
    muzzleHeightOf, poseMatrix, shipPose, SeaState, SIM_DT,
-} from "@segel/shared";
+} from "@quarterdeck/shared";
 import { createSuite } from "../lib/harness.js";
 
 const suite = createSuite("Hull parity");
@@ -94,4 +94,4 @@ suite.section("poseMatrix() == the heeler's world matrix");
 
 export default () => suite.done();
 
-if (!process.env.SEGEL_TEST_RUNNER) suite.done();
+if (!process.env.QUARTERDECK_TEST_RUNNER) suite.done();

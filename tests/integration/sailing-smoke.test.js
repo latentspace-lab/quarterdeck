@@ -134,4 +134,4 @@ export default () => suite.done();
 
 // When run directly (`node tests/<file>`), the suite prints its own summary;
 // under the runner, the runner takes care of that.
-if (!process.env.SEGEL_TEST_RUNNER) suite.done();
+if (!process.env.QUARTERDECK_TEST_RUNNER) suite.done();

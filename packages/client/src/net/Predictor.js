@@ -12,7 +12,7 @@
 // the correction. The correction is handed back so the view can absorb it
 // smoothly instead of jumping.
 
-import { BoatDynamics, SIM_DT, clamp } from "@segel/shared";
+import { BoatDynamics, SIM_DT, clamp } from "@quarterdeck/shared";
 import { lerpAngleDeg } from "./Interpolator.js";
 
 /** Degrees, wrapped to [-180, 180). */

@@ -8,7 +8,7 @@ import { Client } from "@colyseus/sdk";
 import { matchMaker } from "@colyseus/core";
 import { startServer, ROOM_REGATTA } from "../../packages/server/src/index.ts";
 import { listRooms } from "../../packages/client/src/net/NetClient.js";
-import { MSG, courseLayout } from "@segel/shared";
+import { MSG, courseLayout } from "@quarterdeck/shared";
 import { createSuite } from "../lib/harness.js";
 
 const suite = createSuite("Regatta room");
@@ -105,4 +105,4 @@ async function run() {
 
 export default run;
 
-if (!process.env.SEGEL_TEST_RUNNER) await run();
+if (!process.env.QUARTERDECK_TEST_RUNNER) await run();

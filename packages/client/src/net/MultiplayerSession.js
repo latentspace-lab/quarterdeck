@@ -11,7 +11,7 @@
 import { NetClient } from "./NetClient.js";
 import { RemoteShip } from "./RemoteShip.js";
 import { Predictor, ViewOffset } from "./Predictor.js";
-import { lerp, clamp, courseLayout, normDeg } from "@segel/shared";
+import { lerp, clamp, courseLayout, normDeg } from "@quarterdeck/shared";
 
 /** Seconds over which sea state is blended onto the server's. */
 const SEA_TAU = 0.5;

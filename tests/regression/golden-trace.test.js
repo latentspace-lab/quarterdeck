@@ -18,7 +18,7 @@ import { dirname, join } from "node:path";
 import {
    BoatDynamics, DamageModel, Crew, SeaState, Wind, World, setActiveWorld,
    spawnSalvo, deriveRng, getVessel, AMMO, SIM_DT, shipPose,
-} from "@segel/shared";
+} from "@quarterdeck/shared";
 import { createSuite, fingerprint } from "../lib/harness.js";
 
 const suite = createSuite("Golden trace");
@@ -168,4 +168,4 @@ suite.section("The run is internally plausible");
 
 export default () => suite.done();
 
-if (!process.env.SEGEL_TEST_RUNNER) suite.done();
+if (!process.env.QUARTERDECK_TEST_RUNNER) suite.done();

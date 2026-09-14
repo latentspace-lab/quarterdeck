@@ -1,4 +1,4 @@
-// factions.js - moved to @segel/shared (Phase 0B).
+// factions.js - moved to @quarterdeck/shared (Phase 0B).
 // This file remains as a re-export so existing import paths in the
-// client keep working. New code should import directly from @segel/shared.
-export * from "@segel/shared/factions";
+// client keep working. New code should import directly from @quarterdeck/shared.
+export * from "@quarterdeck/shared/factions";

@@ -11,17 +11,17 @@
 @font-face {
    font-family: "IM Fell English";
    font-style: normal; font-weight: 400; font-display: swap;
-   src: url(/sailing/fonts/IMFellEnglish-Regular.ttf) format("truetype");
+   src: url(/quarterdeck/fonts/IMFellEnglish-Regular.ttf) format("truetype");
 }
 @font-face {
    font-family: "IM Fell English";
    font-style: italic; font-weight: 400; font-display: swap;
-   src: url(/sailing/fonts/IMFellEnglish-Italic.ttf) format("truetype");
+   src: url(/quarterdeck/fonts/IMFellEnglish-Italic.ttf) format("truetype");
 }
 @font-face {
    font-family: "IM Fell English SC";
    font-style: normal; font-weight: 400; font-display: swap;
-   src: url(/sailing/fonts/IMFellEnglishSC-Regular.ttf) format("truetype");
+   src: url(/quarterdeck/fonts/IMFellEnglishSC-Regular.ttf) format("truetype");
 }
 
 :root {

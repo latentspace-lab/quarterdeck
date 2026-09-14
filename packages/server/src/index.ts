@@ -8,7 +8,7 @@ import { createServer as createHttpServer, type IncomingMessage, type ServerResp
 import { fileURLToPath } from "node:url";
 import { Server, matchMaker } from "@colyseus/core";
 import { WebSocketTransport } from "@colyseus/ws-transport";
-import { ROOMS } from "@segel/shared";
+import { ROOMS } from "@quarterdeck/shared";
 import { BattleRoom } from "./rooms/BattleRoom.ts";
 import { PracticeRoom } from "./rooms/PracticeRoom.ts";
 import { RegattaRoom } from "./rooms/RegattaRoom.ts";
@@ -123,5 +123,5 @@ if (runDirectly) {
    const port = Number(process.env.PORT) || 2567;
    const host = process.env.HOST || "0.0.0.0";
    const running = await startServer(port, host);
-   console.log(`segel-simulator server: ${running.url} (room "${ROOM_BATTLE}")`);
+   console.log(`quarterdeck server: ${running.url} (room "${ROOM_BATTLE}")`);
 }
