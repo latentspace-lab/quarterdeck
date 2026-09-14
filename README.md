@@ -456,7 +456,7 @@ exactly as before the aquatint work.
 
 ## Project structure
 
-Since Phase 0 of the multiplayer conversion ([Issue #23](https://github.com/latentspace-lab/sailing/issues/23))
+Since Phase 0 of the multiplayer conversion ([Issue #23](https://github.com/latentspace-lab/quarterdeck/issues/23))
 the project has been laid out as an npm workspace. The dividing line is
 strict: `shared/` holds pure logic with no DOM and no renderer, `client/`
 holds everything visible.
