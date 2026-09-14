@@ -26,6 +26,7 @@ import {
 } from "@quarterdeck/shared";
 
 import { palette } from "./style.js";
+import { puffField, flame } from "./puffs.js";
 
 const UP = new THREE.Vector3(0, 1, 0);
 
@@ -999,10 +1000,45 @@ export function buildWarship(vessel) {
       for (let i = 0; i < arr.length; i++) arr[i].visible = i < keep;
    };
 
-   // Fires
+   // Fires. In the aquatint style they are painted by the puff field
+   // (flames anchored to the deck, streaming brown smoke) and throw a warm
+   // light on the ship; otherwise additive fire sprites.
    const texFire = fireTexture();
+   const flames = [];
+   let fireLight = null;
    ship.setFire = function (level) {
       const want = Math.min(6, Math.floor(clamp(level, 0, 1) * 7));
+      const field = puffField();
+      // whichever path is not active loses its fires
+      if (field || want === 0) {
+         while (fires.length) {
+            const f = fires.pop();
+            heeler.remove(f);
+            f.material.dispose();
+         }
+      }
+      if (!field || want === 0) {
+         while (flames.length) { const f = flames.pop(); if (f.field) f.field.remove(f); }
+         if (fireLight && (want === 0 || !field)) { heeler.remove(fireLight); fireLight = null; }
+      }
+      if (field) {
+         while (flames.length > want) { const f = flames.pop(); field.remove(f); }
+         while (flames.length < want) {
+            const local = new THREE.Vector3(
+               (Math.random() - 0.5) * BEAM * 0.6, FB * 1.05, (Math.random() - 0.5) * LOA * 0.6);
+            const f = flame(field, heeler, local, BEAM * (0.45 + Math.random() * 0.4) * (0.6 + level));
+            if (!f) break;
+            f.field = field;
+            flames.push(f);
+         }
+         if (want > 0 && !fireLight) {
+            const p = palette().world.puffs;
+            fireLight = new THREE.PointLight(0xe8903a, (p && p.fireLight) || 900, 110, 1.6);
+            fireLight.position.set(0, FB + 4, 0);
+            heeler.add(fireLight);
+         }
+         return;
+      }
       while (fires.length > want) {
          const f = fires.pop();
          heeler.remove(f);

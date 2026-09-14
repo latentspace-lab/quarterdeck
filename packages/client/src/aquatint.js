@@ -7,9 +7,12 @@
 //                          rigging, nearby wave crests against the sky),
 //   2. the tonal plate   - colour desaturated and pulled onto an ink -> wash
 //                          -> paper ramp, so nothing is pure black or white,
-//   3. (optional) grain  - a fixed screen-space rosin grain, off by default:
+//   3. the bitten tone   - the full range of the plate (an S-curve: deep ink
+//                          in the troughs, paper in the sails) laid down in
+//                          faint steps, as the acid bit the plate in stages,
+//   4. (optional) grain  - a fixed screen-space rosin grain, off by default:
 //                          at screen scale the prints read as smooth washes,
-//   4. the plate tone    - a mild vignette.
+//   5. the plate tone    - a mild vignette.
 //
 // The plain style never comes through here; game.js renders straight to the
 // canvas in that case, so the old look stays exactly as it was.
@@ -37,6 +40,9 @@ uniform float uGrain;      // rosin grain amplitude
 uniform float uVignette;
 uniform float uChroma;     // share of the colour's saturation that survives
 uniform float uTone;       // weight of the ink/paper ramp against the colour
+uniform float uCurve;      // how much of the S-curve (contrast) is applied
+uniform float uSteps;      // number of tonal steps of the bitten plate
+uniform float uStepMix;    // how much the steps show
 uniform vec3 uInk;         // display-space colours
 uniform vec3 uShadow;
 uniform vec3 uPaper;
@@ -73,12 +79,19 @@ void main() {
    float nearD = min(d0, min(min(dl, dr), min(dd, du)));
    float jump = max(max(abs(dr - d0), abs(dl - d0)), max(abs(du - d0), abs(dd - d0)));
    float grad = jump / max(nearD, 1.0);
-   float edge = smoothstep(0.05, 0.18, grad) * (1.0 - smoothstep(400.0, 2000.0, nearD)) * uEdge;
+   float edge = smoothstep(0.05, 0.18, grad) * (1.0 - smoothstep(250.0, 600.0, nearD)) * uEdge;
 
    // 2. The tonal plate: lose a third of the chroma, then pull the value
    //    onto ink -> wash -> paper and blend that with the washed colour.
    //    The hand-colouring must survive: the sea stays green, the ensign red.
    float lum = dot(c, vec3(0.299, 0.587, 0.114));
+   // The plate has a full range: an S-curve pulls the troughs toward the
+   // ink and the sails toward the paper, then the tone comes in steps.
+   float lumC = mix(lum, lum * lum * (3.0 - 2.0 * lum), uCurve);
+   float lumQ = floor(lumC * uSteps + 0.5) / uSteps;
+   lumC = mix(lumC, lumQ, uStepMix);
+   c *= (lumC + 0.02) / (lum + 0.02);
+   lum = lumC;
    vec3 wash = mix(vec3(lum), c, uChroma);
    vec3 tone = lum < 0.5
       ? mix(uInk, uShadow, lum * 2.0)
@@ -141,11 +154,14 @@ export function createAquatint(renderer, scene, camera, opts = {}) {
       uStrength: { value: opts.strength ?? 1.0 },
       uEdge: { value: opts.edge ?? 1.0 },
       uGrain: { value: opts.grain ?? 0.0 },
-      uVignette: { value: opts.vignette ?? 0.2 },
+      uVignette: { value: opts.vignette ?? 0.36 },
       uChroma: { value: opts.chroma ?? 0.85 },
       uTone: { value: opts.tone ?? 0.28 },
-      uInk: { value: display(opts.ink ?? 0x2b2f2c) },
-      uShadow: { value: display(opts.shadow ?? 0x5e665f) },
+      uCurve: { value: opts.curve ?? 0.55 },
+      uSteps: { value: opts.steps ?? 18.0 },
+      uStepMix: { value: opts.stepMix ?? 0.18 },
+      uInk: { value: display(opts.ink ?? 0x1a1d1c) },
+      uShadow: { value: display(opts.shadow ?? 0x55544a) },
       uPaper: { value: display(opts.paper ?? 0xf1ebdb) },
    };
    const material = new THREE.ShaderMaterial({
