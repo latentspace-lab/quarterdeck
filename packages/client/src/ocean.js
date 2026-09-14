@@ -26,6 +26,7 @@ export {
    whitecapsForWind,
 } from "@segel/shared";
 export { seaStateName, SeaState } from "@segel/shared";
+import { palette, rgb } from "./style.js";
 
 const G = 9.81; // Erdbeschleunigung (Tiefwasser-Dispersionsrelation)
 
@@ -111,6 +112,16 @@ uniform float uTime;
 uniform float uAmp;
 uniform float uWaveH;   // signifikante Wellenhoehe in Metern
 uniform float uWhite;   // Anteil Weisskappen (0..1)
+// Colours of the water, set from the style palette (see style.js)
+uniform vec3 uDeep;     // water in the troughs
+uniform vec3 uCrest;    // water on the crests
+uniform vec3 uSkyLo;    // reflected sky near the horizon
+uniform vec3 uSkyHi;    // reflected sky overhead
+uniform vec3 uSss;      // light scattered through a crest
+uniform vec3 uSunCol;   // sun glitter
+uniform vec3 uFoam;     // foam and whitecaps
+uniform vec3 uHaze;     // distance haze
+uniform float uSpec;    // glitter strength (a print has little)
 varying vec3 vWorld;
 varying vec3 vNormal;
 varying float vFoam;
@@ -137,25 +148,24 @@ void main() {
 
   // Himmel-Reflexion entlang des reflektierten Blicks
   vec3 R = reflect(-V, N);
-  vec3 skyRef = mix(vec3(0.66, 0.79, 0.87), vec3(0.20, 0.44, 0.72),
-                    clamp(R.y, 0.0, 1.0));
+  vec3 skyRef = mix(uSkyLo, uSkyHi, clamp(R.y, 0.0, 1.0));
 
   // Wasserfarbe: Tiefblau, an Kaemmen heller + Streulicht (Licht durch die Welle)
-  vec3 deep = vec3(0.004, 0.032, 0.068);
-  vec3 crest = vec3(0.020, 0.170, 0.200);
+  vec3 deep = uDeep;
+  vec3 crest = uCrest;
   // vorzeichenbehaftet: Taeler dunkel, Kaemme hell - auf die tatsaechliche
   // Wellenhoehe bezogen, damit der Kontrast bei jeder Windstaerke sitzt.
   float hSigned = clamp(vHeight / max(uWaveH * 0.55, 0.08), -1.0, 1.0);
   float hMask = hSigned * 0.5 + 0.5;
   vec3 base = mix(deep, crest, hMask * hMask);
   float sss = pow(clamp(dot(V, -L), 0.0, 1.0), 4.0) * hMask;
-  base += vec3(0.03, 0.30, 0.26) * sss;
+  base += uSss * sss;
 
   // Sonnen-Glitzern (Blinn-Spekular, durch Rippeln in Funken gebrochen)
   vec3 H = normalize(L + V);
-  float spec = pow(clamp(dot(N, H), 0.0, 1.0), 300.0);
+  float spec = pow(clamp(dot(N, H), 0.0, 1.0), 300.0) * uSpec;
   float diff = clamp(dot(N, L), 0.0, 1.0);
-  vec3 sunCol = vec3(1.0, 0.93, 0.78);
+  vec3 sunCol = uSunCol;
   vec3 col = base * (0.35 + 0.65 * diff)
            + skyRef * fres * 1.25
            + sunCol * spec * (fres * 3.5 + 0.35) * (0.35 + near * 1.8);
@@ -179,11 +189,11 @@ void main() {
   caps *= 0.55 + 0.45 * clamp(1.0 - N.y, 0.0, 1.0) * 3.0;
 
   float foamMask = clamp(max(jacFoam, caps), 0.0, 1.0);
-  col = mix(col, vec3(0.93, 0.96, 0.97), foamMask * 0.88);
+  col = mix(col, uFoam, foamMask * 0.88);
 
   // Horizont-Dunst
   float fog = smoothstep(450.0, 1400.0, dist);
-  col = mix(col, vec3(0.67, 0.79, 0.88), fog);
+  col = mix(col, uHaze, fog);
 
   gl_FragColor = vec4(col, 1.0);
 }
@@ -205,7 +215,30 @@ export function createOcean({ sunDir = new THREE.Vector3(0.4, 0.6, 0.7) } = {}) 
       uWindDir: { value: Math.PI }, // Ausbreitungsrichtung (Rad): PI = nach Sued
       uSunDir: { value: sunDir.clone().normalize() },
       uCamPos: { value: new THREE.Vector3() },
+      uDeep: { value: new THREE.Color() },
+      uCrest: { value: new THREE.Color() },
+      uSkyLo: { value: new THREE.Color() },
+      uSkyHi: { value: new THREE.Color() },
+      uSss: { value: new THREE.Color() },
+      uSunCol: { value: new THREE.Color() },
+      uFoam: { value: new THREE.Color() },
+      uHaze: { value: new THREE.Color() },
+      uSpec: { value: 1.0 },
    };
+   // Water colours from the style palette; raw linear triples go in as they
+   // are, hex values are linearised (the shader works in linear space).
+   const setPalette = (sea) => {
+      uniforms.uDeep.value.setRGB(...rgb(sea.deep));
+      uniforms.uCrest.value.setRGB(...rgb(sea.crest));
+      uniforms.uSkyLo.value.setRGB(...rgb(sea.skyLo));
+      uniforms.uSkyHi.value.setRGB(...rgb(sea.skyHi));
+      uniforms.uSss.value.setRGB(...rgb(sea.sss));
+      uniforms.uSunCol.value.setRGB(...rgb(sea.sun));
+      uniforms.uFoam.value.setRGB(...rgb(sea.foam));
+      uniforms.uHaze.value.setRGB(...rgb(sea.haze));
+      uniforms.uSpec.value = sea.specular;
+   };
+   setPalette(palette().world.sea);
 
    const mat = new THREE.ShaderMaterial({
       uniforms,
@@ -223,6 +256,7 @@ export function createOcean({ sunDir = new THREE.Vector3(0.4, 0.6, 0.7) } = {}) 
    const api = {
       mesh,
       uniforms,
+      setPalette,
 
       // Wellenfeld um das Boot recentrieren (auf Segmentraster snappen,
       // damit die Flaeche nahtlos "unendlich" wirkt)

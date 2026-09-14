@@ -24,6 +24,7 @@
 import * as THREE from "three";
 import { clamp } from "./utils.js";
 import { puffTexture } from "./fx.js";
+import { palette } from "./style.js";
 
 const G = 9.81;
 const RHO_WATER = 1025;      // kg/m3, Seewasser
@@ -546,7 +547,7 @@ export class DebrisField {
       if (!this._texPuff) return;
       const sp = new THREE.Sprite(new THREE.SpriteMaterial({
          map: this._texPuff, transparent: true, depthWrite: false,
-         color: 0xdff0ff, opacity: 0.75, fog: true,
+         color: palette().world.splash, opacity: 0.75, fog: true,
       }));
       sp.scale.set(size * 0.6, size, 1);
       sp.position.set(x, y + size * 0.35, z);
