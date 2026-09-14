@@ -452,6 +452,7 @@ button.cmd.on { background: var(--btn-on-bg); color: var(--btn-on-fg); border-co
 .room-name { font-weight: var(--wb); }
 .room-kind { font-weight: 400; font-size: 11px; opacity: 0.7; margin-left: 6px; padding: 1px 6px; border-radius: var(--r); border: 1px solid var(--rule-2); }
 .mode-grid.m3 { grid-template-columns: repeat(3, 1fr); }
+.mode-grid.m2 { grid-template-columns: repeat(2, 1fr); }
 .room-info { opacity: 0.75; font-size: 12px; }
 .room-join { padding: 5px 12px; border-radius: var(--r); border: 0; background: var(--primary-bg); color: var(--primary-fg); font: inherit; font-weight: var(--wb); cursor: pointer; }
 :root[data-style="plain"] .room-join { background: #3da3ff; color: #061019; border-radius: 8px; }
