@@ -101,10 +101,9 @@ void main() {
    float g = hash(cell) - 0.5;
    art *= 1.0 + g * (uGrain * (1.0 - lum) + 0.03);
 
-   // 4. Paper fibre and a warm cast.
+   // 4. Paper fibre. (No warm cast: it turned the whole sheet brown.)
    float fib = 0.6 * vnoise(gl_FragCoord.xy * 0.05) + 0.4 * vnoise(gl_FragCoord.xy * 0.011);
-   art *= 0.965 + 0.035 * fib;
-   art *= vec3(1.01, 0.995, 0.97);
+   art *= 0.97 + 0.03 * fib;
 
    // 5. Plate tone. The paper is the brightest thing on the sheet.
    vec2 q = vUv - 0.5;
@@ -154,12 +153,12 @@ export function createAquatint(renderer, scene, camera, opts = {}) {
       uStrength: { value: opts.strength ?? 1.0 },
       uEdge: { value: opts.edge ?? 1.0 },
       uGrain: { value: opts.grain ?? 0.16 },
-      uVignette: { value: opts.vignette ?? 0.35 },
-      uChroma: { value: opts.chroma ?? 0.7 },
-      uTone: { value: opts.tone ?? 0.32 },
-      uInk: { value: display(opts.ink ?? 0x2a231c) },
-      uShadow: { value: display(opts.shadow ?? 0x5a5a4e) },
-      uPaper: { value: display(opts.paper ?? 0xece3cc) },
+      uVignette: { value: opts.vignette ?? 0.25 },
+      uChroma: { value: opts.chroma ?? 0.88 },
+      uTone: { value: opts.tone ?? 0.2 },
+      uInk: { value: display(opts.ink ?? 0x252826) },
+      uShadow: { value: display(opts.shadow ?? 0x5b6462) },
+      uPaper: { value: display(opts.paper ?? 0xf0ecdf) },
    };
    const material = new THREE.ShaderMaterial({
       uniforms, vertexShader: VERT, fragmentShader: FRAG, depthTest: false, depthWrite: false,

@@ -36,10 +36,11 @@
    --num: "tnum";
 
    /* paper and ink */
-   --bg: #d8d3bf;
+   --bg: #c3d0cc;
    --paper: #ece3cc;
    --paper-2: #e1d6b6;
-   --paper-glass: rgba(236, 226, 200, 0.42);
+   /* the pane: a light, mostly transparent glass, the paper tint only a hint */
+   --paper-glass: rgba(244, 240, 226, 0.2);
    --paper-solid: rgba(236, 226, 200, 0.96);
    --paper-deep: rgba(225, 214, 182, 0.55);
    --ink: #2a231c;
@@ -79,7 +80,7 @@
    --r-lg: 4px;
    --r-pill: 3px;
    --glass: var(--paper-glass);
-   --glass-filter: blur(8px) saturate(0.6) sepia(0.25);
+   --glass-filter: blur(9px) saturate(0.85) brightness(1.08);
    --frame: 1px solid var(--rule);
    --frame-2: 1px solid var(--rule-2);   /* inner rule, drawn with outline */
    --frame-2-offset: -4px;
@@ -732,3 +733,82 @@ button.help-close {
 .masts { margin-top: 7px; }
 .mast { font-size: 9px; padding: 2px 0; }
 .mast b { display: block; font-size: 9px; font-weight: var(--wb); opacity: 0.95; }
+
+/* ---- Type scale for the aquatint skin ----
+ * The Fell face has a small x-height, so every size steps up by about an
+ * eighth against the plain skin, and the left-hand panels widen to match. */
+:root:not([data-style="plain"]) .panel { font-size: 14.5px; }
+:root:not([data-style="plain"]) small,
+:root:not([data-style="plain"]) .small,
+:root:not([data-style="plain"]) .train-hint,
+:root:not([data-style="plain"]) .awa { font-size: 12.5px; }
+:root:not([data-style="plain"]) .mode { font-size: 20px; }
+:root:not([data-style="plain"]) .ship-name { font-size: 18px; }
+:root:not([data-style="plain"]) .readbig { font-size: 50px; }
+:root:not([data-style="plain"]) .readbig .u { font-size: 18px; }
+:root:not([data-style="plain"]) .wind-title,
+:root:not([data-style="plain"]) .cmd-title,
+:root:not([data-style="plain"]) .gun-title,
+:root:not([data-style="plain"]) .dmg-title,
+:root:not([data-style="plain"]) .crew-title,
+:root:not([data-style="plain"]) .foe-title,
+:root:not([data-style="plain"]) .train-title { font-size: 13px; }
+:root:not([data-style="plain"]) .wind-dir { font-size: 24px; }
+:root:not([data-style="plain"]) .wind-speed { font-size: 18px; }
+:root:not([data-style="plain"]) .pos { font-size: 18px; }
+:root:not([data-style="plain"]) .rt,
+:root:not([data-style="plain"]) .hint,
+:root:not([data-style="plain"]) .cmd-state,
+:root:not([data-style="plain"]) .sb-era { font-size: 11.5px; }
+:root:not([data-style="plain"]) .cmd-label,
+:root:not([data-style="plain"]) .cmd kbd,
+:root:not([data-style="plain"]) .ammo,
+:root:not([data-style="plain"]) .ammo-key,
+:root:not([data-style="plain"]) .mast,
+:root:not([data-style="plain"]) .mast b,
+:root:not([data-style="plain"]) .plan-x { font-size: 10.5px; }
+:root:not([data-style="plain"]) button.cmd { font-size: 12.5px; }
+:root:not([data-style="plain"]) .gun-row,
+:root:not([data-style="plain"]) .dmg-row,
+:root:not([data-style="plain"]) .crew-row,
+:root:not([data-style="plain"]) .crew-foot,
+:root:not([data-style="plain"]) .warn,
+:root:not([data-style="plain"]) .sb-desc,
+:root:not([data-style="plain"]) .sb-stats,
+:root:not([data-style="plain"]) .sb-foot,
+:root:not([data-style="plain"]) .sc-desc,
+:root:not([data-style="plain"]) .sc-force,
+:root:not([data-style="plain"]) .foe-sub,
+:root:not([data-style="plain"]) .mode-grid.m4 .mb-desc { font-size: 11.5px; }
+:root:not([data-style="plain"]) .sb-rate,
+:root:not([data-style="plain"]) .sc-hint,
+:root:not([data-style="plain"]) .room-kind,
+:root:not([data-style="plain"]) .room-info,
+:root:not([data-style="plain"]) .room-empty,
+:root:not([data-style="plain"]) .ctrl .val { font-size: 12.5px; }
+:root:not([data-style="plain"]) .foe-name,
+:root:not([data-style="plain"]) .foe-dist,
+:root:not([data-style="plain"]) .mb-desc,
+:root:not([data-style="plain"]) .train-desc { font-size: 13.5px; }
+:root:not([data-style="plain"]) .sb-name,
+:root:not([data-style="plain"]) .sc-title,
+:root:not([data-style="plain"]) .ctrl,
+:root:not([data-style="plain"]) .room-row { font-size: 15px; }
+:root:not([data-style="plain"]) .mb-title { font-size: 17px; }
+:root:not([data-style="plain"]) .mode-grid.m4 .mb-title { font-size: 15px; }
+:root:not([data-style="plain"]) .msg { font-size: 20px; }
+:root:not([data-style="plain"]) .help-card p,
+:root:not([data-style="plain"]) .help-card li { font-size: 14.5px; }
+:root:not([data-style="plain"]) .dl { width: 58px; }
+:root:not([data-style="plain"]) .cl { width: 84px; }
+:root:not([data-style="plain"]) .crew-foot > span:first-child { width: 84px; }
+:root:not([data-style="plain"]) .gun-side { width: 66px; }
+:root:not([data-style="plain"]) .gun-state { width: 70px; }
+:root:not([data-style="plain"]) .panel.crew,
+:root:not([data-style="plain"]) .panel.gun { width: 262px; }
+:root:not([data-style="plain"]) .panel.dmg { width: 296px; bottom: 318px; }
+:root:not([data-style="plain"]) .panel.cmd { width: 292px; }
+:root:not([data-style="plain"]) .panel.foes { width: 236px; top: 336px; }
+/* wind box directly under the compass, so the larger type stays clear of the
+ * orders panel; the enemies list follows below it */
+:root:not([data-style="plain"]) .panel.tr { top: 190px; }
