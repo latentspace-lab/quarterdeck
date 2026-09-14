@@ -87,7 +87,11 @@ async function run() {
       suite.section("A broadside from the keyboard");
       await page.keyboard.press("KeyE");
       await page.waitForFunction(() => window.__sim.player.battery.broadsides >= 1, null, { timeout: 4000 });
-      await new Promise((r) => setTimeout(r, 700));
+      // Poll for balls in flight instead of a fixed sleep: a hardcoded delay
+      // races the balls' own flight time and flakes when the CI runner is
+      // slower or faster than the dev machine.
+      await page.waitForFunction(() => window.__sim.player.battery._shots.length > 0, null, { timeout: 3000 })
+         .catch(() => {});
       const guns = await page.evaluate(() => ({
          broadsides: window.__sim.player.battery.broadsides,
          balls: window.__sim.player.battery._shots.length,
