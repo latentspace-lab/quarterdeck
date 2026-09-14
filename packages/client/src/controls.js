@@ -65,6 +65,7 @@ export class Controls {
             case "KeyR": this.queue.push("restart"); break;
             case "KeyG": this.queue.push("toggleGusts"); break;
             case "KeyH": this.queue.push("toggleHud"); break;
+            case "KeyP": this.queue.push("toggleStyle"); break;
             case "KeyM": this.queue.push("toggleMenu"); break;
             case "KeyT": this.queue.push("toggleTopdown"); break;
             case "Escape": this.queue.push("toggleMenu"); break;

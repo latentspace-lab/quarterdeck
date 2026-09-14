@@ -4,14 +4,16 @@ import { Accumulator, SIM_DT } from "@segel/shared";
 
 // Start-Overlay (bleibt sichtbar, bis der Renderer läuft)
 const boot = document.createElement("div");
+// Colours and font come from the stylesheet tokens so the overlay follows the
+// rendering style (styles.css).
 boot.style.cssText =
-    "position:fixed;left:50%;bottom:14px;transform:translateX(-50%);color:#bfe6ff;font-family:system-ui,sans-serif;font-size:13px;opacity:.9;z-index:30;pointer-events:none;text-align:center;background:rgba(6,16,24,.55);padding:6px 14px;border-radius:20px";
+    "position:fixed;left:50%;bottom:14px;transform:translateX(-50%);color:var(--text);font-family:var(--font);font-size:13px;opacity:.9;z-index:30;pointer-events:none;text-align:center;background:var(--paper-solid);border:1px solid var(--rule);padding:6px 14px;border-radius:var(--r-pill)";
 boot.textContent = "Segel-Simulator 3D — initialisiert…";
 document.body.appendChild(boot);
 
 function showError(msg) {
    boot.textContent = "Fehler: " + msg;
-   boot.style.color = "#ff8b8b";
+   boot.style.color = "var(--bad)";
    boot.style.opacity = "1";
    console.error("[segel-simulator] Initialisierungsfehler:", msg);
 }
@@ -29,7 +31,7 @@ try {
    showError(err && err.message ? err.message : String(err));
    const hint = document.createElement("div");
    hint.style.cssText =
-       "position:fixed;left:50%;top:18%;transform:translateX(-50%);color:#9ff;font-family:system-ui;text-align:center;z-index:30;max-width:560px;line-height:1.5";
+       "position:fixed;left:50%;top:18%;transform:translateX(-50%);color:var(--text);font-family:var(--font);text-align:center;z-index:30;max-width:560px;line-height:1.5";
    hint.innerHTML =
        "Der 3D-Renderer konnte nicht gestartet werden.<br>" +
        "Ursachen: WebGL im Browser deaktiviert, alte/unsichere TLS, oder der Server laeuft nicht.<br>" +
@@ -62,7 +64,7 @@ function frame(now) {
       sim.render(acc.alpha, SIM_DT * Math.max(steps, 1));
       if (errShown) {
          errShown = false;
-         boot.style.color = "#bfe6ff";
+         boot.style.color = "var(--text)";
          boot.textContent = "Segel-Simulator 3D";
       }
    } catch (err) {
@@ -72,7 +74,7 @@ function frame(now) {
       if (!errShown) {
          errShown = true;
          boot.style.opacity = "1";
-         boot.style.color = "#ff8b8b";
+         boot.style.color = "var(--bad)";
          boot.textContent = "Fehler: " + (err && err.message ? err.message : String(err));
       }
    }
