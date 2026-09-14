@@ -30,6 +30,8 @@ import { palette, rgb } from "./style.js";
 import { NOISE_GLSL } from "./puffs.js";
 
 const G = 9.81; // gravitational acceleration (deep-water dispersion relation)
+/** Stern positions per ship that the wake is drawn along. */
+export const TRAIL_N = 8;
 
 // GLSL body of the Gerstner sum - generated from the same WAVES array,
 // identical formulas to waveSum().
@@ -127,9 +129,12 @@ uniform vec3 uHaze;     // distance haze
 uniform vec3 uInk;      // the printer's ink in the troughs (painted style)
 uniform float uSpec;    // glitter strength (a print has little)
 uniform float uPainted; // 1 = the aquatint sea, 0 = the plain one
-// Ships for bow waves and wakes: x, z, heading (rad), speed (kn); loa, beam
+// Ships for bow waves and wakes: x, z, heading (rad), speed (kn); loa, beam.
+// The wake follows the water the ship actually passed over: a trail of
+// TRAIL_N stern positions per ship (x, z, distance run from the stern).
 uniform vec4 uShips[4];
 uniform vec2 uShipDim[4];
+uniform vec3 uTrail[32];
 uniform int uShipN;
 varying vec3 vWorld;
 varying vec3 vNormal;
@@ -203,13 +208,25 @@ vec3 painted(vec3 V, float dist, vec3 L) {
      float rb = abs(r) - halfW;
      float bow = smoothstep(-0.05, 0.35, sn) * smoothstep(1.02, 0.7, sn) * smoothstep(-0.3, 0.2, rb) * (1.0 - smoothstep(0.3, 1.2 + 3.5 * spd, rb));
      bow *= (0.5 + 0.7 * fbm(vec2(s * 0.5, r * 0.9) + uTime * 0.7)) * (0.35 + spd);
-     float len = -(s + 0.45 * loa);
-     float wake = 0.0;
-     if (len > 0.0) {
-        float hw = 0.5 * beam * 0.9 + len * 0.10;
-        wake = (1.0 - smoothstep(hw * 0.6, hw, abs(r))) * exp(-len / (loa * 1.3)) * spd;
-        wake *= smoothstep(0.35, 0.65, fbm(vec2(len * 0.12 - uTime * 0.2, r * 0.45)));
+     // wake: churned water along the trail astern, widening a little and
+     // fading with the distance run. The lane is a soft profile across the
+     // nearest point of the trail; the texture is world-space noise so it
+     // does not draw contours around the line.
+     float lane = 0.0;
+     for (int j = 0; j < 7; j++) {
+        vec3 a = uTrail[i * 8 + j], b = uTrail[i * 8 + j + 1];
+        vec2 ab = b.xy - a.xy;
+        float l2 = max(dot(ab, ab), 1e-4);
+        float t = clamp(dot(vWorld.xz - a.xy, ab) / l2, 0.0, 1.0);
+        vec2 q = a.xy + ab * t;
+        float dq = length(vWorld.xz - q);
+        float len = mix(a.z, b.z, t);
+        float hw = 0.5 * beam * 0.8 + len * 0.06;
+        float x = dq / hw;
+        lane = max(lane, exp(-x * x * 2.2) * exp(-len / (loa * 1.2)));
      }
+     float churn = fbm(vWorld.xz * 0.45 + vec2(uTime * 0.15, -uTime * 0.1));
+     float wake = lane * spd * smoothstep(0.30, 0.75, churn + lane * 0.35);
      shipFoam = max(shipFoam, max(bow, wake));
   }
 
@@ -331,6 +348,7 @@ export function createOcean({ sunDir = new THREE.Vector3(0.4, 0.6, 0.7) } = {}) 
       uPainted: { value: 0.0 },
       uShips: { value: [0, 1, 2, 3].map(() => new THREE.Vector4()) },
       uShipDim: { value: [0, 1, 2, 3].map(() => new THREE.Vector2(40, 10)) },
+      uTrail: { value: Array.from({ length: 32 }, () => new THREE.Vector3()) },
       uShipN: { value: 0 },
    };
    // Water colours from the style palette; raw linear triples go in as they
@@ -401,7 +419,9 @@ export function createOcean({ sunDir = new THREE.Vector3(0.4, 0.6, 0.7) } = {}) 
 
       /**
        * The ships that plough the painted sea (bow wave, wake): up to four
-       * of { x, z, heading (deg), speed (kn), loa, beam }.
+       * of { x, z, heading (deg), speed (kn), loa, beam, trail }, where
+       * trail is up to TRAIL_N stern positions {x, z}, newest first (the
+       * first is the stern itself). Missing points repeat the last one.
        */
       setShips(list) {
          const n = Math.min(4, list.length);
@@ -409,6 +429,14 @@ export function createOcean({ sunDir = new THREE.Vector3(0.4, 0.6, 0.7) } = {}) 
             const s = list[i];
             uniforms.uShips.value[i].set(s.x, s.z, s.heading * Math.PI / 180, s.speed);
             uniforms.uShipDim.value[i].set(s.loa, s.beam);
+            const tr = s.trail || [];
+            let run = 0, px = 0, pz = 0;
+            for (let j = 0; j < TRAIL_N; j++) {
+               const pt = tr[Math.min(j, tr.length - 1)] || { x: s.x, z: s.z };
+               if (j > 0) run += Math.hypot(pt.x - px, pt.z - pz);
+               px = pt.x; pz = pt.z;
+               uniforms.uTrail.value[i * TRAIL_N + j].set(pt.x, pt.z, run);
+            }
          }
          uniforms.uShipN.value = n;
       },

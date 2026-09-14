@@ -1,6 +1,6 @@
 // game.js - Simulation: wires up scene, boat, physics, camera, controls, modes, UI
 import * as THREE from "three";
-import { createOcean, seaHeight, ampForWind, waveHeightForWind, seaStateName } from "./ocean.js";
+import { createOcean, seaHeight, ampForWind, waveHeightForWind, seaStateName, TRAIL_N } from "./ocean.js";
 import { SeaState, SIM_DT, makeRng } from "@quarterdeck/shared";
 import { createScene } from "./scene.js";
 import { getVessel, VESSELS, vesselLabel } from "./vessels.js";
@@ -93,6 +93,7 @@ export class Simulator {
       this.puffs = new PuffField(900);
       scene.add(this.puffs.mesh);
       this._puffWind = new THREE.Vector3();
+      this._trails = new Map();   // ship id -> past stern positions (wake)
       setPuffField(this.style === "aquatint" ? this.puffs : null);
 
       // Target marker (for training) — ring on the water
@@ -456,6 +457,7 @@ export class Simulator {
       this.battery.clear();
       this.debris.clear();
       for (const k of [KIND.SMOKE, KIND.BURN]) this.puffs.clear(k);
+      this._trails.clear();
       this.course.setVisible(mode === "Regatta");
       if (mode !== "Battle") {
          this.fleet.clear();
@@ -834,13 +836,39 @@ export class Simulator {
       this._puffWind.set(wv.x * wms, 0, wv.z * wms);
       this.puffs.update(dt, this._puffWind, this.camera, this.sunDir);
       if (this.ocean.uniforms.uPainted.value > 0.5) {
-         this.ocean.setShips(this.allShips().filter((s) => s.dyn && s.vessel).map((s) => ({
-            x: s.dyn.pos.x, z: s.dyn.pos.z, heading: s.dyn.heading, speed: s.dyn.speed,
-            loa: s.vessel.hull.loa, beam: s.vessel.hull.beam,
-         })));
+         const seen = new Set();
+         const list = this.allShips().filter((s) => s.dyn && s.vessel).map((s) => {
+            seen.add(s.id);
+            return {
+               x: s.dyn.pos.x, z: s.dyn.pos.z, heading: s.dyn.heading, speed: s.dyn.speed,
+               loa: s.vessel.hull.loa, beam: s.vessel.hull.beam,
+               trail: this._sternTrail(s),
+            };
+         });
+         for (const id of this._trails.keys()) if (!seen.has(id)) this._trails.delete(id);
+         this.ocean.setShips(list);
       } else {
          this.ocean.setShips([]);
       }
+   }
+
+   /**
+    * The water a ship's stern has passed over, newest first: the wake is
+    * drawn along it, so it stays where it was laid when the ship turns. A
+    * new point is kept every fifth of a ship length.
+    */
+   _sternTrail(s) {
+      const loa = s.vessel.hull.loa;
+      const h = s.dyn.heading * DEG;
+      const stern = { x: s.dyn.pos.x - Math.sin(h) * loa * 0.45, z: s.dyn.pos.z - Math.cos(h) * loa * 0.45 };
+      let hist = this._trails.get(s.id);
+      if (!hist) { hist = []; this._trails.set(s.id, hist); }
+      const last = hist[0];
+      if (!last || Math.hypot(stern.x - last.x, stern.z - last.z) > loa * 0.2) {
+         hist.unshift(stern);
+         if (hist.length > TRAIL_N - 1) hist.length = TRAIL_N - 1;
+      }
+      return [stern, ...hist];
    }
 
    /**
