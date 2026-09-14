@@ -87,11 +87,14 @@ async function run() {
       suite.section("A broadside from the keyboard");
       await page.keyboard.press("KeyE");
       await page.waitForFunction(() => window.__sim.player.battery.broadsides >= 1, null, { timeout: 4000 });
-      // Poll for balls in flight instead of a fixed sleep: a hardcoded delay
-      // races the balls' own flight time and flakes when the CI runner is
-      // slower or faster than the dev machine.
-      await page.waitForFunction(() => window.__sim.player.battery._shots.length > 0, null, { timeout: 3000 })
-         .catch(() => {});
+      // "salvo" (broadsides, sound, recoil) and "shots" (the actual ball
+      // data replayShots() spawns _shots from) are separate server events,
+      // so wait for the shots to actually replay - a fixed sleep here races
+      // the second event and flakes when the CI runner is slow to deliver
+      // it. shotsFired is bumped only inside replayShots(), so it alone is
+      // proof the shots replayed even if the balls' own flight has already
+      // finished by the time we get to check.
+      await page.waitForFunction(() => window.__sim.player.battery.shotsFired > 0, null, { timeout: 6000 });
       const guns = await page.evaluate(() => ({
          broadsides: window.__sim.player.battery.broadsides,
          balls: window.__sim.player.battery._shots.length,
@@ -99,7 +102,7 @@ async function run() {
          state: document.querySelector("#gunStateS") && document.querySelector("#gunStateS").textContent,
       }));
       eq(guns.broadsides, 1, "the server's salvo came back and was played");
-      ok(guns.fired > 0 && guns.balls > 0, "the balls are in the air, replayed from the server's shots", guns.fired + " fired, " + guns.balls + " flying");
+      ok(guns.fired > 0, "the balls were replayed from the server's shots", guns.fired + " fired, " + guns.balls + " still flying");
       ok(/LOADING/.test(guns.state || ""), "the HUD shows the starboard battery reloading from the server's timer", guns.state);
       const seenByOther = other.state.ships.get(joined.shipId);
       ok(seenByOther.reloadStbd > 0, "the other player sees the reload in the state", seenByOther.reloadStbd.toFixed(1) + " s");
