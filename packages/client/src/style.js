@@ -75,7 +75,7 @@ export const PALETTE = {
       world: {
          background: 0x8fb8e0,
          fog: 0xbcd6ee, fogNear: 1600, fogFar: 6000,
-         skyTop: 0x1f5fa8, skyMid: 0x87b8e0, skyBot: 0xd3e6f2,
+         skyTop: 0x1f5fa8, skyMid: 0x87b8e0, skyBot: 0xd3e6f2, skyBand: 0.5,
          skySun: [1.0, 0.94, 0.78], sunDisc: 0xfff4d6,
          sunLight: 0xfff0d2, sunIntensity: 2.4,
          hemiSky: 0x99bbff, hemiGround: 0x0a1a2a, hemiIntensity: 0.55,
@@ -110,26 +110,32 @@ export const PALETTE = {
    // the printer's ink, the brightest the paper.
    aquatint: {
       world: {
-         background: 0xc3d0cc,
-         fog: 0xc3d0cc, fogNear: 1200, fogFar: 5000,
-         skyTop: 0x4a86ad, skyMid: 0x9dbfd0, skyBot: 0xe4e2d2,
-         skySun: 0xf8f0d8, sunDisc: 0xf4eedb,
+         // Sky as in the prints: a warm pale band at the horizon rising into
+         // grey-blue, with grey-mauve cloud masses; the sea a deep olive
+         // green, darker than the sky, with cream crests.
+         // (skyMid is what shows just above the horizon: the dome's gradient
+         // reaches skyMid at the horizon line and skyBot only below it.)
+         background: 0xd6d4c4,
+         fog: 0xd6d4c4, fogNear: 1100, fogFar: 4500,
+         // the grey-blue is reached within a few degrees of the horizon
+         skyTop: 0x6f8fa6, skyMid: 0xdcd6c3, skyBot: 0xece2cf, skyBand: 0.14,
+         skySun: 0xf8efd6, sunDisc: 0xf4eedb,
          sunLight: 0xf5ecd6, sunIntensity: 1.9,
-         hemiSky: 0xb4c6cc, hemiGround: 0x3a403a, hemiIntensity: 0.6,
+         hemiSky: 0xb4c0c4, hemiGround: 0x3a403a, hemiIntensity: 0.6,
          ambient: 0x56605e, ambientIntensity: 0.45,
-         cloud: 0xf6f1e4,
+         cloud: 0xcfc9c0,
          sea: {
-            deep: 0x1c4a40, crest: 0x5da283,
-            skyLo: 0xa5c6c6, skyHi: 0x6fa2b8,
-            sss: 0x4fae78, sun: 0xf8f0d8,
-            foam: 0xeceadb, haze: 0xb4cbc6,
-            specular: 0.5,
+            deep: 0x122c22, crest: 0x3f7a52,
+            skyLo: 0x8aa494, skyHi: 0x527c70,
+            sss: 0x459660, sun: 0xf8efd6,
+            foam: 0xece6d2, haze: 0xc3c9b6,
+            specular: 0.45,
          },
          terrain: {
-            rock: 0x8c8a7c, grass: 0x789e62, sand: 0xd9cda6,
-            shallow: 0x7fb3a0, deep: 0x3f6f62, surf: 0xeceadb,
+            rock: 0x8a8776, grass: 0x6f955a, sand: 0xd9cca2,
+            shallow: 0x74a68e, deep: 0x376454, surf: 0xece6d2,
          },
-         sail: 0xe3dcc6,
+         sail: 0xdccfad,
          smoke: 0xe4e2d6, splash: 0xe9e8dc,
       },
       hud: {
