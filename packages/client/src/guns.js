@@ -16,6 +16,7 @@
 import * as THREE from "three";
 import { clamp, dirVec } from "./utils.js";
 import { puffTexture, flashTexture } from "./fx.js";
+import { puffField, muzzleSmoke, splash as paintedSplash } from "./puffs.js";
 import { AMMO, AMMO_ORDER } from "./damage.js";
 import { palette } from "./style.js";
 import {
@@ -392,8 +393,12 @@ export class Battery {
          this._flashes.push({ sprite: fl, life: 0, max: 0.11 + Math.random() * 0.05 });
       }
 
-      // Smoke: several puffs that expand and drift away
-      if (this.texPuff) {
+      // Smoke: in the aquatint style the painted puff field draws it
+      // (puffs.js); otherwise several sprite puffs that expand and drift away
+      const field = puffField();
+      if (field) {
+         muzzleSmoke(field, world, out);
+      } else if (this.texPuff) {
          const puffs = 3;
          for (let k = 0; k < puffs; k++) {
             const sp = new THREE.Sprite(new THREE.SpriteMaterial({
@@ -549,6 +554,8 @@ export class Battery {
    }
 
    _spawnSplash(x, y, z) {
+      const field = puffField();
+      if (field) { paintedSplash(field, x, y, z, 5.5 + Math.random() * 3.0); return; }
       if (!this.texPuff) return;
       const sp = new THREE.Sprite(new THREE.SpriteMaterial({
          map: this.texPuff, transparent: true, depthWrite: false,
