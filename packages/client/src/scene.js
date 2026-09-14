@@ -24,6 +24,9 @@ export function createScene() {
          botColor: { value: new THREE.Color(0xd3e6f2) },
          sunDir: { value: new THREE.Vector3(0.4, 0.55, 0.6).normalize() },
          sunColor: { value: new THREE.Color(1.0, 0.94, 0.78) },
+         // how far above the horizon (in the 0..1 height term) midColor
+         // turns into topColor: 0.5 reaches it at the zenith
+         band: { value: 0.5 },
       },
       vertexShader:
          `
@@ -36,12 +39,12 @@ export function createScene() {
       fragmentShader:
          `
             uniform vec3 topColor; uniform vec3 midColor; uniform vec3 botColor;
-            uniform vec3 sunDir; uniform vec3 sunColor;
+            uniform vec3 sunDir; uniform vec3 sunColor; uniform float band;
             varying vec3 vDir;
             void main(){
                float h = clamp(vDir.y * 0.5 + 0.5, 0.0, 1.0);
                vec3 col = mix(botColor, midColor, smoothstep(0.0,0.55,h));
-               col = mix(col, topColor, smoothstep(0.5,1.0,h));
+               col = mix(col, topColor, smoothstep(0.5, 0.5 + band, h));
                 // sun disc
                float sun = pow(max(dot(normalize(vDir), normalize(sunDir)), 0.0), 512.0);
                col = mix(col, sunColor, sun);
@@ -133,6 +136,7 @@ export function createScene() {
          skyMat.uniforms.midColor.value.copy(lin(w.skyMid));
          skyMat.uniforms.botColor.value.copy(lin(w.skyBot));
          skyMat.uniforms.sunColor.value.copy(lin(w.skySun));
+         skyMat.uniforms.band.value = w.skyBand;
          sunMat.color.copy(lin(w.sunDisc));
          sunLight.color.copy(lin(w.sunLight));
          sunLight.intensity = w.sunIntensity;

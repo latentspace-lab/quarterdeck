@@ -7,11 +7,9 @@
 //                          rigging, nearby wave crests against the sky),
 //   2. the tonal plate   - colour desaturated and pulled onto an ink -> wash
 //                          -> paper ramp, so nothing is pure black or white,
-//   3. the aquatint grain - a fixed screen-space rosin grain, stronger in the
-//                          darks,
-//   4. the paper         - low-frequency fibre and a warm tint,
-//   5. the plate tone    - a mild vignette.
-// The grain is static in screen space on purpose: a print does not shimmer.
+//   3. (optional) grain  - a fixed screen-space rosin grain, off by default:
+//                          at screen scale the prints read as smooth washes,
+//   4. the plate tone    - a mild vignette.
 //
 // The plain style never comes through here; game.js renders straight to the
 // canvas in that case, so the old look stays exactly as it was.
@@ -57,14 +55,6 @@ float hash(vec2 p) {
    return fract(p.x * p.y);
 }
 
-float vnoise(vec2 p) {
-   vec2 i = floor(p);
-   vec2 f = fract(p);
-   f = f * f * (3.0 - 2.0 * f);
-   return mix(mix(hash(i), hash(i + vec2(1.0, 0.0)), f.x),
-              mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), f.x), f.y);
-}
-
 vec3 toDisplay(vec3 c) { return pow(max(c, vec3(0.0)), vec3(1.0 / 2.2)); }
 
 void main() {
@@ -96,16 +86,14 @@ void main() {
    vec3 art = mix(wash, tone, uTone);
    art = mix(art, uInk, edge * 0.85);
 
-   // 3. Aquatint grain: fixed to the screen, heavier in the darks.
-   vec2 cell = floor(gl_FragCoord.xy / 1.5);
-   float g = hash(cell) - 0.5;
-   art *= 1.0 + g * (uGrain * (1.0 - lum) + 0.03);
+   // 3. Grain, optional and off by default: at screen scale the prints read
+   //    as smooth washes, the rosin grain only shows under a glass.
+   if (uGrain > 0.0) {
+      float g = hash(floor(gl_FragCoord.xy / 1.5)) - 0.5;
+      art *= 1.0 + g * uGrain * (1.0 - lum);
+   }
 
-   // 4. Paper fibre. (No warm cast: it turned the whole sheet brown.)
-   float fib = 0.6 * vnoise(gl_FragCoord.xy * 0.05) + 0.4 * vnoise(gl_FragCoord.xy * 0.011);
-   art *= 0.97 + 0.03 * fib;
-
-   // 5. Plate tone. The paper is the brightest thing on the sheet.
+   // 4. Plate tone. The paper is the brightest thing on the sheet.
    vec2 q = vUv - 0.5;
    art *= 1.0 - dot(q, q) * uVignette;
    art = min(art, uPaper * 1.03);
@@ -152,13 +140,13 @@ export function createAquatint(renderer, scene, camera, opts = {}) {
       uFar: { value: camera.far },
       uStrength: { value: opts.strength ?? 1.0 },
       uEdge: { value: opts.edge ?? 1.0 },
-      uGrain: { value: opts.grain ?? 0.16 },
-      uVignette: { value: opts.vignette ?? 0.25 },
-      uChroma: { value: opts.chroma ?? 0.88 },
-      uTone: { value: opts.tone ?? 0.2 },
-      uInk: { value: display(opts.ink ?? 0x252826) },
-      uShadow: { value: display(opts.shadow ?? 0x5b6462) },
-      uPaper: { value: display(opts.paper ?? 0xf0ecdf) },
+      uGrain: { value: opts.grain ?? 0.0 },
+      uVignette: { value: opts.vignette ?? 0.2 },
+      uChroma: { value: opts.chroma ?? 0.85 },
+      uTone: { value: opts.tone ?? 0.28 },
+      uInk: { value: display(opts.ink ?? 0x2b2f2c) },
+      uShadow: { value: display(opts.shadow ?? 0x5e665f) },
+      uPaper: { value: display(opts.paper ?? 0xf1ebdb) },
    };
    const material = new THREE.ShaderMaterial({
       uniforms, vertexShader: VERT, fragmentShader: FRAG, depthTest: false, depthWrite: false,
