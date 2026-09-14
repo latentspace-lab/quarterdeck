@@ -1,24 +1,24 @@
-// rng.ts - deterministischer Zufall.
+// rng.ts - deterministic randomness.
 //
-// Jede Zufallsentscheidung der Simulation laeuft ueber einen injizierten
-// Generator, nie ueber Math.random(). Das kauft zwei Dinge:
+// Every random decision in the simulation runs through an injected
+// generator, never through Math.random(). That buys two things:
 //
-//   1. Wiederholbare Tests: gleicher Seed + gleiche Eingaben -> gleiches
-//      Gefecht, headless und ohne Browser.
-//   2. Wiederholbare Salven (Phase 3C): der Server schickt Seed und Zeitpunkt,
-//      jeder Client rechnet dieselbe Flugbahn nach.
+//   1. Repeatable tests: same seed + same inputs -> same battle, headless
+//      and without a browser.
+//   2. Repeatable salvos (Phase 3C): the server sends a seed and a
+//      timestamp, and every client recomputes the same trajectory.
 //
-// Was es NICHT kauft: Einigkeit zwischen Client und Server ueber Schadens-
-// wuerfe. Im serverautoritativen Entwurf laeuft die Schadenslogik gar nicht
-// auf dem Client, und die Reihenfolge, in der der Server seinen Generator
-// verbraucht, haengt ohnehin an der Ankunftsreihenfolge der Eingaben.
+// What it does NOT buy: agreement between client and server on damage
+// rolls. In the server-authoritative design, damage logic never runs on the
+// client at all, and the order in which the server consumes its generator
+// depends on the arrival order of inputs anyway.
 
-/** Liefert eine Gleichverteilung in [0, 1). */
+/** Returns a uniform distribution in [0, 1). */
 export type Rng = () => number;
 
 /**
- * mulberry32 - klein, schnell, ausreichend gut verteilt fuer Spiellogik.
- * Stammt aus terrain.js und ist dort seit jeher der Weltgenerator.
+ * mulberry32 - small, fast, distributed well enough for game logic.
+ * Comes from terrain.js, where it has been the world generator all along.
  */
 export function makeRng(seed: number): Rng {
    let a = (seed >>> 0) || 1;
@@ -31,9 +31,9 @@ export function makeRng(seed: number): Rng {
 }
 
 /**
- * Abgeleiteter Generator: aus einem Seed und einem Namen wird ein eigener
- * Strom. So verbraucht das Schadensmodell nicht die Zahlen, auf die der
- * Weltgenerator wartet.
+ * Derived generator: a seed and a name produce their own independent
+ * stream. This way the damage model does not consume the numbers the world
+ * generator is waiting on.
  */
 export function deriveRng(seed: number, label: string): Rng {
    let h = seed >>> 0;
@@ -43,7 +43,7 @@ export function deriveRng(seed: number, label: string): Rng {
    return makeRng(h);
 }
 
-/** Normalverteilte Zufallszahl (Box-Muller), fuer Schaetzfehler. */
+/** Normally distributed random number (Box-Muller), for estimation errors. */
 export function gauss(rng: Rng): number {
    let u = 0;
    let v = 0;
@@ -53,9 +53,9 @@ export function gauss(rng: Rng): number {
 }
 
 /**
- * Notnagel fuer Aufrufer, die (noch) keinen Generator durchreichen. Wird in
- * reinen Modulen absichtlich nur als Vorgabewert benutzt, damit ein vergessener
- * Parameter den Einzelspieler nicht bricht - in Tests und auf dem Server wird
- * immer ein echter Seed uebergeben.
+ * Fallback for callers that don't (yet) pass a generator through. Used in
+ * pure modules deliberately only as a default value, so a forgotten
+ * parameter does not break single-player - tests and the server always pass
+ * a real seed.
  */
 export const systemRng: Rng = Math.random;

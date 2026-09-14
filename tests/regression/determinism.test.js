@@ -1,14 +1,13 @@
 // tests/regression/determinism.test.js
 //
-// Die Zusage von Phase 0D: gleicher Seed + gleiche Eingaben -> gleiches
-// Ergebnis. Ohne sie gibt es keine wiederholbaren Gefechtstests, keine
-// nachspielbaren Salven (Phase 3C) und keine belastbare Fehlersuche.
+// The promise of Phase 0D: same seed + same inputs -> same result. Without
+// it there are no repeatable battle tests, no replayable salvos (Phase 3C),
+// and no reliable debugging.
 //
-// Was hier NICHT behauptet wird: dass Client und Server zu denselben
-// Schadenswuerfen kommen. Im serverautoritativen Entwurf laeuft die
-// Schadenslogik gar nicht auf dem Client, und die Reihenfolge, in der der
-// Server seinen Generator verbraucht, haengt an der Ankunftsreihenfolge der
-// Eingaben.
+// What is NOT claimed here: that client and server arrive at the same
+// damage rolls. In the server-authoritative design, damage logic never runs
+// on the client at all, and the order in which the server consumes its
+// generator depends on the arrival order of inputs.
 import {
    BoatDynamics, DamageModel, Crew, SeaState, Wind, World,
    spawnSalvo, dischargeShots, stepProjectile,
@@ -16,15 +15,15 @@ import {
 } from "@segel/shared";
 import { createSuite, fingerprint } from "../lib/harness.js";
 
-const suite = createSuite("Determinismus");
+const suite = createSuite("Determinism");
 const { ok, eq } = suite;
 
 const SEED = 20260913;
 const VESSEL = getVessel("lydia");
 
 // ---------------------------------------------------------------------------
-// Ein vollstaendiger Simulationslauf aus einem einzigen Seed.
-// Genau so wird ein Raum in Phase 1 aufgesetzt: WorldParams rein, Zustand raus.
+// A complete simulation run from a single seed.
+// This is exactly how a room is set up in Phase 1: WorldParams in, state out.
 // ---------------------------------------------------------------------------
 function run(seed, ticks = 900) {
    const world = new World(seed);
@@ -48,8 +47,8 @@ function run(seed, ticks = 900) {
       dyn.heelBias = dmg.floodHeel();
       dyn.step(SIM_DT, { dir: wind.dir, speedKts: wind.speed });
 
-      // Alle 60 Ticks eine Breitseite und ein Treffer - damit auch die
-      // gewuerfelten Pfade im Lauf vorkommen.
+      // A broadside and a hit every 60 ticks - so the rolled paths show up
+      // in the run too.
       if (i % 60 === 30) {
          const shots = spawnSalvo({
             side: i % 120 === 30 ? "PORT" : "STBD", ammo: "ball",
@@ -84,38 +83,38 @@ function run(seed, ticks = 900) {
    };
 }
 
-suite.section("Ein Seed, ein Ergebnis");
+suite.section("One seed, one result");
 {
    const a = run(SEED);
    const b = run(SEED);
-   eq(a.sig, b.sig, "900 Ticks zweimal gerechnet: identische Spur", a.sig);
-   eq(a.worldSig, b.worldSig, "identische Seekarte", a.worldSig);
-   suite.deepEq(a.state, b.state, "identischer Endzustand");
+   eq(a.sig, b.sig, "900 ticks computed twice: identical trace", a.sig);
+   eq(a.worldSig, b.worldSig, "identical chart", a.worldSig);
+   suite.deepEq(a.state, b.state, "identical final state");
 }
 
-suite.section("Ein anderer Seed ergibt ein anderes Gefecht");
+suite.section("A different seed gives a different battle");
 {
    const a = run(SEED);
    const c = run(SEED + 1);
-   ok(a.sig !== c.sig, "die Spur unterscheidet sich");
-   ok(a.worldSig !== c.worldSig, "und die Seekarte auch");
+   ok(a.sig !== c.sig, "the trace differs");
+   ok(a.worldSig !== c.worldSig, "and so does the chart");
 }
 
-suite.section("Laenge spielt keine Rolle - ein Praefix bleibt ein Praefix");
+suite.section("Length does not matter - a prefix stays a prefix");
 {
-   // Wer 900 Ticks rechnet, muss in den ersten 300 exakt dasselbe tun wie
-   // jemand, der nur 300 rechnet. Das klingt trivial, faellt aber um, sobald
-   // irgendwo ein Zustand ausserhalb der Schleife haengt.
+   // Whoever computes 900 ticks must do exactly the same thing in the first
+   // 300 as someone who only computes 300. That sounds trivial, but breaks
+   // the moment any state hangs on outside the loop.
    const short300 = run(SEED, 300).state;
    const long900 = run(SEED, 900);
    const alsoShort = run(SEED, 300).state;
-   suite.deepEq(short300, alsoShort, "300 Ticks sind reproduzierbar");
-   ok(long900.state.x !== short300.x, "und 900 Ticks fuehren weiter", "Sanity");
+   suite.deepEq(short300, alsoShort, "300 ticks are reproducible");
+   ok(long900.state.x !== short300.x, "and 900 ticks carry on further", "sanity check");
 }
 
-suite.section("Zufallsstroeme bleiben getrennt");
+suite.section("Random streams stay separate");
 {
-   // Das Schadensmodell darf dem Salvengenerator keine Zahlen wegnehmen.
+   // The damage model must not take any numbers away from the salvo generator.
    const salvoOnly = (seed, extraDamageRolls) => {
       const salvo = deriveRng(seed, "salvo");
       const dmg = new DamageModel(VESSEL, { rng: deriveRng(seed, "dmg") });
@@ -127,13 +126,13 @@ suite.section("Zufallsstroeme bleiben getrennt");
       return fingerprint(spawnSalvo(opts, salvo).flatMap((s) => [s.aimElev, s.aimTrain, s.at]));
    };
    eq(salvoOnly(5, 0), salvoOnly(5, 250),
-      "250 Schadenswuerfe mehr aendern die naechste Salve nicht");
+      "250 more damage rolls do not change the next salvo");
 }
 
-suite.section("Die Flugbahn einer Salve laesst sich nachspielen");
+suite.section("A salvo's trajectory can be replayed");
 {
-   // Phase 3C in klein: Seed und Ausgangslage reichen, um bei jedem
-   // Teilnehmer dieselben Einschlaege zu erzeugen.
+   // Phase 3C in miniature: seed and starting state are enough to reproduce
+   // the same impacts for every participant.
    const replay = (seed) => {
       const rng = makeRng(seed);
       const salvo = spawnSalvo({
@@ -154,14 +153,14 @@ suite.section("Die Flugbahn einer Salve laesst sich nachspielen");
       }
       return fingerprint(out);
    };
-   eq(replay(31337), replay(31337), "gleicher Seed, gleiche Einschlaege", replay(31337));
-   ok(replay(31337) !== replay(31338), "anderer Seed, andere Einschlaege");
+   eq(replay(31337), replay(31337), "same seed, same impacts", replay(31337));
+   ok(replay(31337) !== replay(31338), "different seed, different impacts");
 }
 
-suite.section("Kein verstecktes Math.random() in den geteilten Modulen");
+suite.section("No hidden Math.random() in the shared modules");
 {
-   // Der Nachweis mit dem Holzhammer: Math.random wird abgeklemmt. Faellt
-   // irgendwo noch ein unbeseedeter Wurf, fliegt der Lauf hier auf.
+   // Proof by brute force: Math.random is disconnected. If an unseeded roll
+   // still lurks anywhere, the run blows up here.
    const real = Math.random;
    let leaked = 0;
    Math.random = () => { leaked++; return 0.5; };
@@ -170,7 +169,7 @@ suite.section("Kein verstecktes Math.random() in den geteilten Modulen");
    } finally {
       Math.random = real;
    }
-   eq(leaked, 0, "der Simulationslauf greift kein einziges Mal auf Math.random zurueck");
+   eq(leaked, 0, "the simulation run never touches Math.random, not even once");
 }
 
 export default () => suite.done();

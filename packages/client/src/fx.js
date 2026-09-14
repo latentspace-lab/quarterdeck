@@ -1,7 +1,7 @@
-// fx.js - gemeinsam genutzte Effekt-Texturen (Canvas, keine Assets).
-// Die Texturen werden einmal erzeugt und von guns.js und debris.js geteilt.
-// Ohne DOM (Node-Tests) liefern die Funktionen null - die Aufrufer muessen
-// damit umgehen koennen.
+// fx.js - shared effect textures (canvas, no assets).
+// The textures are generated once and shared by guns.js and debris.js.
+// Without a DOM (Node tests) the functions return null - callers must be
+// able to handle that.
 import * as THREE from "three";
 
 const _cache = {};
@@ -19,7 +19,7 @@ function canvasTex(key, size, draw) {
    return t;
 }
 
-// Pulverrauch / Gischt: weiche, unregelmaessige Ballen
+// Powder smoke / spray: soft, irregular puffs
 export function puffTexture() {
    return canvasTex("puff", 64, (g) => {
       for (let i = 0; i < 10; i++) {
@@ -35,7 +35,7 @@ export function puffTexture() {
    });
 }
 
-// Muendungsfeuer
+// Muzzle flash
 export function flashTexture() {
    return canvasTex("flash", 64, (g) => {
       const rg = g.createRadialGradient(32, 32, 0, 32, 32, 30);
@@ -48,12 +48,12 @@ export function flashTexture() {
    });
 }
 
-// Einschlagloch mit aufgerissenen Planken - dunkles Zentrum, ausgefranster Rand
+// Impact hole with torn planking - dark centre, splintered edge
 export function holeTexture() {
    return canvasTex("hole", 96, (g, S) => {
       g.clearRect(0, 0, S, S);
       const cx = S / 2, cy = S / 2;
-      // ausgesplitterter Rand (heller Holzbruch)
+      // splintered rim (bright broken wood)
       g.fillStyle = "rgba(196,168,118,0.95)";
       g.beginPath();
       for (let i = 0; i <= 26; i++) {
@@ -63,7 +63,7 @@ export function holeTexture() {
          if (i === 0) g.moveTo(x, y); else g.lineTo(x, y);
       }
       g.closePath(); g.fill();
-      // Loch
+      // hole
       g.fillStyle = "rgba(10,9,8,0.98)";
       g.beginPath();
       for (let i = 0; i <= 20; i++) {
@@ -76,7 +76,7 @@ export function holeTexture() {
    });
 }
 
-// Feuer / Brandherd
+// Fire / blaze
 export function fireTexture() {
    return canvasTex("fire", 64, (g) => {
       const rg = g.createRadialGradient(32, 40, 2, 32, 32, 30);

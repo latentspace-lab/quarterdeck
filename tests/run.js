@@ -1,31 +1,30 @@
-// tests/run.js - Testlaeufer.
+// tests/run.js - test runner.
 //
-// Drei Ebenen, bewusst getrennt, weil sie verschiedene Fragen beantworten:
+// Three levels, deliberately kept separate because they answer different questions:
 //
-//   unit/        Ein Modul, eine Zusicherung. Schnell, deterministisch.
-//                Faellt hier etwas um, weiss man sofort, wo.
-//   regression/  Was sich NICHT aendern darf. Determinismus, dt-Invarianz,
-//                Golden-Spuren. Das sind die Zusagen, auf denen der
-//                Mehrspieler-Umbau steht - sie muessen bei jeder Aenderung
-//                nachgewiesen werden.
-//   integration/ Mehrere Module ueber Zeit: Schiff + Batterie + Wrack + KI.
-//                Langsam, dafuer faengt es das, was zwischen den Modulen
-//                passiert - wie der Vector3-Bruch in der Trefferrueckgabe.
+//   unit/        One module, one assertion. Fast, deterministic.
+//                If something breaks here, you know right away where.
+//   regression/  What must NOT change. Determinism, dt-invariance,
+//                golden traces. These are the guarantees the multiplayer
+//                rebuild rests on - they must be proven after every change.
+//   integration/ Several modules over time: ship + battery + wreck + AI.
+//                Slow, but it catches what happens between modules -
+//                like the Vector3 breakage in the hit return value.
 //
-//   pending/     Faelle fuer noch nicht gebaute Funktionen. Laeuft nur mit
-//                --pending mit und zaehlt nicht gegen den Exit-Code.
+//   pending/     Cases for functions not yet built. Only runs with
+//                --pending and does not count against the exit code.
 //
-// Aufruf:
-//   node tests/run.js                 alle drei Ebenen
-//   node tests/run.js --unit          nur Unit
+// Usage:
+//   node tests/run.js                 all three levels
+//   node tests/run.js --unit          unit only
 //   node tests/run.js --regression
 //   node tests/run.js --integration
-//   node tests/run.js --pending       zusaetzlich die offenen Faelle
-//   node tests/run.js utils physics   nur Suiten, deren Pfad das enthaelt
+//   node tests/run.js --pending       also run the open cases
+//   node tests/run.js utils physics   only suites whose path contains that
 //
-// npm-Skripte: test, test:unit, test:regression, test:integration, test:pending.
-// Die CI (.github/workflows/test.yml) faehrt die Ebenen einzeln, damit im Log
-// sofort sichtbar ist, auf welcher Ebene es bricht.
+// npm scripts: test, test:unit, test:regression, test:integration, test:pending.
+// CI (.github/workflows/test.yml) runs the levels separately, so the log
+// shows immediately at which level it broke.
 
 import { readdirSync, existsSync } from "node:fs";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -56,7 +55,7 @@ const suites = levels
    .filter((s) => !filters.length || filters.some((f) => s.id.includes(f)));
 
 if (!suites.length) {
-   console.error("Keine passende Suite gefunden.");
+   console.error("No matching suite found.");
    process.exit(1);
 }
 
@@ -71,18 +70,18 @@ for (const s of suites) {
    try {
       const mod = await import(pathToFileURL(s.file).href);
       const r = typeof mod.default === "function" ? await mod.default() : mod.result;
-      if (!r) throw new Error("Suite liefert kein Ergebnis (default export oder `result` fehlt)");
+      if (!r) throw new Error("Suite returned no result (missing default export or `result`)");
       results.push({ ...r, id: s.id, level: s.level, ms: Date.now() - started });
    } catch (err) {
-      console.error("\x1b[31m  ABBRUCH  " + (err && err.stack ? err.stack : err) + "\x1b[0m");
+      console.error("\x1b[31m  ABORTED  " + (err && err.stack ? err.stack : err) + "\x1b[0m");
       results.push({
          id: s.id, level: s.level, pass: 0, fail: 1, ms: Date.now() - started,
-         failures: ["Suite abgebrochen: " + (err && err.message ? err.message : String(err))],
+         failures: ["Suite aborted: " + (err && err.message ? err.message : String(err))],
       });
    }
 }
 
-// --- Zusammenfassung -------------------------------------------------------
+// --- Summary -----------------------------------------------------------
 const w = Math.max(...results.map((r) => r.id.length));
 console.log("\n\x1b[1m" + "─".repeat(w + 34) + "\x1b[0m");
 let pass = 0;
@@ -99,12 +98,12 @@ for (const r of results) {
    );
 }
 console.log("\x1b[1m" + "─".repeat(w + 34) + "\x1b[0m");
-console.log(` ${pass} bestanden, ${fail} gescheitert in ${((Date.now() - t0) / 1000).toFixed(1)} s`);
+console.log(` ${pass} passed, ${fail} failed in ${((Date.now() - t0) / 1000).toFixed(1)} s`);
 if (pendingFail) {
-   console.log(` \x1b[33m${pendingFail} offene Faelle in pending/ (zaehlen nicht)\x1b[0m`);
+   console.log(` \x1b[33m${pendingFail} open cases in pending/ (do not count)\x1b[0m`);
 }
 if (fail) {
-   console.log("\n\x1b[31mFehlgeschlagen:\x1b[0m");
+   console.log("\n\x1b[31mFailed:\x1b[0m");
    for (const r of results) {
       if (r.level === "pending") continue;
       for (const f of r.failures || []) console.log("  " + r.id + " › " + f);

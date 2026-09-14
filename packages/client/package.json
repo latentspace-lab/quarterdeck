@@ -3,7 +3,7 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "description": "Browser-Client: Three.js-Rendering, Eingabe, HUD.",
+  "description": "Browser client: Three.js rendering, input, HUD.",
   "scripts": {
     "dev": "vite",
     "build": "vite build",

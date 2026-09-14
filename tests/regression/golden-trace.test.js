@@ -1,16 +1,16 @@
 // tests/regression/golden-trace.test.js
 //
-// Golden-Test: ein festgeschriebener Simulationslauf. Die Spur liegt als
-// Fixture auf der Platte; weicht der Lauf davon ab, hat sich das Verhalten der
-// Simulation geaendert.
+// Golden test: a pinned-down simulation run. The trace sits on disk as a
+// fixture; if the run deviates from it, the simulation's behaviour has
+// changed.
 //
-// Das ist absichtlich grob und absichtlich unbequem. Es sagt nicht, WAS falsch
-// ist - es sagt nur, dass sich etwas geaendert hat, und zwingt dazu, die
-// Aenderung entweder zu erklaeren oder zurueckzunehmen. Fuer eine Physik, die
-// demnaechst auf zwei Rechnern gleichzeitig laufen soll, ist genau das der
-// Punkt: stille Drift ist die teuerste Sorte Fehler.
+// This is deliberately coarse and deliberately inconvenient. It does not say
+// WHAT is wrong - it only says that something has changed, and forces you to
+// either explain the change or revert it. For a physics engine soon meant to
+// run on two machines at once, that is exactly the point: silent drift is
+// the most expensive kind of bug.
 //
-// Fixture neu schreiben (nur, wenn die Aenderung gewollt ist):
+// Rewrite the fixture (only when the change is intentional):
 //     node tests/regression/golden-trace.test.js --update
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -21,7 +21,7 @@ import {
 } from "@segel/shared";
 import { createSuite, fingerprint } from "../lib/harness.js";
 
-const suite = createSuite("Golden-Spur");
+const suite = createSuite("Golden trace");
 const { ok, near, eq } = suite;
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -29,7 +29,7 @@ const FIXTURE = join(HERE, "..", "fixtures", "golden-trace.json");
 const UPDATE = process.argv.includes("--update");
 
 const SEED = 1805;   // Trafalgar
-const TICKS = 1800;  // eine Minute Spielzeit
+const TICKS = 1800;  // one minute of game time
 
 function goldenRun() {
    const world = setActiveWorld(new World(SEED));
@@ -49,8 +49,8 @@ function goldenRun() {
       sea.step(SIM_DT, wind.speed, wind.dir);
 
       dyn.setRudder(Math.sin(i * 0.011) * 0.6 + Math.cos(i * 0.003) * 0.3);
-      if (i === 600) dyn.sailSet = 0.5;           // reffen
-      if (i === 1200) dyn.sailSet = 1;            // wieder setzen
+      if (i === 600) dyn.sailSet = 0.5;           // reef
+      if (i === 1200) dyn.sailSet = 1;            // set sail again
       dyn.driveMul = dmg.driveFactor();
       dyn.rudderMul = dmg.rudderFactor();
       dyn.dragMul = 1 + 0.7 * dmg.flooding;
@@ -72,7 +72,7 @@ function goldenRun() {
       dmg.update(SIM_DT, { heel: dyn.heel, pump: crew.pumping() });
       crew.update(SIM_DT);
 
-      // Alle 30 Ticks eine Probe - eine Sekunde Spielzeit.
+      // One sample every 30 ticks - one second of game time.
       if (i % 30 === 29) {
          const pose = shipPose({
             pos: dyn.pos, heading: dyn.heading, heel: dyn.heel,
@@ -105,64 +105,64 @@ const actual = goldenRun();
 
 if (UPDATE || !existsSync(FIXTURE)) {
    writeFileSync(FIXTURE, JSON.stringify(actual, null, 1) + "\n");
-   console.log((UPDATE ? "  Fixture neu geschrieben: " : "  Fixture angelegt: ") + FIXTURE);
+   console.log((UPDATE ? "  Fixture rewritten: " : "  Fixture created: ") + FIXTURE);
 }
 
 const golden = JSON.parse(readFileSync(FIXTURE, "utf8"));
 
-suite.section("Die Fixture ist in sich schluessig");
-// Sonst faellt eine von Hand verbogene Fixture nicht auf: die Signatur wird
-// aus den Proben nachgerechnet und muss zu der passen, die danebensteht.
+suite.section("The fixture is internally consistent");
+// Otherwise a hand-edited fixture would go unnoticed: the signature is
+// recomputed from the samples and must match the one stored next to them.
 {
    const recomputed = fingerprint(golden.samples.flatMap((s) => Object.values(s)));
    eq(recomputed, golden.sig,
-      "die gespeicherte Signatur passt zu den gespeicherten Proben",
+      "the stored signature matches the stored samples",
       recomputed === golden.sig ? golden.sig : golden.sig + " != " + recomputed);
 }
 
-suite.section("Die Spur stimmt mit der Fixture ueberein");
-eq(actual.seed, golden.seed, "derselbe Seed");
-eq(actual.ticks, golden.ticks, "dieselbe Laenge");
-eq(actual.worldSig, golden.worldSig, "dieselbe Seekarte", actual.worldSig);
-eq(actual.samples.length, golden.samples.length, "gleich viele Proben");
+suite.section("The trace matches the fixture");
+eq(actual.seed, golden.seed, "the same seed");
+eq(actual.ticks, golden.ticks, "the same length");
+eq(actual.worldSig, golden.worldSig, "the same chart", actual.worldSig);
+eq(actual.samples.length, golden.samples.length, "the same number of samples");
 
 if (actual.sig === golden.sig) {
-   ok(true, "die gesamte Spur ist unveraendert", actual.sig);
+   ok(true, "the entire trace is unchanged", actual.sig);
 } else {
-   ok(false, "die Spur hat sich geaendert", golden.sig + " -> " + actual.sig);
-   // Erste Abweichung benennen - sonst sucht man in 60 Proben.
+   ok(false, "the trace has changed", golden.sig + " -> " + actual.sig);
+   // Name the first deviation - otherwise you're searching through 60 samples.
    const n = Math.min(actual.samples.length, golden.samples.length);
    outer: for (let i = 0; i < n; i++) {
       for (const k of Object.keys(golden.samples[i])) {
          const a = actual.samples[i][k];
          const b = golden.samples[i][k];
          if (a !== b) {
-            suite.note(`erste Abweichung bei Tick ${golden.samples[i].tick}, Feld "${k}": ${b} -> ${a}`);
+            suite.note(`first deviation at tick ${golden.samples[i].tick}, field "${k}": ${b} -> ${a}`);
             break outer;
          }
       }
    }
-   suite.note("War die Aenderung gewollt? Dann: node tests/regression/golden-trace.test.js --update");
+   suite.note("Was the change intentional? Then run: node tests/regression/golden-trace.test.js --update");
 }
 
-suite.section("Der Lauf ist in sich plausibel");
+suite.section("The run is internally plausible");
 {
    const last = actual.samples[actual.samples.length - 1];
    ok(actual.samples.every((s) => Number.isFinite(s.x) && Number.isFinite(s.z)),
-      "die Position bleibt endlich");
-   ok(actual.samples.every((s) => s.speed >= 0 && s.speed < 25), "die Fahrt bleibt plausibel",
+      "position stays finite");
+   ok(actual.samples.every((s) => s.speed >= 0 && s.speed < 25), "speed stays plausible",
       "max " + Math.max(...actual.samples.map((s) => s.speed)).toFixed(1) + " kn");
-   ok(actual.samples.every((s) => Math.abs(s.heel) < 90), "sie kentert nicht");
-   ok(actual.samples.every((s) => s.hull >= 0 && s.hull <= 1), "der Rumpfzustand bleibt normiert");
-   ok(actual.samples.every((s) => Math.abs(s.rudder) <= 1), "die Ruderlage bleibt im Anschlag");
-   ok(actual.samples.every((s) => Math.abs(s.pitchX) <= 0.18 + 1e-9), "Stampfen bleibt gedeckelt");
-   ok(last.fit <= actual.samples[0].fit, "die Mannschaft wird nicht mehr");
-   ok(last.seaWind > 17 && last.seaWind < 20, "der Seegang steht beim Wind",
+   ok(actual.samples.every((s) => Math.abs(s.heel) < 90), "she does not capsize");
+   ok(actual.samples.every((s) => s.hull >= 0 && s.hull <= 1), "hull condition stays normalized");
+   ok(actual.samples.every((s) => Math.abs(s.rudder) <= 1), "rudder angle stays within its stops");
+   ok(actual.samples.every((s) => Math.abs(s.pitchX) <= 0.18 + 1e-9), "pitch stays capped");
+   ok(last.fit <= actual.samples[0].fit, "the crew never grows");
+   ok(last.seaWind > 17 && last.seaWind < 20, "sea state tracks the wind",
       last.seaWind.toFixed(2) + " kn");
-   // Reffen bei Tick 600 muss sichtbar sein.
+   // Reefing at tick 600 must be visible.
    const before = actual.samples.find((s) => s.tick === 600);
    const after = actual.samples.find((s) => s.tick === 1050);
-   ok(after.speed < before.speed, "nach dem Reffen laeuft sie langsamer",
+   ok(after.speed < before.speed, "after reefing she runs slower",
       before.speed.toFixed(2) + " -> " + after.speed.toFixed(2) + " kn");
 }
 
