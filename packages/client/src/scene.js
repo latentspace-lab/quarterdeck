@@ -1,12 +1,20 @@
-// scene.js - 3D-Szene-Setup: Himmel, Sonne, Lichter, Wolken
+// scene.js - 3D scene setup: sky, sun, lights, clouds.
+//
+// Every colour here comes from the style palette (style.js) and can be
+// swapped at runtime with setPalette(), so the same sky dome and lights serve
+// both the modern and the aquatint look.
 import * as THREE from "three";
+import { palette, rgb } from "./style.js";
+
+// Linear THREE.Color from a palette entry (hex or raw linear triple).
+const lin = (c) => new THREE.Color().setRGB(...rgb(c));
 
 export function createScene() {
    const scene = new THREE.Scene();
    scene.background = new THREE.Color(0x8fb8e0);
    scene.fog = new THREE.Fog(0xbcd6ee, 1600, 6000);
 
-    // Himmel-Kuppel (Gradient)
+    // Sky dome (gradient)
    const skyGeo = new THREE.SphereGeometry(7000, 32, 24);
    const skyMat = new THREE.ShaderMaterial({
       side: THREE.BackSide,
@@ -34,10 +42,10 @@ export function createScene() {
                float h = clamp(vDir.y * 0.5 + 0.5, 0.0, 1.0);
                vec3 col = mix(botColor, midColor, smoothstep(0.0,0.55,h));
                col = mix(col, topColor, smoothstep(0.5,1.0,h));
-                // Sonnen-Scheibe
+                // sun disc
                float sun = pow(max(dot(normalize(vDir), normalize(sunDir)), 0.0), 512.0);
                col = mix(col, sunColor, sun);
-                // Halo
+                // halo
                float halo = pow(max(dot(normalize(vDir), normalize(sunDir)), 0.0), 40.0);
                col += sunColor * halo * 0.25;
                 gl_FragColor = vec4(col, 1.0);
@@ -48,13 +56,13 @@ export function createScene() {
    const sky = new THREE.Mesh(skyGeo, skyMat);
    scene.add(sky);
 
-    // Sonne (Sprite / Scheibe)
+    // Sun (disc)
    const sunMat = new THREE.MeshBasicMaterial({ color: 0xfff4d6 });
    const sun = new THREE.Mesh(new THREE.CircleGeometry(180, 32), sunMat);
    sun.position.copy(skyMat.uniforms.sunDir.value).multiplyScalar(6200);
    scene.add(sun);
 
-    // Lichter
+    // Lights
    const sunLight = new THREE.DirectionalLight(0xfff0d2, 2.4);
    sunLight.position.copy(skyMat.uniforms.sunDir.value).multiplyScalar(500);
    sunLight.castShadow = true;
@@ -65,10 +73,12 @@ export function createScene() {
    sunLight.shadow.camera.top = 100;
    sunLight.shadow.camera.bottom = -100;
    scene.add(sunLight);
-   scene.add(new THREE.HemisphereLight(0x99bbff, 0x0a1a2a, 0.55));
-   scene.add(new THREE.AmbientLight(0x404a55, 0.35));
+   const hemi = new THREE.HemisphereLight(0x99bbff, 0x0a1a2a, 0.55);
+   scene.add(hemi);
+   const ambient = new THREE.AmbientLight(0x404a55, 0.35);
+   scene.add(ambient);
 
-    // Wolken (einfache Sprites)
+    // Clouds (simple sprites)
    const cloudMat = new THREE.SpriteMaterial({
       color: 0xffffff,
       transparent: true,
@@ -102,6 +112,8 @@ export function createScene() {
       skyMat,
       sun,
       sunLight,
+      hemi,
+      ambient,
       clouds,
       setSunDir(deg, elevDeg) {
         const e = elevDeg * Math.PI / 180;
@@ -111,6 +123,26 @@ export function createScene() {
         this.sun.position.copy(d).multiplyScalar(6200);
         this.sunLight.position.copy(d).multiplyScalar(500);
       },
+      /** Re-tint sky, fog, lights and clouds from a style's world palette. */
+      setPalette(w) {
+         scene.background.copy(lin(w.background));
+         scene.fog.color.copy(lin(w.fog));
+         scene.fog.near = w.fogNear;
+         scene.fog.far = w.fogFar;
+         skyMat.uniforms.topColor.value.copy(lin(w.skyTop));
+         skyMat.uniforms.midColor.value.copy(lin(w.skyMid));
+         skyMat.uniforms.botColor.value.copy(lin(w.skyBot));
+         skyMat.uniforms.sunColor.value.copy(lin(w.skySun));
+         sunMat.color.copy(lin(w.sunDisc));
+         sunLight.color.copy(lin(w.sunLight));
+         sunLight.intensity = w.sunIntensity;
+         hemi.color.copy(lin(w.hemiSky));
+         hemi.groundColor.copy(lin(w.hemiGround));
+         hemi.intensity = w.hemiIntensity;
+         ambient.color.copy(lin(w.ambient));
+         ambient.intensity = w.ambientIntensity;
+         for (const c of clouds.children) c.material.color.copy(lin(w.cloud));
+      },
       add(obj) {
         this.scene.add(obj);
        },
@@ -118,6 +150,7 @@ export function createScene() {
         this.scene.remove(obj);
        },
     };
+   api.setPalette(palette().world);
    return api;
 }
 

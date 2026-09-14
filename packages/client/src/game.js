@@ -26,6 +26,11 @@ import { voiceAnnounce, TRIGGER } from "./audio.js";
 import { DEG, clamp, lerp, normDeg, dirVec, diffDeg } from "./utils.js";
 import { MultiplayerSession } from "./net/MultiplayerSession.js";
 import { defaultServerUrl, listRooms } from "./net/NetClient.js";
+import {
+   readStyleFromParams, storeStyle, nextStyle, setCurrentStyle, applyStyleToDocument, palette,
+} from "./style.js";
+import { createAquatint } from "./aquatint.js";
+import { applySailPalette } from "./warship.js";
 
 const CAM_LABEL = {
    CHASE: "Verfolger",
@@ -42,6 +47,12 @@ export class Simulator {
       const menuEl = document.getElementById("menu");
       this.paused = false;
       this.menuOpen = true;
+
+      // Rendering style (aquatint or plain), decided before anything is
+      // built so the stylesheet, the world palette and the sails agree.
+      this.style = readStyleFromParams(typeof location !== "undefined" ? location.search : "", safeStorage());
+      setCurrentStyle(this.style);
+      applyStyleToDocument(this.style, document);
 
       // Renderer
       this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
@@ -61,6 +72,10 @@ export class Simulator {
       this.camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.5, 12000);
       this.camera.position.set(0, 8, -18);
       this.camera.lookAt(0, 1, 0);
+
+      // The aquatint pass draws the scene through its own target; the plain
+      // style bypasses it (see _draw).
+      this.aquatint = createAquatint(this.renderer, scene.scene, this.camera);
 
       // Ozean
       this.ocean = createOcean({ sunDir: new THREE.Vector3(0.4, 0.6, 0.7) });
@@ -82,6 +97,7 @@ export class Simulator {
       // Land und Untiefen
       this.terrain = createTerrain(scene.scene);
       this.terrain.setVisible(false);
+      this._applyPalette();
 
       // Wind
       this.wind = new Wind({ dir: 0, speed: 12, gust: 0.5, veer: 0.4, variability: 1 });
@@ -173,6 +189,8 @@ export class Simulator {
       // ?mp=1&server=ws://host:2567&vessel=lydia&name=…&room=…&enemies=a,b
       //   &roomName=…&mode=practice
       // joins a battle straight away - for links and for the browser tests.
+      // ?style=plain|aquatint picks the rendering style (read in the
+      // constructor's first lines, see style.js).
       const q = new URLSearchParams(typeof location !== "undefined" ? location.search : "");
       if (q.get("seed") !== null && q.get("seed") !== "") this.battleSeed = Number(q.get("seed")) | 0;
       if (q.get("random") === "0") this.randomStart = false;
@@ -391,8 +409,8 @@ export class Simulator {
              <li><b>A / D</b> or <b>← / →</b> : Rudder (Port / Starboard)</li>
              <li><b>W / S</b> : Trim sails (in / out) — for manual trimming</li>
              <li><b>C</b> / <b>1–4</b> : Camera (Follow, Cockpit, Top-Down, Orbit)</li>
-             <li><b>M</b> / <b>Esc</b> : Menu · <b>H</b> : Hide / show the HUD · 
-             <b>R</b> : Restart course/training · <b>G</b> : Gusts</li>
+             <li><b>M</b> / <b>Esc</b> : Menu · <b>H</b> : Hide / show the HUD ·
+             <b>R</b> : Restart course/training · <b>G</b> : Gusts · <b>P</b> : Aquatint / plain rendering</li>
              <li><b>Q / E / F</b> : Port / Starboard / Both broadsides</li>
              <li><b>Z</b> : Change load &nbsp;·&nbsp; <b>X</b> : Cut away wreck</li>
              <li><b>V</b> : Change ship &nbsp;·&nbsp; <b>W / S</b> : set / reef sails on square-riggers</li>
@@ -402,7 +420,7 @@ export class Simulator {
            </ul>
            <p style="margin-top:12px"><b class="prim">Tipp:</b> Halte dich an den Kompass.
            The red arrow = ship, the blue = wind (from where), the turquoise = apparent wind.</p>
-           <button class="help-close" style="margin-top:14px;padding:10px 22px;border-radius:10px;border:0;background:#3da3ff;color:#061019;font-weight:700;cursor:pointer">Got it</button>
+           <button class="help-close">Got it</button>
          </div>`;
       document.body.appendChild(help);
       help.style.display = "flex";
@@ -528,6 +546,35 @@ export class Simulator {
       this.camera.aspect = window.innerWidth / window.innerHeight;
       this.camera.updateProjectionMatrix();
       this.renderer.setSize(window.innerWidth, window.innerHeight);
+      if (this.aquatint) this.aquatint.setSize(window.innerWidth, window.innerHeight);
+   }
+
+   // ------------------------------------------------------------------
+   // Rendering style. Everything visual reads the palette for the current
+   // style; switching re-tints the sky, sea, land and every sail in place.
+   // ------------------------------------------------------------------
+   setStyle(name) {
+      this.style = setCurrentStyle(name);
+      applyStyleToDocument(this.style, document);
+      storeStyle(this.style, safeStorage());
+      this._applyPalette();
+      return this.style;
+   }
+
+   _applyPalette() {
+      const world = palette(this.style).world;
+      this.scene.setPalette(world);
+      this.ocean.setPalette(world.sea);
+      this.terrain.setPalette(world.terrain);
+      const ships = [this.player, ...(this.fleet ? this.fleet.ships : []),
+         ...(this.session ? this.session.remoteShips() : [])];
+      for (const s of ships) if (s && s.model) applySailPalette(s.model, world);
+   }
+
+   /** One frame onto the canvas: through the aquatint pass or straight. */
+   _draw() {
+      if (this.style === "aquatint" && this.aquatint) this.aquatint.render();
+      else this.renderer.render(this.scene.scene, this.camera);
    }
 
    // =====================================================================
@@ -748,7 +795,7 @@ export class Simulator {
          this._uiMsg = "";
       }
 
-      this.renderer.render(this.scene.scene, this.camera);
+      this._draw();
    }
 
    /**
@@ -775,7 +822,7 @@ export class Simulator {
          // Skip boat placement, render ocean + sky only
       }
       try {
-         this.renderer.render(this.scene.scene, this.camera);
+         this._draw();
       } catch (e) {
          console.error("[segel-simulator] renderOnly:", e);
       }
@@ -815,6 +862,10 @@ export class Simulator {
             case "toggleHud":
                this.hudVisible = !this.hudVisible;
                this.ui.hudVisible = this.hudVisible;
+               break;
+            case "toggleStyle":
+               this.setStyle(nextStyle(this.style));
+               this.ui.showMessage(this.style === "aquatint" ? "Aquatint" : "Plain rendering");
                break;
             case "toggleMenu":
                this.openMenu();
@@ -1205,6 +1256,15 @@ function disposeTree(root) {
       if (Array.isArray(m)) m.forEach((x) => x && x.dispose && x.dispose());
       else if (m && m.dispose) m.dispose();
    });
+}
+
+// localStorage can be missing or throw (private mode, blocked storage).
+function safeStorage() {
+   try {
+      return typeof window !== "undefined" ? window.localStorage : null;
+   } catch {
+      return null;
+   }
 }
 
 // ---------- Wasser-Ziel-Marker (Ring + Boje) ----------

@@ -87,6 +87,7 @@ picture eases onto the corrected place instead of jumping.
 | **R** | Kurs (Regatta) / Übung (Training) zurücksetzen |
 | **G** | Wind-Gusts & Veer an/aus |
 | **H** | HUD ein/aus |
+| **P** | Rendering style: aquatint / plain (see below) |
 | **Leertaste** | Boot nach Kenter aufrichten |
 | **Mausrad** | Zoom · **Maus ziehen** | Ansicht drehen |
 
@@ -406,6 +407,40 @@ Im Kern (siehe `src/physics.js`, voll testbar unter `tests/`):
   klassischer Scheuerlinie, Spiegelheck, Wasserpass-Band und Antifouling unter
   der Wasserlinie; dazu Flossenkiel mit Rumpfbirne, Ruderblatt, Vorstag/Backstag/
   Wanten, Reling und Cockpit.
+
+### Rendering style: naval aquatint
+
+By default the world is drawn like a hand-coloured naval aquatint of about
+1800: muted washes, a fixed tonal grain, ink outlines on hulls and rigging,
+paper tone and a mild plate vignette. Two layers make the look
+(`packages/client/src/style.js` holds both palettes):
+
+- **Scene palette.** Sky dome, fog, lights, sea colours (`ocean.js` reads them
+  as uniforms), land and surf colours (`terrain.js`), sailcloth and the
+  smoke/splash sprites all take their colours from the style's `world`
+  palette. A teal-grey sky, an olive sea with cream crests and buff sails
+  are already in the frame before any post-processing.
+- **Aquatint pass** (`aquatint.js`). The scene is rendered into an off-screen
+  target with a depth texture; one full-screen shader then draws the etched
+  line (ink where the depth breaks between neighbouring pixels, fading with
+  distance), pulls the value onto an ink → wash → paper ramp while keeping
+  most of the chroma, adds a screen-fixed rosin grain that is heavier in the
+  darks, paper fibre, a warm cast and the vignette. Nothing ends up pure
+  black or pure white: the printer's ink and the paper are the limits.
+
+The HUD keeps its see-through panes but wears the same period: a warm vellum
+tint with the world washed sepia behind it, double ink rules, the IM Fell
+English typeface (SIL Open Font License, bundled in `public/fonts/`), an
+engraved 16-point compass rose and verdigris / ochre / oxblood for good /
+worn / critical. All colours are CSS tokens on `:root`; the
+`[data-style="plain"]` block restores the previous look.
+
+The **plain** style is the unprocessed modern rendering, useful for
+comparison and as a fallback on weak GPUs. Switch with the **P** key, with
+`?style=plain` (or `?style=aquatint`) in the address, or by the stored
+preference (`localStorage["segel.style"]`, written whenever you press P).
+In the plain style the frame goes straight to the canvas, so it renders
+exactly as before the aquatint work.
 
 ---
 
