@@ -1,10 +1,10 @@
-// ship.js - ein Schiff als Ganzes: 3D-Modell, Fahrdynamik, Schadensmodell und
-// Batterie in einer Einheit. Spieler und Gegner benutzen dieselbe Klasse; der
-// Unterschied ist nur, wer das Ruder bedient.
+// ship.js - ein ship als wholes: 3D-Modell, Fahrdynamik, damagesmodell und
+// battery in einer Einheit. player und opponent benutzen dieselbe Klasse; der
+// Unterschied ist nur, wer das rudder bedient.
 //
-// Die Klasse verbindet auch die Folgen: was das Schadensmodell feststellt,
-// wirkt hier auf die Fahrdynamik (Segelkraft, Ruder, Widerstand, Schlagseite)
-// und auf das Aussehen (Loecher, gefallene Masten, Brand, gestrichene Flagge).
+// Die Klasse verbindet auch die Folgen: was das damagesmodell feststellt,
+// wirkt hier auf die Fahrdynamik (sail force, rudder, drag, Schlagseite)
+// und auf das Aussehen (holes, gefallene masts, fire, gestrichene flag).
 
 import * as THREE from "three";
 import { buildSailboat } from "./boat.js";
@@ -30,9 +30,9 @@ export class Ship {
       this.debris = opts.debris || null;
       this.name = opts.name || this.vessel.name;
 
-      // Zufallsquelle (Phase 0D). Wer einen Seed uebergibt, bekommt ein
-      // vollstaendig wiederholbares Schiff: Schadenswuerfe, Mannschafts-
-      // verluste und Salven haengen dann nur noch am Seed. Ohne Seed bleibt es
+      // Zufallsquelle (Phase 0D). Wer einen sead uebergibt, bekommt ein
+      // vollstaendig wiederholbares ship: damageswuerfe, crewschafts-
+      // verluste und salvon haengen dann nur noch am sead. Ohne sead bleibt es
       // Math.random - der Einzelspielerpfad.
       this.rng = opts.rng
          ? opts.rng
@@ -53,7 +53,7 @@ export class Ship {
          autoTrim: true,
       });
 
-      // --- Schaden ---
+      // --- damage ---
       this.faction = opts.faction || null;   // Eintrag aus factions.js
       this.gunnery = this.faction ? this.faction.gunnery : 1;
       this.dmg = new DamageModel(this.vessel, {
@@ -62,8 +62,8 @@ export class Ship {
          rng: this.rng,
       });
 
-      // Freibord bis Oberkante Schanzkleid - Grenze, ab der die See ueber Deck
-      // laeuft. Die Yacht hat kein Schanzkleid, dort reicht ein flacher Wert.
+      // freeboard bis Oberkante Schanzkleid - Grenze, ab der die sea ueber deck
+      // laeuft. Die Yacht hat kein Schanzkleid, dort reicht ein flacher value.
       this.freeboard = this.model.userData.FB
          ?? (this.vessel.rig === "square" ? freeboardOf(this.vessel)
             : this.vessel.hull.draft * 0.55);
@@ -71,9 +71,9 @@ export class Ship {
       // Water-over-the-rail bookkeeping; the check itself is shared with the server.
       this._swamp = { swampT: 0, railClear: this.freeboard };
 
-      // --- Mannschaft ---
+      // --- crewschaft ---
       this.crew = new Crew(this.vessel, { isPlayer: this.isPlayer, rng: this.rng });
-      // Die Leute an Deck (nur Kriegsschiffe haben genug davon)
+      // Die men an deck (nur warshipe haben genug davon)
       this.crewView = null;
       if (this.vessel.rig === "square" && this.model.userData.deckAt) {
          this.crewView = buildCrewView(this.model, this.vessel);
@@ -83,7 +83,7 @@ export class Ship {
       this._sailWork = 0;
       this._lastSailSet = 1;
 
-      // --- Batterie ---
+      // --- battery ---
       this.battery = new Battery(this._rawScene(), {
          sound: opts.sound !== false,
          ownerId: this.id,
@@ -125,7 +125,7 @@ export class Ship {
 
    drainEvents() { const e = this._events; this._events = []; return e; }
 
-   // Beschreibung fuer die Trefferpruefung der Geschuetze
+   // Beschreibung fuer die hitpruefung der gune
    targetInfo() {
       const u = this.model.userData;
       return {
@@ -133,7 +133,7 @@ export class Ship {
          ship: this,
          heeler: u.heeler,
          // Live-Referenz: Three.js schreibt die Matrix in place fort. Die
-         // geteilte Trefferpruefung bekommt damit genau die Matrix, die auch
+         // geteilte hitpruefung bekommt damit genau die Matrix, die auch
          // der Renderer benutzt - und der Server spaeter dieselbe aus
          // shipPose().
          matrixWorld: u.heeler.matrixWorld,
@@ -159,7 +159,7 @@ export class Ship {
    }
 
    // ------------------------------------------------------------------
-   // Treffer einstecken: Schaden buchen und das Bild danach herstellen
+   // hit einstecken: damage buchen und das frame danach herstellen
    // ------------------------------------------------------------------
    takeHit(hit) {
       if (!this.alive) return null;
@@ -174,7 +174,7 @@ export class Ship {
          freeboard: u.FB ?? 4,
       });
       if (!res) return null;
-      // Verluste an Bord buchen
+      // losses an overboard buchen
       if (res.crew && res.crew.n > 0) {
          const c = this.crew.hit(res.crew.n, res.crew.where);
          res.crewHurt = c.hurt;
@@ -242,14 +242,14 @@ export class Ship {
       const outward = hit.dir ? hit.dir.clone().negate() : new THREE.Vector3(0, 1, 0);
 
       if (hit.inRig) {
-         // Der Treffer geht in ein bestimmtes Segel - dort reisst das Tuch auf
+         // Der hit geht in ein bestimmtes sail - dort reisst das canvas auf
          if (this.model.damageSail) {
             const mast = hit.s < 0.38 ? "fore" : hit.s < 0.72 ? "main" : "mizzen";
             const lvl = hit.y > (this.model.userData.rigTop || 40) * 0.62 ? "topgallant"
                : hit.y > (this.model.userData.rigTop || 40) * 0.36 ? "topsail" : "course";
             this.model.damageSail(mast, lvl, 0.05 + Math.random() * 0.10);
          }
-         // Zerschossenes Tauwerk und Tuchfetzen segeln nach Lee weg
+         // shot-ups cordage und canvasfetzen segeln nach leeward weg
          const n = Math.round(1 + Math.random() * 3);
          for (let i = 0; i < n; i++) {
             D.spawnCanvas(world, outward, 0.8 + Math.random() * 2.2, 0.7 + Math.random() * 1.8,
@@ -260,7 +260,7 @@ export class Ship {
                { speed: 5 + Math.random() * 5 });
          }
       } else {
-         // Splitterhagel aus der Bordwand - nach innen UND nach aussen
+         // splintershagel aus der hull side - nach innen UND nach aussen
          if (res.splinters > 0) {
             D.spawnSplinters(world, outward, Math.ceil(res.splinters * 0.55),
                { speed: 13 + Math.random() * 10, color: 0xa98b5c, scale: this.vessel.hull.loa / 43 });
@@ -280,48 +280,48 @@ export class Ship {
    }
 
    // ------------------------------------------------------------------
-   // Mast geht ueber Bord
+   // mast geht ueber overboard
    // ------------------------------------------------------------------
    _dropMast(key, cause) {
       if (!this.model.detachMast) return null;
       const d = this.model.detachMast(key);
       if (!d) return null;
-      // Modell und Schadensmodell duerfen nie auseinanderlaufen: egal ueber
-      // welchen Weg der Mast faellt, er gilt danach als verloren.
+      // Modell und damagesmodell duerfen nie auseinanderlaufen: egal ueber
+      // welchen Weg der mast faellt, er gilt danach als verloren.
       if (this.dmg.masts[key] && this.dmg.masts[key].state !== "gone") {
          this.dmg.breakMast(key, cause);
       }
 
-      // Ein Mast geht nicht lautlos ueber Bord: die Toppsgasten in seinen
-      // Wanten gehen mit, und herabstuerzendes Rundholz und Tauwerk fegen das
-      // Deck. Das kostet Leute - auch wenn kein Schuss gefallen ist.
+      // Ein mast geht nicht lautlos ueber overboard: die topmen in seinen
+      // shrouds gehen mit, und herabstuerzendes spar und cordage fegen das
+      // deck. Das kostet men - auch wenn kein Schuss gefallen ist.
       const aloft = Math.round(this.crew.total * (0.008 + this.rng() * 0.014));
-      if (aloft > 0) this.crew.hit(aloft, "rigg");
+      if (aloft > 0) this.crew.hit(aloft, "rig");
       const onDeck = Math.round(this.crew.total * (0.003 + this.rng() * 0.007));
       if (onDeck > 0) this.crew.hit(onDeck, "deck");
       this.crew.shock(0.30);
 
-      // Das Ereignis meldet das Schadensmodell - hier nicht noch einmal.
+      // Das Ereignis meldet das damagesmodell - hier nicht noch einmal.
 
       if (!this.debris) {
          this.model.remove(d.group);
          return null;
       }
 
-      // Startbewegung: Schiffsfahrt plus Kippen nach Lee. Ein Mast faellt
-      // dorthin, wohin der Wind drueckt - also auf die Leeseite.
+      // Startbewegung: shipfahrt plus topple nach leeward. Ein mast faellt
+      // dorthin, wohin der wind drueckt - also auf die leeward side.
       const leeSign = this.dyn.twaSigned > 0 ? -1 : 1; // Lee = dem Wind abgewandt
       const fwd = dirVec(this.dyn.heading);
       const vel = new THREE.Vector3(
          fwd.x * this.dyn.speed * 0.514444,
          0,
          fwd.z * this.dyn.speed * 0.514444);
-      // Drehachse: laengsschiffs, damit er quer ueber Bord geht
+      // Drehachse: laengsschiffs, damit er quer ueber overboard geht
       const axis = new THREE.Vector3(fwd.x, 0, fwd.z).normalize();
       const omega = axis.multiplyScalar(leeSign * (0.55 + Math.random() * 0.35));
 
-      // Der Mast ist ein langes Rundholz, kein Ball: Auftrieb und Gewicht
-      // werden ueber die ganze Laenge verteilt. Sonst stellt er sich im Wasser
+      // Der mast ist ein langes spar, kein Ball: buoyancy und Gewicht
+      // werden ueber die ganze Laenge verteilt. Sonst stellt er sich im water
       // senkrecht auf wie eine Spierentonne, statt flach umzukippen.
       const H = d.height;
       const axisLocal = new THREE.Vector3(0, 1, 0);   // Mastgruppe: +Y = nach oben
@@ -329,7 +329,7 @@ export class Ship {
          axisLocal, 0, H, d.volume, 11,
          // Untermast dick, Bramstenge duenn - daher liegt der Schwerpunkt tief
          (u) => Math.pow(1 - 0.72 * u, 2),
-         // halbe Dicke am Mastfuss; damit schwimmt er wie ein Rundholz auf
+         // halbe Dicke am mast foot; damit schwimmt er wie ein spar auf
          Math.max(this.vessel.hull.beam * 0.045, 0.30));
       // Schwerpunkt aus derselben Verteilung
       let wsum = 0, wy = 0;
@@ -344,7 +344,7 @@ export class Ship {
          radius: H * 0.06,
          com,
          probes,
-         // Traegheitsmoment eines Stabs um den Schwerpunkt
+         // inertiasmoment eines Stabs um den Schwerpunkt
          inertia: d.mass * H * H / 12,
          cdWater: 1.5,
          angDrag: 0.55,
@@ -353,7 +353,7 @@ export class Ship {
          tether: {
             owner: this.id,
             local: d.anchorLocal.clone(),
-            // Er haengt am Mastfuss im stehenden Gut - dort greift die Trosse an
+            // Er haengt am mast foot im stehenden Gut - dort greift die Trosse an
             attach: new THREE.Vector3(0, 0, 0),
             len: Math.max(H * 0.10, 4),
          },
@@ -361,7 +361,7 @@ export class Ship {
       return piece;
    }
 
-   // Wrack kappen: Beile an die Wanten, das Schiff ist wieder frei
+   // wreck kappen: Beile an die shrouds, das ship ist wieder frei
    cutAwayWreckage() {
       if (!this.debris) return 0;
       const n = this.debris.cutTethers(this.id);
@@ -370,11 +370,11 @@ export class Ship {
    }
 
    // ------------------------------------------------------------------
-   // Rammstoss und Grundberuehrung
+   // Rammstoss und groundberuehrung
    // ------------------------------------------------------------------
    takeRam(info) {
       const res = this.dmg.applyRam(info);
-      // Ein Zusammenstoss wirft die halbe Wache von den Beinen
+      // Ein collision wirft die halbe Wache von den Beinen
       const n = Math.round(this.crew.total * clamp(Math.abs(info.closingKts || 0) * 0.0016, 0, 0.05));
       if (n > 0) this.crew.hit(n, "deck");
       this.crew.shock(0.22);
@@ -404,7 +404,7 @@ export class Ship {
    }
 
    // ------------------------------------------------------------------
-   // Erscheinungsbild an den Schadenszustand angleichen
+   // Erscheinungsbild an den damageszustand angleichen
    // ------------------------------------------------------------------
    _syncAppearance() {
       const m = this.model;
@@ -418,16 +418,16 @@ export class Ship {
    }
 
    // ------------------------------------------------------------------
-   // Schritt
+   // step
    // ------------------------------------------------------------------
-   // ctx: { wind {dir,speedKts}, t, waveRad, amp, dt }
+   // ctx: { wind {dir,speedKts}, t, wavewheel, amp, dt }
    update(dt, ctx) {
       if (!this.alive) return;
       const D = this.dmg;
       const dyn = this.dyn;
       const u = this.model.userData;
 
-      // --- Schaden fortschreiben -----------------------------------------
+      // --- damage fortschreiben -----------------------------------------
       if (!this.serverDriven) D.update(dt, { heel: dyn.heel });
       if (this.vessel.rig === "square" && !this.serverDriven) {
          const broke = D.stressRig(dt, {
@@ -437,7 +437,7 @@ export class Ship {
          });
          if (broke) this._dropMast(broke.mast, "overpress");
       }
-      // Eine ausgeblutete Besatzung kaempft nicht weiter
+      // A bled-out crew doesn't fight on
       if (!this.isPlayer && !this.serverDriven && !D.struck && !D.neverStrikes
             && this.crew.morale() < 0.12 && this.crew.losses > 8) {
          D.struck = true;
@@ -449,19 +449,19 @@ export class Ship {
       }
       if (D.afire > 0.02 && this.model.setFire) this.model.setFire(D.afire);
 
-      // --- Aus den Lieken geflogene Segel ---------------------------------
+      // --- Aus den bolt ropes geflogene sail ---------------------------------
       if (this.model.drainBlownSails) {
          const blown = this.model.drainBlownSails();
          if (blown.length) {
-            // nach Lee: der Wind traegt das Tuch dorthin, wohin er weht
+            // nach leeward: der wind traegt das canvas dorthin, wohin er weht
             const lee = dirVec(ctx.wind.dir + 180);
             const leeVec = new THREE.Vector3(lee.x, 0.25, lee.z).normalize();
             const wkt = ctx.wind.speedKts;
             for (const b of blown) {
                this._events.push({ type: "sailBlown", ship: this, level: b.level, mast: b.mastKey });
                if (!this.debris) continue;
-               // Ein ganzes Segel geht nicht am Stueck ueber Bord - es reisst
-               // in mehrere flatternde Bahnen.
+               // Ein ganzes sail geht nicht am Stueck ueber overboard - es reisst
+               // in mehrere flatternde panels.
                const strips = 3 + Math.floor(Math.random() * 3);
                for (let k = 0; k < strips; k++) {
                   const p = b.pos.clone().add(new THREE.Vector3(
@@ -477,7 +477,7 @@ export class Ship {
          }
       }
 
-      // --- Schadensfolgen auf die Fahrdynamik ----------------------------
+      // --- damagesfolgen auf die Fahrdynamik ----------------------------
       if (this.serverDriven) {
          // The server computed these from its damage and crew; the local
          // prediction must step with exactly the same numbers.
@@ -493,10 +493,10 @@ export class Ship {
          dyn.driveMul = D.driveFactor();
          dyn.rudderMul = D.rudderFactor() * (1 - 0.35 * this.wreckDrag);
          dyn.dragMul = 1 + 1.8 * this.wreckDrag + 0.7 * D.flooding;
-         // Ein Wrack an einer Seite zieht das Schiff staendig in diese Richtung
+         // Ein wreck an einer side zieht das ship staendig in diese direction
          dyn.turnBias = this.wreckDrag * 7 * (this.dyn.twaSigned > 0 ? -1 : 1);
          dyn.heelBias = D.floodHeel();
-         // Mannschaft: bediente Rohre, Ladegeschwindigkeit, Segelmanoever, Ruder
+         // crewschaft: bediente guns, Ladegeschwindigkeit, sail handling, rudder
          const gun = this.crew.gunnery();
          this.battery.effectiveness.PORT = D.gunFraction("PORT") * gun.served;
          this.battery.effectiveness.STBD = D.gunFraction("STBD") * gun.served;
@@ -507,7 +507,7 @@ export class Ship {
          dyn.rudderMul *= this.crew.command();
       }
 
-      // Wird gerade Segel bedient? Dann sind die Toppsgasten in den Wanten.
+      // Wird gerade sail bedient? Dann sind die topmen in den shrouds.
       const dSet = Math.abs(dyn.sailSet - this._lastSailSet);
       this._lastSailSet = dyn.sailSet;
       this._sailWork = clamp(Math.max(this._sailWork - dt * 0.22, dSet > 1e-4 ? 1 : 0), 0, 1);
@@ -528,7 +528,7 @@ export class Ship {
       this.updateCrewView(dt, ctx);
    }
 
-   // Untergang: das Schiff sackt weg und rollt dabei auf die Leckseite
+   // sinking: das ship sackt weg und rollt dabei auf die leakseite
    _sinkStep(dt, ctx) {
       const p = this.pos;
       const hy = seaHeight(p.x, p.z, ctx.waveT ?? ctx.t, ctx.waveRad, ctx.amp, ctx.lambda ?? 1) * 0.9;
@@ -538,8 +538,8 @@ export class Ship {
       const heeler = this.model.userData.heeler;
       heeler.rotation.z = lerp(heeler.rotation.z, 0.9, Math.min(1, dt * 0.35));
       heeler.rotation.x = lerp(heeler.rotation.x, -0.25, Math.min(1, dt * 0.3));
-      // Auch der Untergang liefert Lagen fuer die Zwischenbild-Interpolation,
-      // sonst ruckelt ein sinkendes Schiff auf Simulationsrate.
+      // Auch der sinking liefert Lagen fuer die Zwischenbild-Interpolation,
+      // sonst ruckelt ein sinkendes ship auf Simulationsrate.
       this._posePrev = this._poseCurr || null;
       this._poseCurr = {
          y: hy - sink, rollZ: heeler.rotation.z, pitchX: heeler.rotation.x,
@@ -557,14 +557,14 @@ export class Ship {
       }
    }
 
-   // Auf der Welle platzieren (Auftrieb, Rollen, Stampfen)
+   // Auf der wave platzieren (buoyancy, rolling, Stampfen)
    //
    // Die Lage selbst rechnet shipPose() in @segel/shared - dieselbe Funktion,
-   // aus der der Server seine Trefferpruefungs-Matrix baut. Hier wird sie nur
+   // aus der der Server seine hitpruefungs-Matrix baut. Hier wird sie nur
    // auf das Three.js-Modell gesetzt.
    //
-   // Aufgerufen wird das mit FESTEM Simulationsschritt. Fuer die Darstellung
-   // zwischen zwei Schritten gibt es applyPose(alpha).
+   // Aufgerufen wird das mit FESTEM Simulationsschritt. Fuer die rendering
+   // zwischen zwei stepen gibt es applyPose(alpha).
    placeOnSea(dt, ctx) {
       const wt = ctx.waveT ?? ctx.t;
       const lam = ctx.lambda ?? 1;
@@ -592,7 +592,7 @@ export class Ship {
 
       this._applyPoseExact(pose, this._posCurr);
 
-      // --- Wasser ueber die Reling --------------------------------------
+      // --- water ueber die railing --------------------------------------
       if (!this.serverDriven) this._swampCheck(dt, pose);
    }
 
@@ -609,16 +609,16 @@ export class Ship {
       const heeler = this.model.userData.heeler;
       heeler.rotation.z = pose.rollZ;
       heeler.rotation.x = pose.pitchX;
-      // Weltmatrizen sofort nachziehen: die Trefferpruefung der Geschuetze
-      // rechnet in Schiffskoordinaten und darf sich nicht darauf verlassen,
+      // worldmatrizen sofort nachziehen: die hitpruefung der gune
+      // rechnet in ship coordinates und darf sich nicht darauf verlassen,
       // dass der Renderer sie schon aktualisiert hat.
       this.model.updateMatrixWorld(true);
    }
 
    /**
-    * Darstellungslage zwischen den letzten beiden Simulationsschritten.
-    * alpha = 0 -> vorheriger Schritt, 1 -> aktueller. Rein visuell: die
-    * Simulation liest diese Werte nie zurueck.
+    * renderingslage zwischen den letzten beiden Simulationsschritten.
+    * alpha = 0 -> vorheriger step, 1 -> aktueller. Rein visuell: die
+    * Simulation liest diese valuee nie zurueck.
     */
    applyPose(alpha) {
       if (!this._poseCurr) return;
@@ -627,8 +627,8 @@ export class Ship {
          this._applyPoseExact(this._poseCurr, this._posCurr);
          return;
       }
-      // alpha ist der Restanteil im laufenden Schritt: 0 heisst "noch keine
-      // Zeit im aktuellen Schritt vergangen", also die VORIGE Lage. Das Bild
+      // alpha ist der Restanteil im laufenden step: 0 heisst "noch keine
+      // time im aktuellen step vergangen", also die VORIGE Lage. Das frame
       // laeuft damit um bis zu einen Simulationsschritt (33 ms) hinterher -
       // der uebliche Preis dafuer, dass nie extrapoliert und nie geruckt wird.
       const a = clamp(alpha, 0, 1);
@@ -662,11 +662,11 @@ export class Ship {
       this.lastHitAt += dt;
    }
 
-   // Die Mannschaft an ihren Stationen bewegen
+   // Die crewschaft an ihren stations bewegen
    updateCrewView(dt, ctx) {
       const cv = this.crewView;
       if (!cv) return;
-      // Weit entfernte Schiffe brauchen keine animierte Besatzung
+      // Distant ships don't need animated crew
       if (ctx.crewLod === false) { cv.group.visible = false; return; }
       cv.group.visible = true;
       cv.setStrength(this.crew.status());
@@ -686,7 +686,7 @@ export class Ship {
       });
    }
 
-   // Ankerpunkt fuer eine Trosse (Wrack am stehenden Gut)
+   // Ankerpunkt fuer eine Trosse (wreck am stehenden Gut)
    anchorPoint(local, out) {
       const h = this.model.userData.heeler;
       h.updateMatrixWorld();

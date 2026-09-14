@@ -1,4 +1,4 @@
-// controls.js - Eingabe (Tastatur + Maus)
+// controls.js - input (Tastatur + Maus)
 // Gibt jedes Frame ein Input-Objekt und liefert Edge-Ereignisse ueber eine Queue.
 
 /** True when the key event comes from an element the user is typing into. */
@@ -84,7 +84,7 @@ export class Controls {
     }
 
     _release(e) {
-      // Ruder beim Loslassen auf 0 (langsam)
+      // rudder beim Loslassen auf 0 (langsam)
       switch (e.code) {
          case "ArrowLeft":
           case "KeyA":
@@ -100,7 +100,7 @@ export class Controls {
     }
 
     read(dt) {
-      // Rohes Ruderkommando aus den Tasten: -1, 0 oder +1.
+      // Rohes rudder command aus den Tasten: -1, 0 oder +1.
       //
       // Frueher wurde hier mit dt*8 geglaettet und in BoatDynamics.setRudder()
       // noch einmal mit festem Faktor 0.3 je Aufruf. Zwei Glaettungen, davon

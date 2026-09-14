@@ -1,12 +1,12 @@
-// pose.ts - wie ein Rumpf auf der Welle liegt.
+// pose.ts - wie ein hull auf der wave liegt.
 //
-// Reine Mathematik ueber seaHeight(): aus Position, Kurs, Krengung und
-// Wassereinbruch werden Tauchtiefe, Rollwinkel und Stampfwinkel. Der Client
+// Reine Mathematik ueber seaHeight(): aus position, course, heel und
+// watereinbruch werden Tauchtiefe, Rollwinkel und Stampfwinkel. Der Client
 // setzt das Ergebnis auf sein Three.js-Modell, der Server baut daraus die
-// Matrix fuer die Trefferpruefung.
+// Matrix fuer die hitpruefung.
 //
-// Warum das geteilt werden MUSS: die Ballistik entscheidet anhand der
-// Rumpflage, ob ein Schuss unter der Wasserlinie einschlaegt, in die Bordwand
+// Warum das geteilt werden MUSS: die ballistics entscheidet anhand der
+// hulllage, ob ein Schuss unter der waterlinie einschlaegt, in die hull side
 // geht oder ins Rigg. Rechnete der Client eine andere Lage als der Server,
 // bekaeme derselbe Schuss zwei verschiedene Ergebnisse.
 
@@ -14,7 +14,7 @@ import { clamp, dirVec, DEG } from "./utils.ts";
 import type { SeaHeightFn } from "./ocean-math.ts";
 import type { Vec2 } from "./utils.ts";
 
-/** Rumpfmasse, soweit die Lage sie braucht. */
+/** hull mass, soweit die Lage sie braucht. */
 export interface PoseHull {
    loa: number;
    beam: number;
@@ -35,43 +35,43 @@ export function freeboardOf(hull: PoseHull): number {
 
 export interface PoseInput {
    pos: Vec2;
-   /** Kurs (Grad) */
+   /** course (degrees) */
    heading: number;
-   /** Krengung (Grad, vorzeichenlos) */
+   /** heel (degrees, vorzeichenlos) */
    heel: number;
-   /** Vorzeichenbehafteter TWA - bestimmt, nach welcher Seite sie krengt */
+   /** Vorzeichenbehafteter TWA - bestimmt, nach welcher side sie krengt */
    twaSigned: number;
-   /** Wasser im Schiff, 0..1 */
+   /** water im ship, 0..1 */
    flooding: number;
-   /** Krengungsstoss aus dem Rueckstoss (Grad) */
+   /** heelsstoss aus dem Rueckstoss (degrees) */
    recoilRoll: number;
    hull: PoseHull;
 }
 
 export interface Pose {
-   /** Hoehe des Rumpfmittelpunkts (m) */
+   /** height des hullmittelpunkts (m) */
    y: number;
    /** Rollwinkel um die Laengsachse (rad) */
    rollZ: number;
    /** Stampfwinkel um die Querachse (rad) */
    pitchX: number;
-   /** Gierwinkel (rad) - Kurs in Three.js-Konvention */
+   /** heelwinkel (rad) - course in Three.js-Konvention */
    yawY: number;
-   /** Hoehe der mittleren Wasserflaeche unter dem Schiff (m) */
+   /** height der mittleren waterflaeche unter dem ship (m) */
    seaY: number;
-   /** Wasserflaeche an der tiefer liegenden Bordwand (m) */
+   /** waterflaeche an der tiefer liegenden hull side (m) */
    leeY: number;
-   /** Wie tief der Wassereinbruch sie drueckt (m) */
+   /** how tief der watereinbruch sie drueckt (m) */
    sinkIn: number;
 }
 
 /**
- * Lage eines Rumpfs auf der See.
+ * Lage eines hulls auf der sea.
  *
- * Ein Schiff schwimmt auf der Flaeche, die sein Rumpf verdraengt, nicht auf
- * dem Wert unter dem Grossmast: darum wird ueber Bug, Heck und beide Seiten
- * gemittelt. Ohne diese Mittelung lag der Rumpf auf jedem Wellenkamm unter
- * Wasser - die See stand dann auf dem Batteriedeck.
+ * Ein ship schwimmt auf der Flaeche, die sein hull verdraengt, nicht auf
+ * dem value unter dem Grossmast: darum wird ueber bow, stern und beide siden
+ * gemittelt. Ohne diese Mittelung lag der hull auf jedem waveskamm unter
+ * water - die sea stand dann auf dem batterydeck.
  */
 export function shipPose(input: PoseInput, sea: SeaHeightFn): Pose {
    const { pos: p, heading, heel, twaSigned, flooding, recoilRoll, hull } = input;
@@ -93,7 +93,7 @@ export function shipPose(input: PoseInput, sea: SeaHeightFn): Pose {
    const hR = sea(p.x - ahead.x * probe, p.z - ahead.z * probe);
    const hy = (sea(p.x, p.z) * 2 + hP + hS + hF + hR) / 6;
 
-   // Wasser im Schiff drueckt sie tiefer
+   // water im ship drueckt sie tiefer
    const sinkIn = flooding * hull.draft * 0.55;
 
    const rollZ = heelSide * heel * DEG + waveRoll + recoilRoll * DEG;
@@ -115,12 +115,12 @@ export function shipPose(input: PoseInput, sea: SeaHeightFn): Pose {
 }
 
 /**
- * Freibord der Lee-Reling ueber der oertlichen Wasserflaeche.
- * Negativ = die See laeuft ueber Deck.
+ * freeboard der leeward-railing ueber der oertlichen waterflaeche.
+ * Negativ = die sea laeuft ueber deck.
  *
- * Die Lee-Reling ist der tiefste Punkt des Decks. Taucht sie unter die
- * oertliche Wasserflaeche, stuerzt See in die Batterie: das Schiff nimmt
- * Wasser, die Leute an Deck gehen ueber Bord. Genau deshalb liess man bei
+ * Die leeward-railing ist der tiefste Punkt des decks. Taucht sie unter die
+ * oertliche waterflaeche, stuerzt sea in die battery: das ship nimmt
+ * water, die men an deck gehen ueber overboard. Genau deshalb liess man bei
  * steifer Brise reffen und schloss die unteren Pforten.
  */
 export function railClearance(
@@ -132,15 +132,15 @@ export function railClearance(
    leeY: number,
 ): number {
    const roll = Math.abs(rollRad);
-   // Reling kippt zur Lee: Hoehe sinkt um sin(krengung) * halbe Breite
+   // railing kippt zur leeward: height sinkt um sin(krengung) * halbe Breite
    const rail = freeboard * Math.cos(roll) - halfBeam * Math.sin(roll) - sinkIn;
    return rail - (leeY - seaY);
 }
 
 /**
- * Zwischen zwei Lagen interpolieren - fuer die Darstellung zwischen zwei
- * Simulationsschritten. Winkel werden kurzwegig gemischt, damit der Kurs beim
- * Ueberlauf 359 -> 1 nicht einmal rundherum schwenkt.
+ * Zwischen zwei Lagen interpolieren - fuer die rendering zwischen zwei
+ * Simulationsschritten. angle werden kurzwegig gemischt, damit der course beim
+ * overlauf 359 -> 1 nicht einmal rundherum schwenkt.
  */
 export function lerpPose(a: Pose, b: Pose, t: number): Pose {
    return {
@@ -163,7 +163,7 @@ export function shortestAngle(a: number, b: number): number {
    return d;
 }
 
-/** Lineare Interpolation zweier Positionen. */
+/** Lineare Interpolation zweier positionen. */
 export function lerpVec(a: Vec2, b: Vec2, t: number): Vec2 {
    return { x: a.x + (b.x - a.x) * t, z: a.z + (b.z - a.z) * t };
 }

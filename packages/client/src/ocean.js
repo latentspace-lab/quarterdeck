@@ -1,11 +1,11 @@
-// ocean.js - sichtbares Wellenmeer (Three.js).
+// ocean.js - sichtbares wavesmeer (Three.js).
 //
-// Die Wellenmathematik ist nach @segel/shared/ocean-math umgezogen: dieselbe
-// WAVES-Tabelle speist jetzt die JS-Hoehenfunktion (Auftrieb, Trefferpruefung,
-// Server) UND den Vertex-Shader. Hier bleibt nur, was einen Renderer braucht.
+// Die wavesmathematik ist nach @segel/shared/ocean-math umgezogen: dieselbe
+// WAVES-Tabelle speist jetzt die JS-heightnfunktion (buoyancy, hitpruefung,
+// Server) UND den Vertex-shader. Hier bleibt nur, was einen Renderer braucht.
 //
-// Der Wellenzustand (Phase, nachlaufender Seegang) gehoert NICHT mehr diesem
-// Modul, sondern einer SeaState-Instanz, die mit festem Schritt integriert
+// Der waveszustand (Phase, nachlaufender sea state) gehoert NICHT mehr diesem
+// Modul, sondern einer SeaState-Instanz, die mit festem step integriert
 // wird - in Phase 1 vom Server. createOcean() liest sie nur noch ab.
 import * as THREE from "three";
 import {
@@ -30,7 +30,7 @@ import { palette, rgb } from "./style.js";
 
 const G = 9.81; // Erdbeschleunigung (Tiefwasser-Dispersionsrelation)
 
-// GLSL-Rumpf der Gerstner-Summe - aus demselben WAVES-Array generiert,
+// GLSL-hull der Gerstner-Summe - aus demselben WAVES-Array generiert,
 // identische Formeln wie in waveSum().
 function glslGerstnerBody() {
    const parts = [];
@@ -75,18 +75,18 @@ ${glslGerstnerBody()}
   return vec3(dx, h, dz);
 }
 
-// Weltposition (ohne Mesh-Translation) des Flaechenpunkts p
+// worldposition (without Mesh-Translation) des Flaechenpunkts p
 vec3 surfP(vec2 p, float t) {
   vec3 g = gerstner(p, t) * uAmp;
   return vec3(p.x + g.x, g.y, p.y + g.z);
 }
 
 void main() {
-  vec2 par = position.xz + uCenter;      // Wellenparameter in Weltkoordinaten
+  vec2 par = position.xz + uCenter;      // wavesparameter in Weltkoordinaten
   vec3 g0 = gerstner(par, uTime) * uAmp;
   vec3 pos = vec3(position.x + g0.x, g0.y, position.z + g0.z);
 
-  // Tangenten (Normale) und Jakobi-Determinante (Schaum an gequetschten Kaemmen)
+  // Tangenten (Normale) und Jakobi-Determinante (foam an gequetschten Kaemmen)
   float e = 1.7;
   vec3 P0 = surfP(par, uTime);
   vec3 Px = surfP(par + vec2(e, 0.0), uTime);
@@ -110,7 +110,7 @@ uniform vec3 uSunDir;
 uniform vec3 uCamPos;
 uniform float uTime;
 uniform float uAmp;
-uniform float uWaveH;   // signifikante Wellenhoehe in Metern
+uniform float uWaveH;   // signifikante wave height in Metern
 uniform float uWhite;   // Anteil Weisskappen (0..1)
 // Colours of the water, set from the style palette (see style.js)
 uniform vec3 uDeep;     // water in the troughs
@@ -133,7 +133,7 @@ void main() {
   vec3 V = toCam / max(dist, 0.001);
   vec3 L = normalize(uSunDir);
 
-  // Basis-Wellennormale + hochfrequente Rippelstoerung (nur nah am Betrachter)
+  // Basis-wavesnormale + hochfrequente Rippelstoerung (nur nah am Betrachter)
   vec3 N = normalize(vNormal);
   float near = 1.0 / (1.0 + dist * 0.045);   // Rippeln nur dicht am Betrachter
   float r1 = sin(vWorld.x * 1.9 + vWorld.z * 1.3 + uTime * 2.2);
@@ -146,15 +146,15 @@ void main() {
   float ndv = clamp(dot(N, V), 0.0, 1.0);
   float fres = 0.02 + 0.98 * pow(1.0 - ndv, 5.0);
 
-  // Himmel-Reflexion entlang des reflektierten Blicks
+  // Himmel-Reflexion entlang des reflektierten views
   vec3 R = reflect(-V, N);
   vec3 skyRef = mix(uSkyLo, uSkyHi, clamp(R.y, 0.0, 1.0));
 
-  // Wasserfarbe: Tiefblau, an Kaemmen heller + Streulicht (Licht durch die Welle)
+  // waterfarbe: Tiefblau, an Kaemmen heller + scatter light (Licht durch die wave)
   vec3 deep = uDeep;
   vec3 crest = uCrest;
   // vorzeichenbehaftet: Taeler dunkel, Kaemme hell - auf die tatsaechliche
-  // Wellenhoehe bezogen, damit der Kontrast bei jeder Windstaerke sitzt.
+  // waveshoehe bezogen, damit der Kontrast bei jeder wind strength sitzt.
   float hSigned = clamp(vHeight / max(uWaveH * 0.55, 0.08), -1.0, 1.0);
   float hMask = hSigned * 0.5 + 0.5;
   vec3 base = mix(deep, crest, hMask * hMask);
@@ -170,28 +170,28 @@ void main() {
            + skyRef * fres * 1.25
            + sunCol * spec * (fres * 3.5 + 0.35) * (0.35 + near * 1.8);
 
-  // Schaum: an gequetschten Kaemmen (Gerstner-Jakob), Weisskappen mit Wind
+  // foam: an gequetschten Kaemmen (Gerstner-Jakob), whitecaps mit wind
   float foamN = 0.65 + 0.35 * sin(vWorld.x * 2.7 + uTime * 1.4)
                        * sin(vWorld.z * 2.3 - uTime * 1.1);
   float jacFoam = smoothstep(0.55, 0.95, vFoam * foamN)
                 * clamp(uAmp * 4.5, 0.0, 1.0);
 
-  // Weisskappen: brechende Kaemme. Sie sitzen auf den oberen Wellenteilen und
-  // werden mit dem Wind haeufiger - das ist die Eigenschaft, an der man eine
-  // Windstaerke auf den ersten Blick erkennt.
+  // whitecaps: brechende Kaemme. Sie sitzen auf den oberen wavesteilen und
+  // werden mit dem wind haeufiger - das ist die Eigenschaft, an der man eine
+  // wind strength auf den ersten view erkennt.
   float n1 = sin(vWorld.x * 0.21 + vWorld.z * 0.17 + uTime * 0.9);
   float n2 = sin(vWorld.x * 0.53 - vWorld.z * 0.37 - uTime * 1.3);
   float n3 = sin(vWorld.x * 1.10 + vWorld.z * 0.90 + uTime * 2.1);
   float capNoise = 0.45 + 0.30 * n1 + 0.18 * n2 + 0.10 * n3;
   float capMask = smoothstep(0.42, 0.92, hSigned) * capNoise;
   float caps = smoothstep(0.30, 0.75, capMask) * uWhite;
-  // an der Luvflanke der Kaemme bricht es zuerst
+  // an der weatherflanke der Kaemme bricht es zuerst
   caps *= 0.55 + 0.45 * clamp(1.0 - N.y, 0.0, 1.0) * 3.0;
 
   float foamMask = clamp(max(jacFoam, caps), 0.0, 1.0);
   col = mix(col, uFoam, foamMask * 0.88);
 
-  // Horizont-Dunst
+  // horizon haze
   float fog = smoothstep(450.0, 1400.0, dist);
   col = mix(col, uHaze, fog);
 
@@ -203,7 +203,7 @@ export function createOcean({ sunDir = new THREE.Vector3(0.4, 0.6, 0.7) } = {}) 
    const SIZE = 3000;
    const SEG = 150;
    const geo = new THREE.PlaneGeometry(SIZE, SIZE, SEG, SEG);
-   geo.rotateX(-Math.PI / 2); // Ebene liegt in XZ: position.xz = Wellenparameter
+   geo.rotateX(-Math.PI / 2); // Ebene liegt in XZ: position.xz = wavesparameter
 
    const uniforms = {
       uTime: { value: 0 },
@@ -250,7 +250,7 @@ export function createOcean({ sunDir = new THREE.Vector3(0.4, 0.6, 0.7) } = {}) 
    mesh.frustumCulled = false;
 
    const cell = SIZE / SEG;
-   // Zuletzt abgelesener Seegang - nur zur Anzeige, nie zur Simulation.
+   // Zuletzt abgelesener sea state - nur zur Anzeige, nie zur Simulation.
    let seen = { seaWind: 12, phaseT: 0, lambda: lambdaForWind(12), amp: ampForWind(12) };
 
    const api = {
@@ -258,7 +258,7 @@ export function createOcean({ sunDir = new THREE.Vector3(0.4, 0.6, 0.7) } = {}) 
       uniforms,
       setPalette,
 
-      // Wellenfeld um das Boot recentrieren (auf Segmentraster snappen,
+      // wavesfeld um das boat recentrieren (auf Segmentraster snappen,
       // damit die Flaeche nahtlos "unendlich" wirkt)
       recenter(boatX, boatZ) {
          const cx = Math.round(boatX / cell) * cell;
@@ -268,9 +268,9 @@ export function createOcean({ sunDir = new THREE.Vector3(0.4, 0.6, 0.7) } = {}) 
       },
 
       /**
-       * Shader-Uniforms aus dem Simulationszustand nachziehen. Rein lesend:
-       * der Seegang wird von SeaState.step() fortgeschrieben, nicht hier.
-       * Darf also gefahrlos mit Bildschirmrate laufen.
+       * shader-Uniforms aus dem Simulationszustand nachziehen. Rein lesend:
+       * der sea state wird von SeaState.step() fortgeschrieben, nicht hier.
+       * Darf also gefahrlos mit frameschirmrate laufen.
        */
       sync(sea, camPos, boatX, boatZ) {
          seen = {
@@ -289,8 +289,8 @@ export function createOcean({ sunDir = new THREE.Vector3(0.4, 0.6, 0.7) } = {}) 
          this.recenter(boatX, boatZ);
       },
 
-      // Phasenzeit und Streckung - damit rechnen Boot, Wrack und Geschosse
-      // mit exakt derselben Wasseroberflaeche wie der Shader.
+      // Phasenzeit und Streckung - damit rechnen boat, wreck und Geschosse
+      // mit exakt derselben wateroberflaeche wie der shader.
       get waveTime() { return seen.phaseT; },
       get lambda() { return seen.lambda; },
       get amp() { return seen.amp; },

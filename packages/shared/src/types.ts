@@ -10,10 +10,10 @@ import type { Side } from "./damage.ts";
 import type { XYZ } from "./ballistics.ts";
 
 /**
- * Zustand eines Schiffs, wie ihn der Server je Tick veroeffentlicht.
+ * state eines ship, wie ihn der Server je Tick veroeffentlicht.
  *
  * Die Felder driveMul..wreckDrag sind keine Anzeigewerte: sie sind die
- * Eingaben, mit denen BoatDynamics.step() gerechnet hat. Der Client muss von
+ * inputn, mit denen BoatDynamics.step() gerechnet hat. Der Client muss von
  * einem bestaetigten Snapshot aus NACH-simulieren, also gehoeren sie dazu.
  */
 export interface ShipState {
@@ -36,7 +36,7 @@ export interface ShipState {
    isCapsized: boolean;
    alive: boolean;
 
-   // --- Schadenszustand ---
+   // --- damageszustand ---
    hullIntegrity: number;
    mastsStanding: number;
    flooding: number;
@@ -65,7 +65,7 @@ export interface ShipState {
    mastMainState: number;
    mastMizzenState: number;
 
-   // --- Batterie ---
+   // --- battery ---
    reloadPort: number;
    reloadStbd: number;
    /** seconds a full reload takes (crew-dependent) */
@@ -74,7 +74,7 @@ export interface ShipState {
    /** guns per side */
    guns: number;
 
-   // --- Server-seitige Eingaben in BoatDynamics.step() ---
+   // --- Server-seitige inputn in BoatDynamics.step() ---
    driveMul: number;
    rudderMul: number;
    dragMul: number;
@@ -100,22 +100,22 @@ export interface ShipState {
 }
 
 /**
- * Der Wasserzustand. Beides wird integriert und laesst sich nicht aus der
+ * Der waterzustand. Beides wird integriert und laesst sich nicht aus der
  * Tickzahl allein ausrechnen - deshalb gehoert es in den Snapshot.
  */
 export interface SeaSync {
-   /** nachlaufender Seegang (kn), server-integriert */
+   /** nachlaufender sea state (kn), server-integriert */
    seaWind: number;
-   /** aufsummierte Wellenphase (s), server-integriert */
+   /** aufsummierte wavesphase (s), server-integriert */
    phaseT: number;
 }
 
-/** Ein Eingabekommando des Clients fuer genau einen Tick. */
+/** Ein inputkommando des Clients fuer genau einen Tick. */
 export interface InputCommand {
    seq: number;
    /** -1..1 */
    rudder: number;
-   /** 0.25..1 (nur Rahsegler) */
+   /** 0.25..1 (nur square-rigger) */
    sailSet?: number;
    fire?: Side | "BOTH";
    ammo?: string;

@@ -1,8 +1,8 @@
 // terrain.js - Insel und Untiefe, sichtbarer Teil (Three.js).
 //
-// Die Seekarte selbst ist nach @segel/shared/terrain-math umgezogen: dieselbe
-// analytische Grundfunktion liefert das Gelaendemesh, die Brandung, die
-// Grundberuehrung und - in Phase 1 - die Karte auf dem Server. Hier bleibt der
+// Die seakarte selbst ist nach @segel/shared/terrain-math umgezogen: dieselbe
+// analytische groundfunktion liefert das terrainmesh, die surf, die
+// groundberuehrung und - in Phase 1 - die chart auf dem Server. Hier bleibt der
 // Mesh-Aufbau.
 
 import * as THREE from "three";
@@ -32,7 +32,7 @@ export {
    PLAY_RADIUS,
 } from "@segel/shared";
 
-// ---------------------------------------------------------------- Darstellung
+// ---------------------------------------------------------------- rendering
 // Land colours (linear triples) from the style palette; setPalette() swaps
 // them and recolours the mesh in place.
 import { palette, rgb } from "./style.js";
@@ -65,7 +65,7 @@ function colorAt(h) {
          COL_SAND[2] + (COL_GRASS[2] - COL_SAND[2]) * t,
       ];
    }
-   // unter Wasser: von hellem Sand in die Tiefe
+   // unter water: von hellem Sand in die depth
    const t = Math.min(1, (-h - 1.5) / 14);
    return [
       COL_SHALLOW[0] + (COL_DEEP[0] - COL_SHALLOW[0]) * t,
@@ -81,7 +81,7 @@ export function createTerrain(scene, opts = {}) {
 
    let mesh = null, foam = null, foamMat = null;
 
-   // Baut Gelaende- und Brandungsmesh aus der aktuell gueltigen Seekarte.
+   // Baut terrain- und surfsmesh aus der aktuell gueltigen seakarte.
    function build() {
       const geo = new THREE.PlaneGeometry(SIZE, SIZE, N, N);
       geo.rotateX(-Math.PI / 2);
@@ -99,9 +99,9 @@ export function createTerrain(scene, opts = {}) {
       mesh.receiveShadow = true;
       group.add(mesh);
 
-      // Brandung: heller Saum, wo das Wasser flacher als fuenf Meter ist.
-      // Nur die Dreiecke behalten, die auch Schaum tragen - sonst liegt eine
-      // kilometergrosse transparente Flaeche ueber der ganzen Szene.
+      // surf: heller Saum, wo das water flacher als fuenf metres ist.
+      // Nur die Dreiecke behalten, die auch foam tragen - sonst liegt eine
+      // kilometergrosse transparente Flaeche ueber der ganzen scene.
       const fGeo = new THREE.PlaneGeometry(SIZE, SIZE, N, N);
       fGeo.rotateX(-Math.PI / 2);
       const fPos = fGeo.attributes.position;
@@ -130,7 +130,7 @@ export function createTerrain(scene, opts = {}) {
             uniform float uTime; uniform vec3 uColor; varying float vA; varying vec3 vP;
             void main(){
                if (vA <= 0.001) discard;
-               // Brecher laufen ueber das Riff
+               // Brecher laufen ueber das reef
                float w = 0.55 + 0.45 * sin(vP.x * 0.055 + vP.z * 0.04 - uTime * 1.7);
                gl_FragColor = vec4(uColor, vA * w * 0.85);
             }`,
@@ -178,7 +178,7 @@ export function createTerrain(scene, opts = {}) {
          if (mesh) paint(mesh.geometry);
          if (foamMat) foamMat.uniforms.uColor.value.setRGB(...COL_SURF);
       },
-      // Neue Seekarte auswuerfeln und Geometrie neu aufbauen.
+      // Neue seakarte auswuerfeln und Geometrie neu aufbauen.
       regenerate(seed) {
          const w = generateWorld(seed ?? ((Math.random() * 1e9) | 0));
          clear();

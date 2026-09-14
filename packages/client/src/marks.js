@@ -1,10 +1,10 @@
 // marks.js - the regatta course: buoys and lines in the scene, and the race
 // judged by the shared course tracker (@segel/shared/course), which is what
-// the server runs in a regatta room. Wind from the north: +Z is upwind.
+// the server runs in a regatta room. wind from the north: +Z is upwind.
 import * as THREE from "three";
 import { courseLayout, newRace, raceStep, SIM_DT } from "@segel/shared";
 
-// ---------- Boje (Floater / Komitee) ----------
+// ---------- mark (Floater / Komitee) ----------
 export function makeBuoy(color, type = "float") {
    const g = new THREE.Group();
    const bodyMat = new THREE.MeshStandardMaterial({
@@ -39,7 +39,7 @@ export function makeBuoy(color, type = "float") {
    return g;
 }
 
-// Start-/Ziellinie zwischen zwei Bojen
+// Start-/targetlinie zwischen zwei markn
 function makeLine(a, b, color, y = 0.1) {
    const dx = b.x - a.x;
    const dz = b.z - a.z;
@@ -108,7 +108,7 @@ export class Course {
       return this;
    }
 
-   // Bojen und Linien aus- bzw. einblenden (im Freeride/Training stoeren sie)
+   // markn und Linien show/hide (im Freeride/Training stoeren sie)
    setVisible(v) {
       this.root.visible = !!v;
       return this;

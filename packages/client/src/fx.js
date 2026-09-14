@@ -19,7 +19,7 @@ function canvasTex(key, size, draw) {
    return t;
 }
 
-// Pulverrauch / Gischt: weiche, unregelmaessige Ballen
+// powderrauch / Gischt: weiche, unregelmaessige Ballen
 export function puffTexture() {
    return canvasTex("puff", 64, (g) => {
       for (let i = 0; i < 10; i++) {
@@ -48,7 +48,7 @@ export function flashTexture() {
    });
 }
 
-// Einschlagloch mit aufgerissenen Planken - dunkles Zentrum, ausgefranster Rand
+// impactloch mit aufgerissenen planken - dunkles Zentrum, ausgefranster Rand
 export function holeTexture() {
    return canvasTex("hole", 96, (g, S) => {
       g.clearRect(0, 0, S, S);
@@ -76,7 +76,7 @@ export function holeTexture() {
    });
 }
 
-// Feuer / Brandherd
+// fire / fireherd
 export function fireTexture() {
    return canvasTex("fire", 64, (g) => {
       const rg = g.createRadialGradient(32, 40, 2, 32, 32, 30);

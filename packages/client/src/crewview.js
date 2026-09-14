@@ -1,15 +1,15 @@
-// crewview.js - die Leute an Deck.
+// crewview.js - die men an deck.
 //
-// Ein Schiff dieser Zeit war ein Ameisenhaufen: an jedem Rohr eine Bedienung,
-// Toppsgasten in den Wanten, ein Rudergaenger am Rad, Zimmerleute an den
-// Pumpen. Genau diese Stationen werden hier besetzt und bewegt - die Figuren
-// sind bewusst simpel, aber ihr VERHALTEN haengt am Spielzustand: die
-// Geschuetzbedienungen arbeiten im Takt des Nachladens, die Pumpen gehen
-// schneller, je mehr Wasser im Schiff steht, und wer gefallen ist, steht
+// Ein ship dieser time war ein Ameisenhaufen: an jedem gun eine Bedienung,
+// topmen in den shrouds, ein helmsman am wheel, carpenters an den
+// pumps. Genau diese stations werden hier besetzt und bewegt - die figures
+// sind bewusst simpel, aber ihr VERHALTEN haengt am gamezustand: die
+// gun crews arbeiten im rhythm des reloadings, die pumps gehen
+// schneller, je mehr water im ship steht, und wer gefallen ist, steht
 // nicht mehr da.
 //
-// Darstellung: zwei InstancedMeshes (Rumpf + Kopf) fuer die ganze Besatzung,
-// also zwei Zeichenaufrufe unabhaengig von der Kopfzahl.
+// rendering: two InstancedMeshes (hull + head) for the whole crew,
+// also zwei draw calls unabhaengig von der Kopfzahl.
 
 import * as THREE from "three";
 import { clamp } from "./utils.js";
@@ -24,7 +24,7 @@ const ROLE_COLOR = {
 };
 
 function figureGeometry(scale) {
-   // Rumpf: Kapsel; Kopf: kleine Kugel. Fuesse bei y = 0.
+   // hull: Kapsel; Kopf: smalle ball. Fuesse bei y = 0.
    const body = new THREE.CapsuleGeometry(0.20 * scale, 0.80 * scale, 3, 7);
    body.translate(0, 0.60 * scale, 0);
    const head = new THREE.SphereGeometry(0.155 * scale, 7, 6);
@@ -41,8 +41,8 @@ export function buildCrewView(shipModel, vessel, opts = {}) {
    const stations = [];
    const add = (st) => { stations.push(st); return st; };
 
-   // ---------------------------------------------------------------- Stationen
-   // 1) Geschuetzbedienungen - nur am obersten Batteriedeck, dort stehen sie
+   // ---------------------------------------------------------------- stations
+   // 1) gun crews - nur am obersten batterydeck, dort stehen sie
    //    auf dem Wetterdeck und sind auch sichtbar.
    if (u.gunDecks && u.gunDecks.length) {
       const deck = u.gunDecks[u.gunDecks.length - 1]; // oberstes
@@ -65,7 +65,7 @@ export function buildCrewView(shipModel, vessel, opts = {}) {
       }
    }
 
-   // 2) Toppsgasten: am Mastfuss und in den Wanten
+   // 2) topmen: am mast foot und in den shrouds
    const mastKeys = Object.keys(u.masts || {});
    for (const key of mastKeys) {
       const m = u.masts[key];
@@ -78,7 +78,7 @@ export function buildCrewView(shipModel, vessel, opts = {}) {
             face: 0, phase: Math.random() * 6.28, slot: k,
          });
       }
-      // einer in den Wanten
+      // einer in den shrouds
       add({
          role: "top", mast: key, climbing: true,
          x: BEAM * 0.30, y, z: m.z,
@@ -86,7 +86,7 @@ export function buildCrewView(shipModel, vessel, opts = {}) {
       });
    }
 
-   // 3) Rudergaenger und Offizier auf dem Achterdeck
+   // 3) helmsman und Offizier auf dem quarterdeck
    {
       const s = 0.80, y = u.deckAt(s), z = u.zAt(s);
       add({ role: "officer", helm: true, x: -0.55 * scale, y, z, face: 0, phase: 0 });
@@ -94,7 +94,7 @@ export function buildCrewView(shipModel, vessel, opts = {}) {
       add({ role: "officer", conn: true, x: BEAM * 0.22, y, z: z + 3.5 * scale, face: 0.5, phase: 2.4 });
    }
 
-   // 4) Pumpen mittschiffs
+   // 4) pumps mittschiffs
    {
       const s = 0.55, y = u.deckAt(s), z = u.zAt(s);
       for (let k = 0; k < 2; k++) {
@@ -103,7 +103,7 @@ export function buildCrewView(shipModel, vessel, opts = {}) {
       }
    }
 
-   // 5) Seesoldaten an der Reling, Pulverjungen unterwegs
+   // 5) marines an der railing, powder boys unterwegs
    for (let k = 0; k < 4; k++) {
       const s = 0.30 + k * 0.14, y = u.deckAt(s), z = u.zAt(s);
       const hb = u.halfBeamAt(s, y);
@@ -137,7 +137,7 @@ export function buildCrewView(shipModel, vessel, opts = {}) {
    if (bodies.instanceColor) bodies.instanceColor.needsUpdate = true;
    group.add(bodies, heads);
 
-   // Wie viele je Rolle noch da sind (aus dem Besatzungsmodell)
+   // how many per role are still standing (aus dem crew model)
    const strength = {};
    for (const k in ROLE_COLOR) strength[k] = 1;
 
@@ -147,7 +147,7 @@ export function buildCrewView(shipModel, vessel, opts = {}) {
    const _s = new THREE.Vector3(1, 1, 1);
    const _hidden = new THREE.Matrix4().makeScale(0, 0, 0);
 
-   // Reihenfolge je Rolle, damit beim Ausduennen immer dieselben verschwinden
+   // Reihenfolge je role, damit beim Ausduennen immer dieselben verschwinden
    const rank = {};
    for (const st of stations) {
       rank[st.role] = (rank[st.role] || 0);
@@ -158,15 +158,15 @@ export function buildCrewView(shipModel, vessel, opts = {}) {
    const api = {
       group, stations, count: N,
 
-      // Mannschaftsstaerke je Rolle 0..1 - daraus ergibt sich, wie viele
-      // Figuren noch an ihren Stationen stehen.
+      // crewschaftsstaerke je role 0..1 - daraus ergibt sich, wie viele
+      // figures noch an ihren stations stehen.
       setStrength(status) {
          if (!status || !status.roles) return;
          for (const r of status.roles) strength[r.id] = clamp(r.frac, 0, 1);
       },
 
       // o: { dt, time, reload:{PORT,STBD}, ready:{PORT,STBD}, rudder, flooding,
-      //      sailWork, lostMasts:Set, struck }
+      //      sailWork, lostmasts:Set, struck }
       update(dt, o = {}) {
          const t = o.time || 0;
          const lost = o.lostMasts || new Set();
@@ -185,10 +185,10 @@ export function buildCrewView(shipModel, vessel, opts = {}) {
             const bob = Math.sin(t * 2.1 + st.phase) * 0.02;
 
             if (st.role === "gun") {
-               // Takt des Nachladens: ausrennen, laden, zuruecktreten
+               // rhythm des reloadings: ausrennen, laden, zuruecktreten
                const rl = o.reload ? (o.reload[st.side] ?? 0) : 0;   // 1 = frisch gefeuert
                const work = clamp(rl, 0, 1);
-               // kurz nach dem Schuss weichen sie zurueck, dann holen sie das Rohr ein
+               // kurz nach dem Schuss weichen sie zurueck, dann holen sie das gun ein
                const step = Math.sin(work * Math.PI) * 0.55 + work * 0.25;
                x -= st.out * step * (0.7 + st.slot * 0.3);
                y += Math.abs(Math.sin(t * 5 + st.phase)) * 0.05 * work;
@@ -196,7 +196,7 @@ export function buildCrewView(shipModel, vessel, opts = {}) {
                const crouch = 0.85 + 0.15 * Math.cos(t * 4.5 + st.phase);
                _s.set(1, work > 0.05 ? crouch : 1, 1);
             } else if (st.climbing) {
-               // Toppsgast entert auf und ab, wenn Segel bedient werden
+               // Toppsgast entert auf und ab, wenn sail bedient werden
                const w = clamp(o.sailWork ?? 0, 0, 1);
                const h = (0.5 + 0.5 * Math.sin(t * 0.55 + st.phase)) * w;
                y += h * st.climbTop;
@@ -206,13 +206,13 @@ export function buildCrewView(shipModel, vessel, opts = {}) {
                x = st.x + (o.rudder || 0) * 0.12;
                _s.set(1, 1, 1);
             } else if (st.pump) {
-               // Pumpen: je mehr Wasser, desto haerter wird gearbeitet
+               // pumps: je mehr water, desto haerter wird gearbeitet
                const f = clamp(o.flooding ?? 0, 0, 1);
                const rate = 1.6 + f * 5;
                y += Math.sin(t * rate + st.phase) * 0.16 * (0.3 + f);
                _s.set(1, 1 - 0.12 * Math.abs(Math.sin(t * rate + st.phase)), 1);
             } else if (st.runner) {
-               // Pulverjunge laeuft zwischen Luke und Batterie hin und her
+               // powderjunge laeuft zwischen hatch und battery hin und her
                const u2 = 0.5 + 0.5 * Math.sin(t * 0.42 * st.dir + st.phase);
                const s2 = clamp(st.s0 + (u2 - 0.5) * 0.32, 0.08, 0.92);
                z = u.zAt(s2);

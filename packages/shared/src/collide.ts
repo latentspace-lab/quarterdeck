@@ -1,28 +1,28 @@
-// collide.ts - Schiff gegen Schiff.
+// collide.ts - ship gegen ship.
 //
-// Ein Rumpf wird als Kette von drei Kreisen laengs der Mittellinie genaehert
-// (Bug, Mitte, Heck). Das ist fuer laengliche Koerper deutlich besser als ein
+// Ein hull wird als Kette von drei Kreisen laengs der Mittellinie genaehert
+// (bow, Mitte, stern). Das ist fuer laengliche Koerper deutlich besser als ein
 // einzelner Kreis und viel billiger als echte Polygonpruefung.
 //
-// Beim Stoss werden Impuls und Schaden aus der Annaeherungsgeschwindigkeit und
-// den Verdraengungen berechnet. Bei geringer Geschwindigkeit verhaken sich die
-// Schiffe im Tauwerk, statt abzuprallen - genau das war die Voraussetzung fuers
+// Beim impact werden Impuls und damage aus der approach velocity und
+// den displacementen berechnet. Bei geringer speed verhaken sich die
+// ships im cordage, statt abzuprallen - genau das war die Voraussetzung fuers
 // Entern.
 //
 // Das Modul kennt keine Ship-Klasse, sondern nur das Interface unten. Der
-// Client reicht seine Three.js-Schiffe hinein, der Server seine reinen
-// Zustandsobjekte.
+// Client reicht seine Three.js-ships hinein, der Server seine reinen
+// statesobjekte.
 
 import { clamp, dirVec, normDeg, diffDeg, type Vec2 } from "./utils.ts";
 import type { Side } from "./damage.ts";
 import type { Vessel } from "./vessels.ts";
 
-/** Was collide von einem Schiff braucht - mehr nicht. */
+/** Was collide von einem ship braucht - mehr nicht. */
 export interface CollidableShip {
    id: string;
    vessel: Vessel;
    pos: Vec2;
-   /** Verdraengung (t) */
+   /** displacement (t) */
    tons: number;
    alive: boolean;
    dyn: { heading: number; speed: number; stopped: boolean };
@@ -48,7 +48,7 @@ interface Circle {
 export interface ContactInfo {
    /** Durchdringungstiefe (m) */
    pen: number;
-   /** Stossnormale */
+   /** impactnormale */
    nx: number;
    nz: number;
    ia: number;
@@ -92,7 +92,7 @@ const _b: Circle[] = [
    { x: 0, z: 0, r: 0 },
 ];
 
-/** Prueft ein Paar. Liefert null oder die Stossbeschreibung. */
+/** Prueft ein Paar. Liefert null oder die impactbeschreibung. */
 export function testPair(A: CollidableShip, B: CollidableShip): ContactInfo | null {
    const fast = Math.hypot(A.pos.x - B.pos.x, A.pos.z - B.pos.z);
    const reach = (A.vessel.hull.loa + B.vessel.hull.loa) * 0.55;
@@ -117,7 +117,7 @@ export function testPair(A: CollidableShip, B: CollidableShip): ContactInfo | nu
    return best;
 }
 
-/** Stoss aufloesen: Schiffe trennen, Impuls tauschen, Schaden buchen. */
+/** impact aufloesen: ships trennen, Impuls tauschen, damage buchen. */
 export function resolve(
    A: CollidableShip,
    B: CollidableShip,
@@ -128,14 +128,14 @@ export function resolve(
    const mB = B.tons;
    const inv = 1 / (mA + mB);
 
-   // 1) Durchdringung aufheben (nach Masse gewichtet)
+   // 1) Durchdringung aufheben (nach mass gewichtet)
    const push = hit.pen * 0.5;
    A.pos.x -= hit.nx * push * (mB * inv) * 2;
    A.pos.z -= hit.nz * push * (mB * inv) * 2;
    B.pos.x += hit.nx * push * (mA * inv) * 2;
    B.pos.z += hit.nz * push * (mA * inv) * 2;
 
-   // 2) Geschwindigkeiten entlang der Stossnormalen
+   // 2) speeden entlang der impactnormalen
    const fa = dirVec(A.dyn.heading);
    const fb = dirVec(B.dyn.heading);
    const vA = (fa.x * hit.nx + fa.z * hit.nz) * A.dyn.speed;
@@ -143,27 +143,27 @@ export function resolve(
    const closing = vA - vB; // > 0 = sie laufen aufeinander zu
 
    if (closing > 0) {
-      // teilelastischer Stoss: das leichtere Schiff wird weggeworfen
+      // teilelastischer impact: das leichtere ship wird weggeworfen
       const e = 0.18;
       const j = (1 + e) * closing * inv;
       A.dyn.speed = Math.max(0, A.dyn.speed - j * mB * 0.9);
       B.dyn.speed = Math.max(0, B.dyn.speed + j * mA * 0.25);
    }
 
-   // 3) Verhaken: bei langsamer Beruehrung bleiben sie im Tauwerk haengen
+   // 3) foul: bei langsamer Beruehrung bleiben sie im cordage haengen
    const locked = Math.abs(closing) < 1.6;
    if (locked) {
       A.dyn.speed *= 1 / (1 + 2.2 * dt);
       B.dyn.speed *= 1 / (1 + 2.2 * dt);
    }
 
-   // 4) Schaden - nur einmal je Beruehrung, nicht in jedem Frame
+   // 4) damage - nur einmal je Beruehrung, nicht in jedem Frame
    const now = A._ramCooldown ?? 0;
    const res: ResolveResult = { closing, locked, damaged: false, aRes: null, bRes: null };
    if (closing > 1.2 && now <= 0) {
       A._ramCooldown = 1.2;
       B._ramCooldown = 1.2;
-      // Welche Seite wurde getroffen? Peilung des Stosspunkts im Schiffssystem.
+      // Welche side wurde getroffen? bearing des impactpunkts im ship system.
       const bearA = normDeg((Math.atan2(hit.nx, hit.nz) * 180) / Math.PI);
       const bearB = normDeg(bearA + 180);
       const relA = diffDeg(A.dyn.heading, bearA);
@@ -217,7 +217,7 @@ export interface GroundingResult {
    hard: boolean;
 }
 
-/** Grundberuehrung pruefen und buchen */
+/** groundberuehrung pruefen und buchen */
 export function groundStep(
    ship: CollidableShip,
    depthAt: (x: number, z: number) => number,
@@ -231,11 +231,11 @@ export function groundStep(
       ship.groundedFor = 0;
       return null;
    }
-   // Kiel beruehrt den Grund
+   // Kiel beruehrt den ground
    const speed = ship.dyn.speed;
    ship.groundedFor += dt;
    const dmg = ship.takeGrounding({ speedKts: speed, draft, depth: Math.max(d, 0) });
-   // Fahrt abrupt weg, das Schiff sitzt fest
+   // way abrupt weg, das ship sitzt fest
    ship.dyn.speed *= 1 / (1 + 6 * dt);
    if (d < draft * 0.82) ship.dyn.stopped = true;
    return { depth: d, draft, dmg, hard: d < draft * 0.82 };

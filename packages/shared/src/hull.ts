@@ -168,7 +168,7 @@ export function muzzleHeightOf(vessel: Vessel): number {
    return y / ports.length;
 }
 
-/** Mast heights as the client builds them, in metres. */
+/** mast heights as the client builds them, in metres. */
 export function mastHeights(vessel: Vessel): { fore: number; main: number; mizzen: number } {
    const LOA = vessel.hull.loa;
    return { fore: LOA * 0.86, main: LOA * 0.98, mizzen: LOA * 0.74 };

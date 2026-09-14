@@ -175,7 +175,7 @@ export class MultiplayerSession {
       if (!st || !st.ships) return;
       const now = this.now();
 
-      // Wind and sea follow the server. The fields are undefined until the
+      // wind and sea follow the server. The fields are undefined until the
       // first full patch has been decoded - a NaN here would poison the
       // dynamics for good.
       if (Number.isFinite(st.windDir) && Number.isFinite(st.windSpeed)) {

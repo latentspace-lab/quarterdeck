@@ -1,20 +1,20 @@
-// factions.js - unter welcher Flagge gesegelt wird.
+// factions.js - under which flag we sail.
 //
-// Die Wahl der Partei ist keine Kosmetik: jede Marine hatte ihre eigenen
-// Schiffe, ihre eigene Bauart und ihre eigene Gefechtsdoktrin.
+// The choice of faction is not cosmetic: each navy had its own
+// ships, its own build style and its own combat doctrine.
 //
-//   Royal Navy   - gedrillte Bedienungen, schnelles Feuer, Schuss in den RUMPF.
-//                  Ziel: den Gegner niederkaempfen und aufbringen.
-//   Marine Imp.  - grosse, schnell gebaute Schiffe, Schuss in die TAKELAGE.
-//                  Ziel: den Gegner manoevrierunfaehig machen und entkommen.
-//   Armada       - schwer gebaute Rümpfe, die viel wegstecken, aber knapp und
-//                  ungleichmaessig besetzt: langsames Feuer.
-//   Piraten      - alles erbeutet, duennhaeutig und schnell, riesige Besatzung
-//                  fuers Entern, miserable Geschuetzausbildung. Sie streichen
-//                  nie die Flagge - am Galgen wartet nichts Besseres.
+//   Royal Navy   - drilled crews, rapid fire, shot into the HULL.
+//                  Goal: beat the enemy down and capture.
+//   Marine Imp.  - large, fast-built ships, shot into the RIGGING.
+//                  Goal: disable the enemy and escape.
+//   Armada       - heavily built hulls that take a lot of punishment, but thinly
+//                  and unevenly crewed: slow fire.
+//   Pirates      - everything taken, thin-skinned and fast, huge crew
+//                  for boarding, miserable gunnery training. They never
+//                  strike the flag - nothing better awaits at the gallows.
 
 
-/** Gefechtsdoktrin: worauf die Bedienungen gerichtet werden. */
+/** Combat doctrine: where the crews aim. */
 export type Doctrine = "hull" | "rig";
 
 export interface Faction {
@@ -26,9 +26,9 @@ export interface Faction {
    short: string;
    desc: string;
    doctrine: Doctrine;
-   /** Ausbildungsstand der Bedienungen (1 = Referenz) */
+   /** Crew training level (1 = reference) */
    gunnery: number;
-   /** Piraten streichen die Flagge nie */
+   /** Pirates never strike the flag */
    neverStrikes: boolean;
    color: string;
    ships: string[];
@@ -44,7 +44,7 @@ export const FACTIONS: Faction[] = [
       short: "GB",
       desc: "Best gunnery training in the world. Fires into the hull to cripple and capture the enemy.",
       doctrine: "hull",
-      gunnery: 1.12,          // Ausbildungsstand der Bedienungen
+      gunnery: 1.12,          // crew training level
       neverStrikes: false,
       color: "#6fe1ff",
       ships: ["hotspur", "lydia", "sutherland"],
@@ -97,8 +97,8 @@ export function getFaction(id: string): Faction {
    return FACTIONS.find((f) => f.id === id) || FACTIONS[0];
 }
 
-// Wer steht dem Spieler gegenueber? Piraten sind mit allen verfeindet, die
-// Marinen untereinander nach historischer Gegnerschaft.
+// Who stands against the player? Pirates are hostile to all, the
+// navies among each other by historical enmity.
 const RIVALS: Record<string, string[]> = {
    gb: ["fr", "es", "pirate"],
    fr: ["gb", "es", "pirate"],

@@ -1,20 +1,20 @@
-// ballistics.ts - Wurfbahn, Streuung und Trefferpruefung.
+// ballistics.ts - trajectory, Streuung und hitpruefung.
 //
-// Der aufwendigste Schnitt der Phase 0: in guns.js lagen Ballistik,
-// Trefferpruefung, Nachladeuhren und Rauchwolken in einer einzigen Klasse.
+// Der aufwendigste Schnitt der Phase 0: in guns.js lagen ballistics,
+// hitpruefung, afterladeuhren und Rauchwolken in einer einzigen Klasse.
 // Hier steht nur noch die Mathematik - sie laeuft im Browser wie auf dem
 // Server. Alles Sichtbare (Muendungsfeuer, Rauch, Fontaenen, Geschossmeshes)
 // bleibt im Client.
 //
-// Warum Three.js-Vektoren: Matrix4 und Vector3 aus `three/src/math/...` sind
-// reines JavaScript ohne DOM- oder WebGL-Bezug. Ein zweiter Vektortyp
-// (gl-matrix) haette nur Uebersetzungsfehler zwischen Client und Server
+// Warum Three.js-vectoren: Matrix4 und Vector3 aus `three/src/math/...` sind
+// reines JavaScript without DOM- oder WebGL-Bezug. Ein zweiter vectortyp
+// (gl-matrix) haette nur oversetzungsfehler zwischen Client und Server
 // eingebracht - `_battle.mjs` faehrt diese Klassen seit jeher headless.
 //
-// Warum der Server die Salve wuerfelt: eine Breitseite ist durch
-// `spawnSalvo()` vollstaendig beschrieben. Der Server schickt Seed und
-// Zeitpunkt, jeder Client rechnet dieselben Flugbahnen nach und sieht
-// dieselben Einschlaege - ohne dass je ein Geschoss uebertragen wird.
+// Warum der Server die salvo wuerfelt: eine broadside ist durch
+// `spawnSalvo()` vollstaendig beschrieben. Der Server schickt sead und
+// timepunkt, jeder Client rechnet dieselben Flugbahnen nach und sieht
+// dieselben Einschlaege - without dass je ein Geschoss uebertragen wird.
 
 import { Matrix4 } from "three/src/math/Matrix4.js";
 import { Vector3 } from "three/src/math/Vector3.js";
@@ -27,12 +27,12 @@ export { gauss };
 const GRAVITY = 9.81;
 
 // ---------------------------------------------------------------------------
-// Wurfweite fuer eine gegebene Rohrerhoehung (Schwerkraft + Luftwiderstand,
+// Wurfweite fuer eine gegebene gunsrhoehung (gravity + airwiderstand,
 // gleiche Integration wie im Flug) und die Umkehrung dazu.
 //
-// Genau hier steckt der eigentliche Grund, warum auf Distanz kaum etwas traf:
-// die Entfernung musste GESCHAETZT werden, und ein Schaetzfehler von 15 % ist
-// auf 500 m eine Lage weit ueber oder weit vor dem Gegner.
+// Genau hier steckt der eigentliche ground, warum auf distance kaum etwas traf:
+// die distance musste GESCHAETZT werden, und ein Schaetzfehler von 15 % ist
+// auf 500 m eine Lage weit ueber oder weit vor dem opponent.
 // ---------------------------------------------------------------------------
 export function rangeForElevation(elevDeg: number, v0: number, drag: number, y0 = 2.5): number {
    const e = (elevDeg * Math.PI) / 180;
@@ -54,7 +54,7 @@ export function rangeForElevation(elevDeg: number, v0: number, drag: number, y0 
    return x;
 }
 
-/** Rohrerhoehung, die eine gewuenschte Entfernung ergibt (Bisektion) */
+/** gunsrhoehung, die eine gewuenschte distance ergibt (Bisektion) */
 export function elevationForRange(R: number, v0: number, drag: number, y0 = 2.5): number {
    let lo = -1;
    let hi = 22;
@@ -66,7 +66,7 @@ export function elevationForRange(R: number, v0: number, drag: number, y0 = 2.5)
    return (lo + hi) / 2;
 }
 
-/** Etwas, das .x/.y/.z hat - Vector3 oder ein blankes Objekt. */
+/** something, das .x/.y/.z hat - Vector3 oder ein blankes Objekt. */
 export interface XYZ {
    x: number;
    y: number;
@@ -110,26 +110,26 @@ export function segmentBox(
       if (tmin > tmax) return null;
    }
    // Der Schnitt muss INNERHALB der Strecke liegen - sonst meldet auch eine
-   // Box weit voraus auf der Geraden einen Treffer.
+   // Box weit voraus auf der Geraden einen hit.
    if (tmin > 1 || tmax < 0) return null;
    return Math.max(tmin, 0);
 }
 
 // ---------------------------------------------------------------------------
-// Salve
+// salvo
 // ---------------------------------------------------------------------------
 
-/** Huellkoerper eines Ziels, in Schiffskoordinaten. */
+/** bounding volume eines targets, in ship coordinates. */
 export interface TargetBox {
    id: string;
-   /** Weltmatrix des gekrengten Rumpfs (aus shipPose gebaut) */
+   /** worldmatrix des gekrengten hulls (aus shipPose gebaut) */
    matrixWorld: Matrix4;
    LOA: number;
    BEAM: number;
    DRAFT: number;
-   /** Freibord (m) */
+   /** freeboard (m) */
    FB: number;
-   /** Oberkante des Riggs ueber der Wasserlinie (m); 0 = kein Rigg mehr */
+   /** Oberkante des Riggs ueber der waterlinie (m); 0 = kein Rigg mehr */
    rigTop?: number;
    rigHalfWidth?: number;
 }
@@ -137,61 +137,61 @@ export interface TargetBox {
 /** Ein einzelner Schuss im Flug. */
 export interface Projectile {
    origin: XYZ;
-   /** Position am Anfang des Schritts */
+   /** position am Anfang des steps */
    prev: XYZ;
-   /** Aktuelle Position */
+   /** Aktuelle position */
    pos: XYZ;
    vel: XYZ;
    ammo: string;
-   /** Kugelgewicht (englische Pfund) */
+   /** ballgewicht (englische Pfund) */
    lb: number;
    drag: number;
-   /** je Ziel einmal gewuerfelt: faengt sich das Geschoss im Tauwerk? */
+   /** je target einmal gewuerfelt: faengt sich das Geschoss im cordage? */
    rigRolled?: Record<string, boolean>;
 }
 
 export interface SalvoShot {
    side: Side;
-   /** Index der Pforte auf dieser Seite */
+   /** Index der Pforte auf dieser side */
    idx: number;
    ammo: string;
-   /** Gemeinsamer Hoehenrichtfehler der Salve (Grad) */
+   /** Gemeinsamer heightnrichtfehler der salvo (degrees) */
    aimElev: number;
-   /** Gemeinsamer Seitenrichtfehler der Salve (rad) */
+   /** Gemeinsamer sidenrichtfehler der salvo (rad) */
    aimTrain: number;
-   /** Verzoegerung bis zum Abfeuern (s) - die Breitseite rollt die Bordwand entlang */
+   /** delay bis zum firing (s) - die broadside rollt die hull side entlang */
    at: number;
 }
 
 export interface SalvoOptions {
    side: Side;
    ammo: string;
-   /** Zahl der Pforten auf dieser Seite */
+   /** Zahl der Pforten auf dieser side */
    muzzleCount: number;
-   /** Zahl der Rohre, die noch bedient werden */
+   /** Zahl der guns, die noch bedient werden */
    readyCount: number;
-   /** Zeitlicher Versatz der Einzelschuesse (s) */
+   /** timelicher Versatz der Einzelschuesse (s) */
    spread: number;
-   /** Ausbildungsstand der Bedienungen (0.3 .. 1.6) */
+   /** Ausbildungsstand der crews (0.3 .. 1.6) */
    gunnery: number;
-   /** Geschaetzte Entfernung zum Ziel (m); 0 = nichts im Schussfeld */
+   /** Geschaetzte distance zum target (m); 0 = nichts im Schussfeld */
    rangeToTarget: number;
-   /** Effektive Reichweite der Batterie (m) */
+   /** effective range der battery (m) */
    maxRange: number;
-   /** Hoehe der Pforten ueber Wasser (m) */
+   /** height der Pforten ueber water (m) */
    muzzleHeight?: number;
 }
 
 /**
- * Eine Breitseite wuerfeln.
+ * Eine broadside wuerfeln.
  *
- * Die Bedienungen schaetzen die Entfernung und legen die Rohre darauf. Der
- * Schaetzfehler waechst mit der Entfernung - deshalb faellt die Trefferquote
+ * Die crews schaetzen die distance und legen die guns darauf. Der
+ * Schaetzfehler waechst mit der distance - deshalb faellt die hitquote
  * weit draussen in sich zusammen. Der groesste Streuposten danach ist die
- * Rollbewegung im Moment des Abfeuerns: ein Grad Rollen ist auf 400 m schon
- * ein Schiff daneben. Darum wurde "auf der Rolle" geschossen.
+ * roll motion im Moment des firings: ein degrees rolling ist auf 400 m schon
+ * ein ship daneben. Darum wurde "auf der role" geschossen.
  *
- * Saemtlicher Zufall steckt hier - damit ist eine Salve durch (Seed, Optionen)
+ * Saemtlicher Zufall steckt hier - damit ist eine salvo durch (sead, Optionen)
  * vollstaendig beschrieben und laesst sich anderswo nachspielen.
  */
 export function spawnSalvo(opts: SalvoOptions, rng: Rng): SalvoShot[] {
@@ -215,7 +215,7 @@ export function spawnSalvo(opts: SalvoOptions, rng: Rng): SalvoShot[] {
    const n = Math.max(0, Math.floor(opts.readyCount));
    if (n <= 0 || opts.muzzleCount <= 0) return shots;
 
-   // Ausgefallene Rohre gleichmaessig ueber die Seite verteilen
+   // Ausgefallene guns gleichmaessig ueber die side verteilen
    const stepSize = opts.muzzleCount / n;
    for (let k = 0; k < n; k++) {
       const i = Math.min(opts.muzzleCount - 1, Math.floor(k * stepSize));
@@ -233,9 +233,9 @@ export function spawnSalvo(opts: SalvoOptions, rng: Rng): SalvoShot[] {
 }
 
 export interface DischargeOptions {
-   /** Muendung in Weltkoordinaten */
+   /** Muendung in worldkoordinaten */
    origin: XYZ;
-   /** Waagerechte Bordwandnormale (normiert) */
+   /** Waagerechte hull sidenormale (normiert) */
    flat: XYZ;
    ammo: string;
    aimElev: number;
@@ -246,15 +246,15 @@ export interface DischargeOptions {
 const _up = new Vector3(0, 1, 0);
 
 /**
- * Aus einem gerichteten Rohr die einzelnen Geschosse machen.
+ * Aus einem gerichteten gun die einzelnen Geschosse machen.
  *
- * Vollkugel: ein Stueck, flach und weit.
- * Kettenkugel: taumelndes Paar, hoch gerichtet, kurze Reichweite.
- * Kartaetsche: Schwarm kleiner Kugeln, breiter Kegel, sehr kurze Wirkung.
+ * solid shot: ein Stueck, flach und weit.
+ * chain shot: taumelndes Paar, hoch gerichtet, kurze range.
+ * Kartaetsche: Schwarm smaller balls, breiter Kegel, sehr kurze effect.
  *
- * Die Grundrichtung ist die WAAGERECHTE Projektion der Bordwandnormalen:
- * gefeuert wurde "auf der Rolle", wenn das Rohr durch die Waagerechte ging.
- * Die Krengung bleibt nur als Restfehler (aimElev) uebrig.
+ * Die groundrichtung ist die WAAGERECHTE Projektion der hull sidenormalen:
+ * gefeuert wurde "auf der role", wenn das gun durch die Waagerechte ging.
+ * Die heel bleibt nur als Restfehler (aimElev) uebrig.
  */
 export function dischargeShots(opts: DischargeOptions, rng: Rng): Projectile[] {
    const a = AMMO[opts.ammo] || AMMO.ball;
@@ -266,8 +266,8 @@ export function dischargeShots(opts: DischargeOptions, rng: Rng): Projectile[] {
    const out: Projectile[] = [];
    for (let k = 0; k < a.pellets; k++) {
       const dir = flat.clone();
-      // Streuung je Rohr plus der gemeinsame Richtfehler der Salve: dadurch
-      // geht auch mal eine ganze Breitseite geschlossen zu hoch.
+      // Streuung je gun plus der gemeinsame Richtfehler der salvo: dadurch
+      // geht auch mal eine ganze broadside geschlossen zu hoch.
       const sp = a.spreadDeg * DEG;
       dir.addScaledVector(sideways, (rng() - 0.5) * 2 * sp + opts.aimTrain);
       dir.addScaledVector(
@@ -291,8 +291,8 @@ export function dischargeShots(opts: DischargeOptions, rng: Rng): Projectile[] {
 }
 
 /**
- * Ein Geschoss einen festen Schritt weiterfliegen lassen: Schwerkraft und
- * Luftwiderstand, genau wie in rangeForElevation().
+ * Ein Geschoss einen festen step weiterfliegen lassen: gravity und
+ * airwiderstand, genau wie in rangeForElevation().
  */
 export function stepProjectile(b: Projectile, dt: number): void {
    b.prev.x = b.pos.x;
@@ -311,20 +311,20 @@ export function stepProjectile(b: Projectile, dt: number): void {
 export interface ProjectileHit {
    target: TargetBox;
    side: Side;
-   /** Laengsposition 0 = Bug .. 1 = Spiegel */
+   /** Laengsposition 0 = bow .. 1 = Spiegel */
    s: number;
-   /** Hoehe ueber der Wasserlinie im Schiffssystem (m) */
+   /** height ueber der waterlinie im ship system (m) */
    y: number;
    inRig: boolean;
-   /** Einschlag in Schiffskoordinaten */
+   /** impact in ship coordinates */
    local: Vector3;
-   /** Einschlag in Weltkoordinaten */
+   /** impact in worldkoordinaten */
    world: Vector3;
    ammo: AmmoSpec;
    lb: number;
    /** 0 nah .. 2 sehr weit */
    range01: number;
-   /** Flugrichtung beim Einschlag (normiert) */
+   /** Flugrichtung beim impact (normiert) */
    dir: Vector3;
    speed: number;
 }
@@ -354,14 +354,14 @@ export function poseMatrix(
 }
 
 /**
- * Trefferpruefung: Strecke prev -> pos gegen die Huellkoerper der Ziele.
+ * hitpruefung: Strecke prev -> pos gegen die bounding volume der targete.
  *
- * Rumpf ist massiv, das Rigg besteht groesstenteils aus Luft - deshalb trifft
- * dort nur ein Teil der Geschosse (Kettenkugel deutlich oefter). Je Geschoss
- * und Ziel wird genau einmal gewuerfelt, ob sich etwas faengt; danach fliegt
- * die Kugel durch.
+ * hull ist massiv, das Rigg besteht groesstenteils aus air - deshalb trifft
+ * dort nur ein Teil der Geschosse (chain shot deutlich oefter). Je Geschoss
+ * und target wird genau einmal gewuerfelt, ob sich etwas faengt; danach fliegt
+ * die ball durch.
  *
- * Die Weltmatrix des Ziels kommt als Argument herein, nicht aus einem
+ * Die worldmatrix des targets kommt als Argument herein, nicht aus einem
  * Three.js-Objekt: auf dem Server wird sie aus shipPose() gebaut.
  */
 export function checkProjectileHits(
@@ -379,11 +379,11 @@ export function checkProjectileHits(
 
       const hx = tg.BEAM * 0.52;
       const hz = tg.LOA * 0.52;
-      // 1) Rumpf
+      // 1) hull
       let t = segmentBox(_p0, _p1, -hx, hx, -tg.DRAFT, tg.FB * 1.3, -hz, hz);
       let inRig = false;
       if (t === null && tg.rigTop) {
-         // 2) Rigg - grossteils Luft.
+         // 2) Rigg - grossteils air.
          t = segmentBox(
             _p0,
             _p1,
@@ -400,8 +400,8 @@ export function checkProjectileHits(
                t = shot.rigRolled[tg.id] ? t : null;
             } else {
                const a = AMMO[shot.ammo] || AMMO.ball;
-               // Dichte des Tauwerks: unten Untermasten, Rahen und Kurse,
-               // ganz oben nur noch duenne Stengen
+               // density des cordages: unten lower masts, yards und coursee,
+               // ganz oben nur noch duenne topmasts
                const yh = _p0.y + (_p1.y - _p0.y) * t;
                const u = clamp(
                   (yh - tg.FB * 1.3) / Math.max(tg.rigTop - tg.FB * 1.3, 1),
@@ -450,8 +450,8 @@ export function checkProjectileHits(
 }
 
 /**
- * Entfernung zum naechsten Ziel, das auf dieser Seite in der Breitseite steht
- * (Peilung grob querab). 0 = nichts im Schussfeld.
+ * distance zum naechsten target, das auf dieser side in der broadside steht
+ * (bearing grob querab). 0 = nichts im Schussfeld.
  */
 export function rangeToTarget(
    ownMatrixWorld: Matrix4,
@@ -468,7 +468,7 @@ export function rangeToTarget(
       const onSide = side === "STBD" ? _p0.x < 0 : _p0.x > 0;
       if (!onSide) continue;
       const d = Math.hypot(_p0.x, _p0.z);
-      // nur was halbwegs querab steht, laesst sich mit der Breitseite fassen
+      // nur was halbwegs querab steht, laesst sich mit der broadside fassen
       if (Math.abs(_p0.x) < Math.abs(_p0.z) * 0.45) continue;
       if (d > maxRange * 2.2) continue;
       if (!best || d < best) best = d;
