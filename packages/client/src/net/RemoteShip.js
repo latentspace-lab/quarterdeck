@@ -9,7 +9,7 @@
 
 import { Ship } from "../ship.js";
 import { getVessel } from "../vessels.js";
-import { shipPose, SIM_DT, lerp, clamp } from "@segel/shared";
+import { shipPose, SIM_DT, lerp, clamp } from "@quarterdeck/shared";
 import { SnapshotBuffer } from "./Interpolator.js";
 
 export class RemoteShip {

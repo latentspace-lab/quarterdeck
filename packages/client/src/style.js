@@ -14,7 +14,7 @@
 
 export const STYLES = ["aquatint", "plain"];
 export const DEFAULT_STYLE = "aquatint";
-export const STORAGE_KEY = "segel.style";
+export const STORAGE_KEY = "quarterdeck.style";
 
 let current = DEFAULT_STYLE;
 

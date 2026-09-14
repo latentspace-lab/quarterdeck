@@ -5,7 +5,7 @@
 // muzzles, some strike, damage and casualties accrue, masts come down, and
 // the whole thing is reproducible from the seed.
 import { Simulation, DEFAULT_PARAMS } from "../../packages/server/src/sim/Simulation.ts";
-import { SIM_HZ, AMMO } from "@segel/shared";
+import { SIM_HZ, AMMO } from "@quarterdeck/shared";
 import { createSuite, fingerprint } from "../lib/harness.js";
 
 const suite = createSuite("Headless battle");
@@ -147,4 +147,4 @@ suite.section("The yacht has no guns");
 
 export default () => suite.done();
 
-if (!process.env.SEGEL_TEST_RUNNER) suite.done();
+if (!process.env.QUARTERDECK_TEST_RUNNER) suite.done();

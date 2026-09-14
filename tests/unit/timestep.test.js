@@ -1,5 +1,5 @@
 // tests/unit/timestep.test.js - accumulator for "fixed simulation, free rendering".
-import { Accumulator, SIM_DT, SIM_HZ, MAX_STEPS_PER_FRAME } from "@segel/shared";
+import { Accumulator, SIM_DT, SIM_HZ, MAX_STEPS_PER_FRAME } from "@quarterdeck/shared";
 import { createSuite } from "../lib/harness.js";
 
 const suite = createSuite("timestep");
@@ -102,4 +102,4 @@ suite.section("Fixed step size");
 
 export default () => suite.done();
 
-if (!process.env.SEGEL_TEST_RUNNER) suite.done();
+if (!process.env.QUARTERDECK_TEST_RUNNER) suite.done();

@@ -2,7 +2,7 @@
 import {
    WAVES, seaHeight, ampForWind, lambdaForWind, waveHeightForWind,
    whitecapsForWind, seaStateName, SeaState, SIM_DT,
-} from "@segel/shared";
+} from "@quarterdeck/shared";
 import { createSuite, fingerprint } from "../lib/harness.js";
 
 const suite = createSuite("ocean-math");
@@ -123,4 +123,4 @@ suite.section("SeaState: determinism and transfer");
 
 export default () => suite.done();
 
-if (!process.env.SEGEL_TEST_RUNNER) suite.done();
+if (!process.env.QUARTERDECK_TEST_RUNNER) suite.done();

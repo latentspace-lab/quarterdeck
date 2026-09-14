@@ -10,7 +10,7 @@
 // the frame interval - so on a 144 Hz screen with different dt values than
 // on a 60 Hz screen, and therefore with a different result.
 import { BoatDynamics, Wind, SeaState, SIM_DT, getVessel, approach, RUDDER_TAU }
-   from "@segel/shared";
+   from "@quarterdeck/shared";
 import { createSuite, fingerprint } from "../lib/harness.js";
 
 const suite = createSuite("dt invariance");
@@ -156,4 +156,4 @@ function chunked(total) {
 
 export default () => suite.done();
 
-if (!process.env.SEGEL_TEST_RUNNER) suite.done();
+if (!process.env.QUARTERDECK_TEST_RUNNER) suite.done();

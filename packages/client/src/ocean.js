@@ -1,6 +1,6 @@
 // ocean.js - the visible wave ocean (Three.js).
 //
-// The wave math moved to @segel/shared/ocean-math: the same WAVES table now
+// The wave math moved to @quarterdeck/shared/ocean-math: the same WAVES table now
 // feeds the JS height function (buoyancy, hit detection, server) AND the
 // vertex shader. What's left here is only what needs a renderer.
 //
@@ -15,7 +15,7 @@ import {
    waveHeightForWind,
    whitecapsForWind,
    seaHeight,
-} from "@segel/shared";
+} from "@quarterdeck/shared";
 
 export {
    WAVES,
@@ -24,8 +24,8 @@ export {
    lambdaForWind,
    waveHeightForWind,
    whitecapsForWind,
-} from "@segel/shared";
-export { seaStateName, SeaState } from "@segel/shared";
+} from "@quarterdeck/shared";
+export { seaStateName, SeaState } from "@quarterdeck/shared";
 import { palette, rgb } from "./style.js";
 
 const G = 9.81; // gravitational acceleration (deep-water dispersion relation)

@@ -13,7 +13,7 @@ import {
    type RaceProgress,
    type RoomCreateOptions,
    type WelcomeMessage,
-} from "@segel/shared";
+} from "@quarterdeck/shared";
 import { BattleRoom } from "./BattleRoom.ts";
 import type { ServerShip } from "../sim/ServerShip.ts";
 

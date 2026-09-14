@@ -8,7 +8,7 @@
 // (fire, load, cut the wreck, a sail change) are folded into the next input
 // that is kept: a rudder value may be lost, a broadside may not.
 
-import type { InputCommand } from "@segel/shared";
+import type { InputCommand } from "@quarterdeck/shared";
 
 /** Default ceiling on queued inputs per ship (~270 ms at 30 Hz). */
 export const MAX_INPUT_BACKLOG = 8;

@@ -171,4 +171,4 @@ async function run() {
 
 export default run;
 
-if (!process.env.SEGEL_TEST_RUNNER) await run();
+if (!process.env.QUARTERDECK_TEST_RUNNER) await run();

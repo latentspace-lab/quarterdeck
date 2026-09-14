@@ -11,7 +11,7 @@ import { RemoteShip } from "../../packages/client/src/net/RemoteShip.js";
 import { MultiplayerSession } from "../../packages/client/src/net/MultiplayerSession.js";
 import { Ship } from "../../packages/client/src/ship.js";
 import { DebrisField } from "../../packages/client/src/debris.js";
-import { getVessel, Wind, SeaState, World, SIM_DT, SIM_HZ, BoatDynamics } from "@segel/shared";
+import { getVessel, Wind, SeaState, World, SIM_DT, SIM_HZ, BoatDynamics } from "@quarterdeck/shared";
 import { createSuite } from "../lib/harness.js";
 
 const suite = createSuite("Multiplayer session (headless)");
@@ -249,4 +249,4 @@ async function run() {
 
 export default run;
 
-if (!process.env.SEGEL_TEST_RUNNER) await run();
+if (!process.env.QUARTERDECK_TEST_RUNNER) await run();

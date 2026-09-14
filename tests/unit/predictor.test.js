@@ -6,7 +6,7 @@
 // client's prediction - and when the server was pushed off course, the
 // difference must come out as a correction.
 import { Predictor, ViewOffset } from "../../packages/client/src/net/Predictor.js";
-import { BoatDynamics, getVessel, SIM_DT } from "@segel/shared";
+import { BoatDynamics, getVessel, SIM_DT } from "@quarterdeck/shared";
 import { createSuite } from "../lib/harness.js";
 
 const suite = createSuite("predictor");
@@ -145,4 +145,4 @@ suite.section("ViewOffset absorbs and decays");
 
 export default () => suite.done();
 
-if (!process.env.SEGEL_TEST_RUNNER) suite.done();
+if (!process.env.QUARTERDECK_TEST_RUNNER) suite.done();

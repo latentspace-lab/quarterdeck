@@ -22,7 +22,7 @@ const { ok, eq } = suite;
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const DIST = join(HERE, "..", "..", "packages", "client", "dist");
-const BASE = "/sailing/";
+const BASE = "/quarterdeck/";
 
 const MIME = {
    ".html": "text/html", ".js": "text/javascript", ".css": "text/css",
@@ -173,4 +173,4 @@ async function run() {
 
 export default run;
 
-if (!process.env.SEGEL_TEST_RUNNER) await run();
+if (!process.env.QUARTERDECK_TEST_RUNNER) await run();

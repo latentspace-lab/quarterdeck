@@ -16,7 +16,7 @@ import {
    type RoomCreateOptions,
    type RoomMeta,
    type WelcomeMessage,
-} from "@segel/shared";
+} from "@quarterdeck/shared";
 import { Simulation } from "../sim/Simulation.ts";
 import type { ServerShip } from "../sim/ServerShip.ts";
 import { GameState, ShipSchema } from "../state/GameState.ts";

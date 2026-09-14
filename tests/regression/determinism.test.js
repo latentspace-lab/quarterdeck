@@ -12,7 +12,7 @@ import {
    BoatDynamics, DamageModel, Crew, SeaState, Wind, World,
    spawnSalvo, dischargeShots, stepProjectile,
    makeRng, deriveRng, getVessel, AMMO, SIM_DT,
-} from "@segel/shared";
+} from "@quarterdeck/shared";
 import { createSuite, fingerprint } from "../lib/harness.js";
 
 const suite = createSuite("Determinism");
@@ -174,4 +174,4 @@ suite.section("No hidden Math.random() in the shared modules");
 
 export default () => suite.done();
 
-if (!process.env.SEGEL_TEST_RUNNER) suite.done();
+if (!process.env.QUARTERDECK_TEST_RUNNER) suite.done();

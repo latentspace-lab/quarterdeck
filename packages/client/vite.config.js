@@ -2,18 +2,18 @@
 import { defineConfig } from "vite";
 import { fileURLToPath } from "node:url";
 
-// @segel/shared is resolved directly from the TypeScript sources during dev
+// @quarterdeck/shared is resolved directly from the TypeScript sources during dev
 // and build. This means the client needs no separate tsc pass beforehand,
 // and HMR reaches all the way into the shared modules too. Node consumers
 // (tests, server) use the compiled dist/ from package.json instead.
 const sharedSrc = fileURLToPath(new URL("../shared/src", import.meta.url));
 
 export default defineConfig({
-   base: "/sailing/",
+   base: "/quarterdeck/",
    resolve: {
       alias: [
-         { find: /^@segel\/shared$/, replacement: sharedSrc + "/index.ts" },
-         { find: /^@segel\/shared\/(.*)$/, replacement: sharedSrc + "/$1.ts" },
+         { find: /^@quarterdeck\/shared$/, replacement: sharedSrc + "/index.ts" },
+         { find: /^@quarterdeck\/shared\/(.*)$/, replacement: sharedSrc + "/$1.ts" },
       ],
    },
    server: {
