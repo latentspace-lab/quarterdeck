@@ -1,8 +1,8 @@
-// @segel/shared - reine Simulationslogik, die Client und Server teilen.
+// @segel/shared - pure simulation logic shared by client and server.
 //
-// Regel fuer dieses Paket: kein DOM, kein WebGL, kein Renderer. Aus `three`
-// werden ausschliesslich die Mathe-Klassen unter `three/src/math/` benutzt -
-// sie sind reines JavaScript und laufen headless.
+// Rule for this package: no DOM, no WebGL, no renderer. From `three`, only
+// the math classes under `three/src/math/` are used - they are pure
+// JavaScript and run headless.
 
 export * from "./utils.ts";
 export * from "./rng.ts";

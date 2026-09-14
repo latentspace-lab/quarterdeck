@@ -1,4 +1,4 @@
-// game.js - Simulation: bindet Szene, Boot, Physik, Kamera, Steuerung, Modi, UI
+// game.js - Simulation: wires up scene, boat, physics, camera, controls, modes, UI
 import * as THREE from "three";
 import { createOcean, seaHeight, ampForWind, waveHeightForWind, seaStateName } from "./ocean.js";
 import { SeaState, SIM_DT, makeRng } from "@segel/shared";
@@ -18,10 +18,10 @@ import { Controls } from "./controls.js";
 import { Course } from "./marks.js";
 import { makeTrainer } from "./trainer.js";
 import { UI } from "./ui.js";
-// Fehlte seit dem Zusammenfuehren der Sprachansagen: game.js ruft
-// voiceAnnounce()/TRIGGER auf, ohne sie zu importieren. openMenu() laeuft im
-// Konstruktor - die ReferenceError hat die Simulator-Erzeugung abgebrochen und
-// damit das ganze Spiel.
+// Missing since the voice announcements were merged in: game.js calls
+// voiceAnnounce()/TRIGGER without importing them. openMenu() runs in the
+// constructor - the ReferenceError aborted Simulator construction and
+// with it the whole game.
 import { voiceAnnounce, TRIGGER } from "./audio.js";
 import { DEG, clamp, lerp, normDeg, dirVec, diffDeg } from "./utils.js";
 import { MultiplayerSession } from "./net/MultiplayerSession.js";
@@ -33,9 +33,9 @@ import { createAquatint } from "./aquatint.js";
 import { applySailPalette } from "./warship.js";
 
 const CAM_LABEL = {
-   CHASE: "Verfolger",
+   CHASE: "Chase",
    COCKPIT: "Cockpit",
-   TOP: "Draufsicht",
+   TOP: "Top-Down",
    ORBIT: "Orbit",
 };
 
@@ -63,12 +63,12 @@ export class Simulator {
       viewport.appendChild(this.renderer.domElement);
       this.renderer.domElement.style.cssText = "position:fixed;inset:0;width:100%;height:100%";
 
-      // Szene
+      // Scene
       const scene = createScene();
       this.scene = scene;
       scene.setSunDir(55, 48);
 
-      // Kamera
+      // Camera
       this.camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.5, 12000);
       this.camera.position.set(0, 8, -18);
       this.camera.lookAt(0, 1, 0);
@@ -77,12 +77,12 @@ export class Simulator {
       // style bypasses it (see _draw).
       this.aquatint = createAquatint(this.renderer, scene.scene, this.camera);
 
-      // Ozean
+      // Ocean
       this.ocean = createOcean({ sunDir: new THREE.Vector3(0.4, 0.6, 0.7) });
       scene.add(this.ocean.mesh);
       this.ocean.mesh.receiveShadow = false;
 
-      // Sonnenrichtung an Meer weiterreichen (Sonne ist fix)
+      // Pass the sun direction to the sea (the sun is fixed)
       this.sunDir = scene.sunLight.position.clone().normalize();
       this.ocean.uniforms.uSunDir.value.copy(this.sunDir);
 
@@ -91,10 +91,10 @@ export class Simulator {
       this.targetMarker.visible = false;
       scene.add(this.targetMarker);
 
-      // Wrackteile (eigene Starrkoerper-Simulation)
+      // Wreckage (its own rigid-body simulation)
       this.debris = new DebrisField(scene.scene, { max: 420 });
 
-      // Land und Untiefen
+      // Land and shoals
       this.terrain = createTerrain(scene.scene);
       this.terrain.setVisible(false);
       this._applyPalette();
@@ -103,11 +103,11 @@ export class Simulator {
       this.wind = new Wind({ dir: 0, speed: 12, gust: 0.5, veer: 0.4, variability: 1 });
       this.manualTrim = false;
 
-      // Kamera-Regie
+      // Camera rig
       this.cam = new CameraRig(this.camera, this.renderer.domElement);
       this.cam.mode = "CHASE";
 
-      // Eingabe
+      // Input
       this.controls = new Controls(document);
 
       // UI
@@ -130,7 +130,7 @@ export class Simulator {
       this._targets = () => this.allShips().map((s) => s.targetInfo());
       this._onHit = (h) => this._handleHit(h);
 
-      // Gegnerische Schiffe
+      // Enemy ships
       this.fleet = new Fleet({
          scene,
          debris: this.debris,
@@ -138,27 +138,27 @@ export class Simulator {
          onHit: this._onHit,
       });
 
-      // Spielerschiff
+      // Player ship
       this.player = null;
       this.vessel = null;
       this.vesselId = null;
       this.scenarioId = "single";
       this.setVessel("yacht");
 
-      // Regatta-Kurs
+      // Regatta course
       this.course = new Course(scene.scene, { x: 0, z: 0 });
 
-      // Trainer (wird von setVessel an das Schiff angepasst)
+      // Trainer (adapted to the ship by setVessel)
       this.trainState = null;
       this.trainDoneTimer = 0;
 
-      // Modus
-      // Der Seegang folgt dem Wind nur traege: eine See baut sich auf und
-      // laeuft langsamer wieder ab. Sonst wuerde jede Boe die Wellen pumpen.
-      // Phase 0: der Zustand (nachlaufender Wind + Wellenphase) sitzt in
-      // SeaState und wird mit festem Schritt integriert. In Phase 1 kommt er
-      // vom Server (SeaSync) - Trefferpruefung und Bild muessen auf derselben
-      // Welle stehen.
+      // Mode
+      // The sea state follows the wind only sluggishly: a sea builds up and
+      // subsides more slowly. Otherwise every gust would pump the waves.
+      // Phase 0: the state (lagging wind + wave phase) lives in SeaState and
+      // is integrated with a fixed step. In Phase 1 it comes from the server
+      // (SeaSync) - hit detection and the picture must sit on the same
+      // wave.
       this.sea = new SeaState(12);
       this._groundMsg = 0;
       this._battleOver = false;
@@ -258,8 +258,8 @@ export class Simulator {
       await s.stop();
    }
 
-   // Schiff wechseln: 3D-Modell, Physik-Profil, Kamera, Batterie, Trainer.
-   // Bequeme Abkuerzungen, damit der uebrige Code unveraendert bleibt
+   // Switch ship: 3D model, physics profile, camera, battery, trainer.
+   // Convenient shortcuts so the rest of the code stays unchanged
    get boat() { return this.player ? this.player.dyn : null; }
    get yacht() { return this.player ? this.player.model : null; }
    get battery() { return this.player ? this.player.battery : null; }
@@ -288,7 +288,7 @@ export class Simulator {
          old.dispose();
       }
 
-      // Sonnenrichtung an alle Segel-Shader weiterreichen
+      // Pass the sun direction to every sail shader
       for (const sail of this.player.model.userData.sails || []) {
          const u = sail.material && sail.material.uniforms;
          if (u && u.uSunDir) u.uSunDir.value.copy(this.sunDir);
@@ -300,7 +300,7 @@ export class Simulator {
    }
 
    // ------------------------------------------------------------------
-   // Treffer: das getroffene Schiff bucht den Schaden und wirft Splitter
+   // Hit: the struck ship books the damage and throws splinters
    // ------------------------------------------------------------------
    _handleHit(hit) {
       const ship = hit.target && hit.target.ship;
@@ -308,7 +308,7 @@ export class Simulator {
       const res = ship.takeHit(hit);
       if (!res) return;
       if (ship === this.player) {
-         // Der Spieler soll spueren, dass er getroffen wurde
+         // The player should feel that they were hit
          this.cam.shake(hit.inRig ? 0.25 : 0.6);
       }
    }
@@ -330,7 +330,7 @@ export class Simulator {
             this.wind.variability = gusts ? 1 : 0;
             this.sea.snapTo(speed);
          },
-         // Live-Vorschau: das Schiff wird schon im Menue gewechselt
+         // Live preview: the ship is already switched in the menu
          scenarioId: this.scenarioId,
          scenarios: SCENARIOS,
          onScenarioChange: (id) => { this.scenarioId = id; },
@@ -372,16 +372,16 @@ export class Simulator {
       help.id = "help";
       help.innerHTML =
          `<div class="help-card" style="pointer-events:auto">
-           <h2>Hilfe & Steuerung</h2>
-           <h3>Grundregeln der Segelphysik</h3>
-           <p>Der <b>Segelkurs (TWA)</b> ist der Winkel zwischen Bootskurs und Wind.
+           <h2>Help & Controls</h2>
+           <h3>Basic Rules of Sailing Physics</h3>
+           <p>The <b>point of sail (TWA)</b> is the angle between the boat's heading and the wind.
            Sailing against the wind (upwind), you never point at 0° — you sail in <i>luffing</i> (~45°) and tack.
            The fastest point of sail is <i>beam reach</i> (~90°).
            Downwind you sail deeper (~135°) than directly before the wind (180°).</p>
            <h3>Royal Navy Square-Rigged Ships</h3>
            <p>A square-rigged ship (Sloop, Frigate, Ship of the Line) can only point about
-           <b>six points</b> — roughly 65° — into the wind; darunter liegen die
-           Segel back und das Schiff verliert Fahrt. The <b>yards are braced</b>:
+           <b>six points</b> — roughly 65° — into the wind; below that the sails
+           go aback and the ship loses way. The <b>yards are braced</b>:
            the sharper the wind angle, the more oblique the yards — until at 45° the rigging
            cannot follow. The fastest running point is with the wind
            well aft (backstays' breeze, ~135°). Mass means inertia:
@@ -418,7 +418,7 @@ export class Simulator {
              <li><b>Mouse wheel</b> : Zoom · <b>Drag</b> : Rotate view</li>
              <li><b>Orders panel</b> (bottom right) : every command as a button — hold the helm and sail buttons.</li>
            </ul>
-           <p style="margin-top:12px"><b class="prim">Tipp:</b> Halte dich an den Kompass.
+           <p style="margin-top:12px"><b class="prim">Tip:</b> Watch the compass.
            The red arrow = ship, the blue = wind (from where), the turquoise = apparent wind.</p>
            <button class="help-close">Got it</button>
          </div>`;
@@ -442,12 +442,12 @@ export class Simulator {
       this.ui.closeMenu();
       this.menuOpen = false;
       this.paused = false;
-      if (mode === "Gefecht") this._rollBattle();
+      if (mode === "Battle") this._rollBattle();
       this._placeAtStart(mode);
       this.battery.clear();
       this.debris.clear();
       this.course.setVisible(mode === "Regatta");
-      if (mode !== "Gefecht") {
+      if (mode !== "Battle") {
          this.fleet.clear();
          this.terrain.setVisible(false);
       }
@@ -479,7 +479,7 @@ export class Simulator {
          this.targetMarker.visible = false;
          this.yacht.visible = true;
       }
-      if (mode === "Gefecht") {
+      if (mode === "Battle") {
          this.ui.setTraining(null);
          this.trainState = null;
          this.targetMarker.visible = false;
@@ -490,13 +490,13 @@ export class Simulator {
 
    _placeAtStart(mode) {
       const V = this.vessel;
-      // Kein Start mitten im Wind: ein Rahsegler kaeme dort nie heraus.
-      // Regatta beginnt am Wind auf dem besten Kreuzkurs, sonst auf Raumschot.
+      // No starting head to wind: a square-rigger would never get out of irons there.
+      // Regatta starts close-hauled on the best tacking angle, otherwise on a broad reach.
       const startTwa = mode === "Regatta"
          ? V.sail.noGo + 8
-         : mode === "Gefecht" ? 100
+         : mode === "Battle" ? 100
          : (V.rig === "square" ? 110 : 90);
-      // twa = windDir - heading  ->  heading = windDir - twa (Wind von Starboard)
+      // twa = windDir - heading  ->  heading = windDir - twa (wind from starboard)
       this.boat.heading = normDeg(this.wind.baseDir - startTwa);
       this.boat.heel = 0;
       this.boat.pos.x = 0;
@@ -504,8 +504,8 @@ export class Simulator {
       this.boat.sailSet = 1;
       this.boat.tack = "STBD";
       this.boat.leeway = 0;
-      // Mit ein wenig Fahrt im Schiff anfangen - sonst duempelt ein
-      // Linienschiff zwei Minuten lang vor sich hin, bevor etwas passiert.
+      // Start with a bit of way on - otherwise a ship of the line
+      // wallows for two minutes before anything happens.
       this.boat.speed = polarSpeedAt(
          startTwa, this.wind.baseSpeed, 1, 1, V.sail.polar) * 0.55;
       this.boat.groundHeading = this.boat.heading;
@@ -519,7 +519,7 @@ export class Simulator {
       this.sea.snapTo(speed);
    }
 
-   // Wellenausbreitung in Rad: Wellen laufen mit dem Wind (dorthin, wohin er weht)
+   // Wave propagation in radians: waves travel with the wind (toward where it blows)
    _waveRad() {
       return this.sea.windRad;
    }
@@ -539,7 +539,7 @@ export class Simulator {
    }
 
    _bindMenu() {
-      // nix
+      // nothing
    }
 
    _resize() {
@@ -578,33 +578,33 @@ export class Simulator {
    }
 
    // =====================================================================
-   // Simulation - IMMER mit festem Schritt (SIM_DT).
+   // Simulation - ALWAYS with a fixed step (SIM_DT).
    //
-   // Alles, was den Spielzustand aendert, steht hier. Nichts davon haengt an
-   // der Bildwiederholrate: derselbe Kommandostrom bei derselben Schrittweite
-   // ergibt denselben Zustand - auf diesem Rechner, auf einem langsameren und
-   // spaeter auf dem Server. Die Darstellung passiert getrennt in render().
+   // Everything that changes game state lives here. None of it depends on
+   // the frame rate: the same command stream at the same step size produces
+   // the same state - on this machine, on a slower one, and later on the
+   // server. Rendering happens separately in render().
    // =====================================================================
    stepFixed(dt) {
-      // --- Menu pause: keine Physik, aber das Wasser lebt weiter ---
+      // --- Menu pause: no physics, but the water keeps moving ---
       if (this.menuOpen || this.paused) {
          this.t += dt;
          this.sea.step(dt, this.wind.speed, this.wind.dir);
          return;
       }
 
-      // Zeit
+      // Time
       this.t += dt;
       this.wind.update(dt, this.t);
 
-      // Eingabe
+      // Input
       const inp = this.controls.read(dt);
       this._handleQueue();
-      // Die Ruderglaettung sitzt seit Phase 0B' geschlossen in
-      // BoatDynamics.step() - hier geht nur noch das rohe Kommando rein.
+      // Rudder smoothing has lived entirely inside BoatDynamics.step() since
+      // Phase 0B' - only the raw command goes in here now.
       this.boat.setRudder(inp.rudder);
       if (this.vessel.rig === "square") {
-         // W / S setzen bzw. reffen die Segel (mehr Tuch = mehr Fahrt und Krengung)
+         // W / S set or reef the sails (more canvas = more speed and heel)
          if (inp.trimIn) {
             this.boat.sailSet = clamp(this.boat.sailSet + dt * 0.45, 0.25, 1);
             voiceAnnounce(TRIGGER.makesail);
@@ -617,14 +617,14 @@ export class Simulator {
 
       if (this.boat.isCapsized && inp.queue && inp.queue.includes("capsizeRight")) {
          this.boat.rightBoat();
-         this.ui.showMessage("Aufgerichtet — weiter segeln!");
+         this.ui.showMessage("Righted — sail on!");
       }
 
       // ------------------------------------------------------------------
-      // Welt-Schritt: Spieler, Gegner, Wrack, Kollisionen, Grund
+      // World step: player, enemies, wreckage, collisions, ground
       // ------------------------------------------------------------------
-      // Zuerst das Wasser: Boot, Wrack und Geschosse rechnen danach mit exakt
-      // derselben Oberflaeche wie der Shader.
+      // First the water: the boat, wreckage and projectiles then compute
+      // against exactly the same surface as the shader.
       this.sea.step(dt, this.wind.speed, this.wind.dir);
       const seaFn = this.sea.sampler(0.9);
       const gunCtx = { windDir: this.wind.dir, windSpeed: this.wind.speed, seaHeight: seaFn };
@@ -643,35 +643,35 @@ export class Simulator {
          return;
       }
 
-      if (this.mode === "Gefecht") {
-         // Besatzung nur auf Schiffen animieren, die man auch erkennen kann
+      if (this.mode === "Battle") {
+         // Only animate crew on ships that can actually be made out
          for (const e of this.fleet.ships) {
             e._crewNear = Math.hypot(e.pos.x - this.boat.pos.x, e.pos.z - this.boat.pos.z) < 420;
          }
          this.fleet.update(dt, { ...worldCtx, target: this.player });
       }
 
-      // Kollisionen zwischen allen Schiffen
+      // Collisions between all ships
       const ships = this.allShips();
       if (ships.length > 1) {
          for (const ev of collide.step(ships, dt)) this._onWorldEvent(ev);
       }
 
-      // Grundberuehrung (nur wo es Land gibt)
+      // Ground contact (only where there is land)
       if (this.terrain.visible) {
          for (const sh of ships) {
             const g = collide.groundStep(sh, this.terrain.depthAt, dt);
             if (g && sh === this.player && this._groundMsg <= 0) {
                this._groundMsg = 6;
                this.ui.showMessage(g.hard
-                  ? "AUFGELAUFEN! Der Kiel sitzt fest — Wasser kommt ein."
+                  ? "AGROUND! The keel is stuck fast — water is coming in."
                   : "Ground contact! Bear away immediately, the water is too shallow.");
             }
          }
       }
       if (this._groundMsg > 0) this._groundMsg -= dt;
 
-      // Wrackteile treiben, sinken, schleppen
+      // Wreckage drifts, sinks, drags
       const wv = dirVec(this.wind.dir + 180);
       this.debris.update(dt, {
          seaHeight: seaFn,
@@ -683,15 +683,15 @@ export class Simulator {
          },
       });
 
-      // Meldungen aus dem Schadensmodell
+      // Messages from the damage model
       for (const ev of this.player.drainEvents()) this._onShipEvent(ev);
-      if (this.mode === "Gefecht") {
+      if (this.mode === "Battle") {
          for (const ev of this.fleet.drainEvents()) this._onShipEvent(ev);
       }
 
-      // Modus-spezifische Logik
+      // Mode-specific logic
       let msg = "";
-      if (this.mode === "Gefecht") {
+      if (this.mode === "Battle") {
          msg = this._updateBattle(dt);
       } else if (this.mode === "Regatta") {
          const res = this.course.update(this.boat.pos, this.t);
@@ -763,11 +763,11 @@ export class Simulator {
    }
 
    // =====================================================================
-   // Darstellung - mit Bildschirmrate, nie zustandsaendernd.
+   // Rendering - at screen rate, never changes state.
    //
-   // alpha ist der Restanteil im laufenden Simulationsschritt: 0 = letzter
-   // Schritt, 1 = aktueller. Die Schiffe werden dazwischen interpoliert, sonst
-   // saehe man bei 120 Hz Bildrate die 30 Hz der Simulation.
+   // alpha is the remaining fraction of the current simulation step: 0 = the
+   // last step, 1 = the current one. Ships are interpolated in between,
+   // otherwise you would see the simulation's 30 Hz at a 120 Hz frame rate.
    // =====================================================================
    render(alpha = 0, frameDt = SIM_DT) {
       this.ocean.sync(this.sea, this.camera.position, this.boat.pos.x, this.boat.pos.z);
@@ -784,7 +784,7 @@ export class Simulator {
             }, frameDt);
          }
 
-         // Kamera: rein visuell, darf mit Bildrate laufen und profitiert davon.
+         // Camera: purely visual, may run at frame rate and benefits from it.
          this.cam.update(frameDt, {
             heading: this.boat.heading,
             pos: this.boat.pos,
@@ -799,9 +799,9 @@ export class Simulator {
    }
 
    /**
-    * Alte Einzelschritt-Schnittstelle. Nur noch fuer Aufrufer, die keinen
-    * Akkumulator haben (Tests, Werkzeuge); die Spielschleife in main.js
-    * benutzt stepFixed()/render().
+    * Old single-step interface. Only still used by callers that have no
+    * accumulator (tests, tools); the game loop in main.js
+    * uses stepFixed()/render().
     */
    step(dt = SIM_DT) {
       this.stepFixed(dt);
@@ -812,7 +812,7 @@ export class Simulator {
       return { dir: this.wind.dir, speedKts: this.wind.speed };
    }
 
-   // Notfall-Rendering: falls ein Frame-Fehler auftritt, trotzdem ein Bild zeigen
+   // Emergency rendering: show a frame anyway even if a frame error occurs
    renderOnly() {
       try {
          this.sea.step(SIM_DT, this.wind.speed, this.wind.dir);
@@ -873,7 +873,7 @@ export class Simulator {
             case "capsizeRight":
                if (this.boat.isCapsized) {
                   this.boat.rightBoat();
-                  this.ui.showMessage("Aufgerichtet — weiter segeln!");
+                  this.ui.showMessage("Righted — sail on!");
                }
                break;
             case "firePort":
@@ -916,7 +916,7 @@ export class Simulator {
                   this._updateTrainTarget(c);
                   this.ui.setTraining({ title: c.title, desc: c.desc, hint: c.hint, progress: 0, done: false });
                }
-               this.ui.showMessage("An Bord: " + vesselLabel(nxt) + " · " + nxt.rate);
+               this.ui.showMessage("Now aboard: " + vesselLabel(nxt) + " · " + nxt.rate);
                break;
             }
             default:
@@ -934,10 +934,10 @@ export class Simulator {
       this.ui.showMessage("Loaded: " + AMMO[id].name + " — " + AMMO[id].desc);
    }
 
-   // Breitseite: nur bewaffnete Schiffe, nicht gekentert, nicht im Menue
+   // Broadside: only armed ships, not capsized, not in the menu
    _fire(side) {
       if (!this.vessel.guns) {
-         this.ui.showMessage("Die " + this.vessel.name + "  has no guns.");
+         this.ui.showMessage("The " + this.vessel.name + "  has no guns.");
          return false;
       }
       if (this.boat.isCapsized) return false;
@@ -967,7 +967,7 @@ export class Simulator {
    }
 
    // ------------------------------------------------------------------
-   // Gefecht
+   // Battle
    // ------------------------------------------------------------------
    /**
     * A fresh battle: seed the dice and, unless switched off in the menu, roll
@@ -991,14 +991,14 @@ export class Simulator {
       const sc = scenarioFor(this.scenarioId);
       const list = sc.forces[this.vesselId] || [];
       this.terrain.setVisible(true);
-      // Der Seegang folgt dem Wind nur traege: eine See baut sich auf und
-      // laeuft langsamer wieder ab. Sonst wuerde jede Boe die Wellen pumpen.
+      // The sea state follows the wind only sluggishly: a sea builds up and
+      // subsides more slowly. Otherwise every gust would pump the waves.
       this.sea.snapTo(this.wind.baseSpeed);
       this._groundMsg = 0;
       this._battleOver = false;
 
       if (!list.length) {
-         this.ui.showMessage("Die " + this.vessel.name + " ist kein Kriegsschiff — kein Gegner in Sicht.");
+         this.ui.showMessage("The " + this.vessel.name + " is not a warship — no enemy in sight.");
          return;
       }
       if (!this._battle) this._rollBattle();
@@ -1008,17 +1008,17 @@ export class Simulator {
          random: this.randomStart, rng: this._battle.rng,
       });
       for (const { id, ...o } of spawns) this.fleet.spawn(id, o);
-      const names = this.fleet.ships.map((s) => s.name).join(" und ");
-      this.ui.showMessage("Segel in Sicht: " + names + " — klar Schiff zum Gefecht!");
+      const names = this.fleet.ships.map((s) => s.name).join(" and ");
+      this.ui.showMessage("Sails in sight: " + names + " — clear ship for action!");
    }
 
    _updateBattle(dt) {
       const enemies = this.fleet.ships;
       const fighting = this.fleet.fighting();
       let msg = "";
-      if (this._battleOver) return "";   // Ergebnis wurde schon gemeldet
+      if (this._battleOver) return "";   // result was already reported
       if (this.player.dmg.sunk) {
-         msg = "Die " + this.vessel.name + " has sunk. R for a new battle.";
+         msg = "The " + this.vessel.name + " has sunk. R for a new battle.";
          this._battleOver = true;
       } else if (this.player.dmg.beaten() && this.player.dmg.mastsStanding() <= 1) {
          msg = "Badly damaged — R resets the battle.";
@@ -1026,24 +1026,24 @@ export class Simulator {
       } else if (enemies.length && fighting.length === 0) {
          const struck = enemies.filter((s) => s.dmg.struck).length;
          const sunk = enemies.filter((s) => s.dmg.sunk).length;
-         msg = "Gefecht wins! " + (struck ? struck + " gestrichen" : "")
-            + (struck && sunk ? ", " : "") + (sunk ? sunk + " gesunken" : "") + ".";
+         msg = "Battle won! " + (struck ? struck + " struck" : "")
+            + (struck && sunk ? ", " : "") + (sunk ? sunk + " sunk" : "") + ".";
          this._battleOver = true;
       }
       return msg;
    }
 
    _onShipEvent(ev) {
-      const who = ev.ship === this.player ? "Wir" : ev.ship.name;
+      const who = ev.ship === this.player ? "We" : ev.ship.name;
       const isUs = ev.ship === this.player;
       const M = {
          fore: "Foremast", main: "Mainmast", mizzen: "Mizzenmast",
       };
       switch (ev.type) {
          case "mastLost": {
-            const cause = ev.cause === "overpress" ? " — zu viel Tuch im Sturm!"
+            const cause = ev.cause === "overpress" ? " — too much sail in the storm!"
                : ev.cause === "ram" ? " — in the collision" : "";
-            this.ui.showMessage((isUs ? "Der " : ev.ship.name + ": ") + M[ev.mast]
+            this.ui.showMessage((isUs ? "The " : ev.ship.name + ": ") + M[ev.mast]
                + " goes overboard" + cause + (isUs ? " — X cuts the wreck." : ""));
             if (isUs) this.cam.shake(1.2);
             break;
@@ -1051,10 +1051,10 @@ export class Simulator {
          case "casualties": {
             if (isUs && ev.n >= 4) {
                const R = { gun: "at the guns", top: "aloft",
-                  marine: "unter den Marines", officer: "unter den Offizieren",
-                  carpenter: "bei den Zimmerleuten", powder: "unter den Powder Boys" };
-               this.ui.showMessage(ev.n + " Mann " + (R[ev.worst] || "an Deck")
-                  + " gefallen oder verwundet!");
+                  marine: "among the marines", officer: "among the officers",
+                  carpenter: "among the carpenters", powder: "among the powder boys" };
+               this.ui.showMessage(ev.n + " men " + (R[ev.worst] || "on deck")
+                  + " killed or wounded!");
             }
             break;
          }
@@ -1066,22 +1066,22 @@ export class Simulator {
             break;
          }
          case "mastWounded":
-            if (isUs) this.ui.showMessage(M[ev.mast] + " damaged — Tuch wegnehmen!");
+            if (isUs) this.ui.showMessage(M[ev.mast] + " damaged — take in sail!");
             break;
          case "holed":
             if (isUs && Math.random() < 0.4) this.ui.showMessage("Leak below the waterline — the pumps!");
             break;
          case "rudder":
-            if (isUs) this.ui.showMessage("Das Ruder ist getroffen!");
+            if (isUs) this.ui.showMessage("The rudder has been hit!");
             break;
          case "struck":
-            this.ui.showMessage(ev.ship.name + " streicht die Flagge!");
+            this.ui.showMessage(ev.ship.name + " strikes her colours!");
             break;
          case "sunk":
-            this.ui.showMessage(isUs ? "Wir sinken." : ev.ship.name + " sinkt.");
+            this.ui.showMessage(isUs ? "We are sinking." : ev.ship.name + " sinks.");
             break;
          case "exploded":
-            this.ui.showMessage(ev.ship.name + " fliegt in die Luft!");
+            this.ui.showMessage(ev.ship.name + " blows up!");
             break;
          case "aground":
             if (isUs) this.ui.showMessage("Ground contact — the keel scrapes on the rock!");
@@ -1104,18 +1104,18 @@ export class Simulator {
          const us = ev.a === this.player || ev.b === this.player;
          if (us && this._lockMsg !== true) {
             this._lockMsg = true;
-            this.ui.showMessage("Die Schiffe haben sich im Tauwerk verhakt.");
+            this.ui.showMessage("The ships have become entangled in the rigging.");
          }
       }
    }
 
    _restartCurrent() {
       this.battery.clear();
-      if (this.mode === "Gefecht") {
+      if (this.mode === "Battle") {
          this.debris.clear();
          this.setVessel(this.vesselId, true);
          this._rollBattle();
-         this._placeAtStart("Gefecht");
+         this._placeAtStart("Battle");
          this._startBattle();
          return;
       }
@@ -1219,7 +1219,7 @@ export class Simulator {
          multiplayer: !!this.session,
          depth: this.terrain.visible ? this.terrain.depthAt(b.pos.x, b.pos.z) : null,
          enemies: this.session ? this.session.others(b.pos)
-         : this.mode === "Gefecht" ? this.fleet.ships.map((sh) => {
+         : this.mode === "Battle" ? this.fleet.ships.map((sh) => {
             const dx = sh.pos.x - b.pos.x, dz = sh.pos.z - b.pos.z;
             return {
                name: sh.name,
@@ -1248,7 +1248,7 @@ export class Simulator {
    }
 }
 
-// ---------- Aufraeumen beim Schiffswechsel ----------
+// ---------- Cleanup on ship change ----------
 function disposeTree(root) {
    root.traverse((o) => {
       if (o.geometry) o.geometry.dispose();
@@ -1267,7 +1267,7 @@ function safeStorage() {
    }
 }
 
-// ---------- Wasser-Ziel-Marker (Ring + Boje) ----------
+// ---------- Water target marker (ring + buoy) ----------
 function makeTargetMarker() {
    const g = new THREE.Group();
    const ring = new THREE.Mesh(

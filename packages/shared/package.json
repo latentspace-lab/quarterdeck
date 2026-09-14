@@ -3,7 +3,7 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "description": "Reine Simulationslogik, die Client und Server teilen (kein Three.js-Renderer, kein DOM).",
+  "description": "Pure simulation logic shared by client and server (no Three.js renderer, no DOM).",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {

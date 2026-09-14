@@ -1,44 +1,43 @@
-// timestep.ts - feste Simulationsrate.
+// timestep.ts - fixed simulation rate.
 //
-// Warum ueberhaupt:
+// Why this exists at all:
 //
-// Die Physik enthaelt an mehreren Stellen Glaettungsterme der Form
-// `x += (ziel - x) * f(dt)`. Solche Terme sind nur dann exakt reproduzierbar,
-// wenn dt konstant ist - `f(dt1) danach f(dt2)` ist nicht dasselbe wie
-// `f(dt1 + dt2)`. Client-Prediction verlangt aber genau das: der Client
-// rechnet dieselben Eingaben noch einmal, die der Server schon gerechnet hat,
-// und muss auf dasselbe Ergebnis kommen. Also: Simulation mit festem Schritt,
-// Darstellung mit Bildschirmrate, dazwischen interpoliert.
+// The physics contains smoothing terms in several places of the form
+// `x += (target - x) * f(dt)`. Such terms are only exactly reproducible
+// when dt is constant - `f(dt1) then f(dt2)` is not the same as
+// `f(dt1 + dt2)`. Client prediction, however, demands exactly that: the
+// client recomputes the same inputs the server has already computed and
+// must arrive at the same result. So: simulate with a fixed step, render at
+// screen rate, and interpolate in between.
 //
-// 30 Hz ist der Kompromiss: fein genug fuer Ballistik und Trefferpruefung,
-// grob genug, dass ein Server mehrere Raeume traegt.
+// 30 Hz is the compromise: fine enough for ballistics and hit testing,
+// coarse enough that a server can carry multiple rooms.
 
-/** Simulationsschritt in Sekunden. Client und Server benutzen exakt diesen Wert. */
+/** Simulation step in seconds. Client and server use exactly this value. */
 export const SIM_HZ = 30;
 export const SIM_DT = 1 / SIM_HZ;
 
 /**
- * Hoechstzahl an Simulationsschritten je Frame. Verhindert die
- * "Todesspirale": wenn ein Rechner die Simulation ohnehin nicht schafft,
- * holt er den Rueckstand nicht durch noch mehr Schritte auf - dann laeuft die
- * Spielzeit lieber sichtbar langsamer.
+ * Maximum number of simulation steps per frame. Prevents the "death
+ * spiral": if a machine can't keep up with the simulation anyway, it does
+ * not try to catch up on the backlog with even more steps - instead, game
+ * time visibly runs slower.
  */
 export const MAX_STEPS_PER_FRAME = 5;
 
 /**
- * Fliesskomma-Spielraum beim Abzaehlen der Schritte.
+ * Floating-point slack when counting off steps.
  *
- * Ohne ihn ist der haeufigste Fall ueberhaupt - Bildrate gleich
- * Simulationsrate - der unangenehmste: `(now - last) / 1000` liegt dann mal
- * ein Bit ueber und mal ein Bit unter dt, und die Schleife liefert abwechselnd
- * 0 und 2 Schritte statt gleichmaessig 1. Sichtbar wird das als feines
- * Zittern. Eine Nanosekunde Spielraum raeumt das aus, ohne dass je Zeit
- * entsteht, die es nicht gab.
+ * Without it, the single most common case - frame rate equal to simulation
+ * rate - is the most unpleasant one: `(now - last) / 1000` then lands a bit
+ * above or a bit below dt, and the loop alternately yields 0 and 2 steps
+ * instead of a steady 1. That shows up as a fine jitter. One nanosecond of
+ * slack clears this up, without ever creating time that wasn't there.
  */
 const STEP_EPS = 1e-9;
 
 /**
- * Akkumulator fuer die Schleife "feste Simulation, freie Darstellung".
+ * Accumulator for the "fixed simulation, free rendering" loop.
  *
  *     const acc = new Accumulator();
  *     function frame(now) {
@@ -51,16 +50,16 @@ export class Accumulator {
    private acc = 0;
    private last = 0;
    private started = false;
-   /** Restanteil im laufenden Schritt (0..1) - der Interpolationsfaktor. */
+   /** Remaining fraction of the current step (0..1) - the interpolation factor. */
    alpha = 0;
-   /** Zahl der Schritte, die beim letzten advance() verworfen wurden. */
+   /** Number of steps dropped on the last advance() call. */
    dropped = 0;
 
    constructor(dt: number = SIM_DT) {
       this.dt = dt;
    }
 
-   /** Auf eine neue Zeitbasis setzen (Start, Pausenende, Tab-Wechsel). */
+   /** Reset to a new time base (start, end of pause, tab switch). */
    reset(nowMs: number): void {
       this.last = nowMs;
       this.acc = 0;
@@ -70,8 +69,8 @@ export class Accumulator {
    }
 
    /**
-    * Zeit bis `nowMs` verbuchen. Liefert die Zahl der faelligen
-    * Simulationsschritte und setzt `alpha` fuer die Darstellung.
+    * Book time up to `nowMs`. Returns the number of simulation steps due
+    * and sets `alpha` for rendering.
     */
    advance(nowMs: number): number {
       if (!this.started) {
@@ -80,8 +79,8 @@ export class Accumulator {
       }
       const elapsed = (nowMs - this.last) / 1000;
       this.last = nowMs;
-      // Ein negativer oder absurder Sprung (Systemzeit, schlafender Tab) darf
-      // die Simulation nicht in eine Aufholjagd schicken.
+      // A negative or absurd jump (system clock, a sleeping tab) must not
+      // send the simulation into a catch-up spiral.
       this.acc += elapsed > 0 && elapsed < 1 ? elapsed : 0;
 
       let steps = Math.floor((this.acc + STEP_EPS) / this.dt);

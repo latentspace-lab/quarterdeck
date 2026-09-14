@@ -1,20 +1,20 @@
-// pose.ts - wie ein Rumpf auf der Welle liegt.
+// pose.ts - how a hull sits on the wave.
 //
-// Reine Mathematik ueber seaHeight(): aus Position, Kurs, Krengung und
-// Wassereinbruch werden Tauchtiefe, Rollwinkel und Stampfwinkel. Der Client
-// setzt das Ergebnis auf sein Three.js-Modell, der Server baut daraus die
-// Matrix fuer die Trefferpruefung.
+// Pure mathematics on top of seaHeight(): from position, heading, heel and
+// flooding come draft, roll angle and pitch angle. The client applies the
+// result to its Three.js model; the server builds the matrix for hit testing
+// from it.
 //
-// Warum das geteilt werden MUSS: die Ballistik entscheidet anhand der
-// Rumpflage, ob ein Schuss unter der Wasserlinie einschlaegt, in die Bordwand
-// geht oder ins Rigg. Rechnete der Client eine andere Lage als der Server,
-// bekaeme derselbe Schuss zwei verschiedene Ergebnisse.
+// Why this MUST be shared: ballistics decides, from the hull's pose, whether
+// a shot strikes below the waterline, into the side, or into the rig. If the
+// client computed a different pose than the server, the same shot would get
+// two different results.
 
 import { clamp, dirVec, DEG } from "./utils.ts";
 import type { SeaHeightFn } from "./ocean-math.ts";
 import type { Vec2 } from "./utils.ts";
 
-/** Rumpfmasse, soweit die Lage sie braucht. */
+/** Hull dimensions, as far as the pose needs them. */
 export interface PoseHull {
    loa: number;
    beam: number;
@@ -35,43 +35,43 @@ export function freeboardOf(hull: PoseHull): number {
 
 export interface PoseInput {
    pos: Vec2;
-   /** Kurs (Grad) */
+   /** Heading (degrees) */
    heading: number;
-   /** Krengung (Grad, vorzeichenlos) */
+   /** Heel (degrees, unsigned) */
    heel: number;
-   /** Vorzeichenbehafteter TWA - bestimmt, nach welcher Seite sie krengt */
+   /** Signed TWA - determines which side she heels to */
    twaSigned: number;
-   /** Wasser im Schiff, 0..1 */
+   /** Water in the ship, 0..1 */
    flooding: number;
-   /** Krengungsstoss aus dem Rueckstoss (Grad) */
+   /** Roll kick from recoil (degrees) */
    recoilRoll: number;
    hull: PoseHull;
 }
 
 export interface Pose {
-   /** Hoehe des Rumpfmittelpunkts (m) */
+   /** Height of the hull's centre point (m) */
    y: number;
-   /** Rollwinkel um die Laengsachse (rad) */
+   /** Roll angle about the longitudinal axis (rad) */
    rollZ: number;
-   /** Stampfwinkel um die Querachse (rad) */
+   /** Pitch angle about the transverse axis (rad) */
    pitchX: number;
-   /** Gierwinkel (rad) - Kurs in Three.js-Konvention */
+   /** Yaw angle (rad) - heading in Three.js convention */
    yawY: number;
-   /** Hoehe der mittleren Wasserflaeche unter dem Schiff (m) */
+   /** Height of the mean water surface under the ship (m) */
    seaY: number;
-   /** Wasserflaeche an der tiefer liegenden Bordwand (m) */
+   /** Water surface at the lower (leeward) side (m) */
    leeY: number;
-   /** Wie tief der Wassereinbruch sie drueckt (m) */
+   /** How deep the flooding pushes her down (m) */
    sinkIn: number;
 }
 
 /**
- * Lage eines Rumpfs auf der See.
+ * Pose of a hull on the sea.
  *
- * Ein Schiff schwimmt auf der Flaeche, die sein Rumpf verdraengt, nicht auf
- * dem Wert unter dem Grossmast: darum wird ueber Bug, Heck und beide Seiten
- * gemittelt. Ohne diese Mittelung lag der Rumpf auf jedem Wellenkamm unter
- * Wasser - die See stand dann auf dem Batteriedeck.
+ * A ship floats on the surface her hull displaces, not on the value under
+ * the mainmast: hence the average over bow, stern and both sides. Without
+ * this averaging, the hull would sit underwater on every wave crest - the
+ * sea would then stand on the gun deck.
  */
 export function shipPose(input: PoseInput, sea: SeaHeightFn): Pose {
    const { pos: p, heading, heel, twaSigned, flooding, recoilRoll, hull } = input;
@@ -93,7 +93,7 @@ export function shipPose(input: PoseInput, sea: SeaHeightFn): Pose {
    const hR = sea(p.x - ahead.x * probe, p.z - ahead.z * probe);
    const hy = (sea(p.x, p.z) * 2 + hP + hS + hF + hR) / 6;
 
-   // Wasser im Schiff drueckt sie tiefer
+   // Water in the ship pushes her deeper
    const sinkIn = flooding * hull.draft * 0.55;
 
    const rollZ = heelSide * heel * DEG + waveRoll + recoilRoll * DEG;
@@ -115,13 +115,13 @@ export function shipPose(input: PoseInput, sea: SeaHeightFn): Pose {
 }
 
 /**
- * Freibord der Lee-Reling ueber der oertlichen Wasserflaeche.
- * Negativ = die See laeuft ueber Deck.
+ * Freeboard of the lee rail above the local water surface.
+ * Negative = the sea is breaking over the deck.
  *
- * Die Lee-Reling ist der tiefste Punkt des Decks. Taucht sie unter die
- * oertliche Wasserflaeche, stuerzt See in die Batterie: das Schiff nimmt
- * Wasser, die Leute an Deck gehen ueber Bord. Genau deshalb liess man bei
- * steifer Brise reffen und schloss die unteren Pforten.
+ * The lee rail is the lowest point of the deck. When it dips below the
+ * local water surface, the sea pours into the battery: the ship takes
+ * water, and people on deck go overboard. That is exactly why ships reefed
+ * down and closed the lower gun ports in a stiff breeze.
  */
 export function railClearance(
    freeboard: number,
@@ -132,15 +132,15 @@ export function railClearance(
    leeY: number,
 ): number {
    const roll = Math.abs(rollRad);
-   // Reling kippt zur Lee: Hoehe sinkt um sin(krengung) * halbe Breite
+   // The rail tips to leeward: its height drops by sin(heel) * half beam
    const rail = freeboard * Math.cos(roll) - halfBeam * Math.sin(roll) - sinkIn;
    return rail - (leeY - seaY);
 }
 
 /**
- * Zwischen zwei Lagen interpolieren - fuer die Darstellung zwischen zwei
- * Simulationsschritten. Winkel werden kurzwegig gemischt, damit der Kurs beim
- * Ueberlauf 359 -> 1 nicht einmal rundherum schwenkt.
+ * Interpolate between two poses - for rendering between two simulation
+ * steps. Angles are blended along the shortest path, so the heading does not
+ * swing all the way around on the 359 -> 1 wraparound.
  */
 export function lerpPose(a: Pose, b: Pose, t: number): Pose {
    return {
@@ -154,7 +154,7 @@ export function lerpPose(a: Pose, b: Pose, t: number): Pose {
    };
 }
 
-/** Kuerzester Weg von a nach b im Bogenmass, in [-PI, PI]. */
+/** Shortest path from a to b in radians, in [-PI, PI]. */
 export function shortestAngle(a: number, b: number): number {
    const TAU = Math.PI * 2;
    let d = (b - a) % TAU;
@@ -163,7 +163,7 @@ export function shortestAngle(a: number, b: number): number {
    return d;
 }
 
-/** Lineare Interpolation zweier Positionen. */
+/** Linear interpolation of two positions. */
 export function lerpVec(a: Vec2, b: Vec2, t: number): Vec2 {
    return { x: a.x + (b.x - a.x) * t, z: a.z + (b.z - a.z) * t };
 }

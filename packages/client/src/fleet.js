@@ -1,25 +1,25 @@
-// fleet.js - gegnerische Schiffe und ihre Kapitaene.
+// fleet.js - enemy ships and their captains.
 //
-// Der Kapitaen kann nur, was der Spieler auch kann: er steuert das Ruder,
-// setzt oder refft Segel und gibt Feuerbefehle. Er kann nicht gegen den Wind
-// segeln und nicht schneller laufen, als die Polarkurve hergibt.
+// The captain can only do what the player can do: steer the rudder, set or
+// reef sails, and give fire orders. He cannot sail against the wind and
+// cannot go faster than the polar diagram allows.
 //
-// Taktik: Die Royal Navy schoss auf den Rumpf (Schiff niederkaempfen), die
-// franzoesische Marine bevorzugt in die Takelage (Gegner manoevrierunfaehig
-// machen, dann abdrehen). Beide Doktrinen sind hier abgebildet und fuehren zu
-// spuerbar verschiedenen Gefechten.
+// Tactics: the Royal Navy fired on the hull (beat the ship down), the
+// French navy preferred firing into the rigging (cripple the enemy's
+// manoeuvrability, then break off). Both doctrines are modelled here and
+// lead to noticeably different engagements.
 
 import { Ship } from "./ship.js";
 import { getVessel } from "./vessels.js";
 import { AMMO } from "./damage.js";
 import { clamp, normDeg, diffDeg } from "./utils.js";
 
-// Kurs, den das Schiff tatsaechlich anliegen kann: liegt der Wunschkurs in der
-// No-Go-Zone, wird auf die naechste segelbare Kante gedreht.
+// The course the ship can actually hold: if the desired heading falls in the
+// no-go zone, it is turned to the nearest sailable edge.
 export function sailableHeading(desired, windDir, noGo) {
    const twa = diffDeg(desired, windDir);       // = windDir - desired
    if (Math.abs(twa) >= noGo) return normDeg(desired);
-   // naechste Kante: mit dem Wind von Steuerbord oder von Backbord
+   // nearest edge: with the wind on starboard or on port
    const a = normDeg(windDir - noGo);
    const b = normDeg(windDir + noGo);
    return Math.abs(diffDeg(desired, a)) < Math.abs(diffDeg(desired, b)) ? a : b;
@@ -30,12 +30,12 @@ export class Captain {
       this.ship = ship;
       this.doctrine = opts.doctrine || "rig";     // "rig" | "hull"
       this.skill = clamp(opts.skill ?? 0.85, 0.3, 1.5);
-      this.engage = opts.engage ?? 190;           // gewuenschte Kampfentfernung (m)
+      this.engage = opts.engage ?? 190;           // desired engagement range (m)
       this.aggression = opts.aggression ?? 1;
       this.name = opts.name || ship.name;
       this.state = "engage";
-      // Zufallsquelle (Phase 0D): ohne Angabe erbt der Kapitaen den Strom
-      // seines Schiffs. Damit ist ein KI-Gefecht bei gleichem Seed wiederholbar.
+      // Random source (Phase 0D): if not given, the captain inherits its
+      // ship's stream. This makes an AI battle reproducible for the same seed.
       this.rng = opts.rng || (ship && ship.rng) || Math.random;
       this._side = 1;         // preferred side to engage on (+1 = the +x/port side, -1 = starboard)
       this._sideTimer = 0;
@@ -51,7 +51,7 @@ export class Captain {
 
       if (!ship.alive || D.sunk) return;
 
-      // --- Flagge gestrichen: beidrehen und nicht mehr feuern -------------
+      // --- Colours struck: heave to and stop firing -------------
       if (D.struck) {
          this.state = "struck";
          dyn.sailSet = 0.25;
@@ -70,45 +70,45 @@ export class Captain {
       const dz = target.pos.z - ship.pos.z;
       const dist = Math.hypot(dx, dz);
       const bearing = normDeg(Math.atan2(dx, dz) * 180 / Math.PI);
-      const rel = diffDeg(dyn.heading, bearing);   // + = Ziel an Steuerbord
+      const rel = diffDeg(dyn.heading, bearing);   // + = target to starboard
 
-      // --- Lage beurteilen -------------------------------------------------
-      // Schwer angeschlagen: abdrehen und laufen, solange noch Masten stehen.
+      // --- Assess the situation -------------------------------------------------
+      // Badly beaten: turn away and run, as long as masts are still standing.
       const beaten = D.integrity() < 0.45 || D.mastsStanding() < 2 || D.flooding > 0.3;
       this.state = beaten && D.mastsStanding() >= 1 ? "flee" : "engage";
 
-      // --- Gefechtsseite waehlen (nicht jede Sekunde wechseln) -------------
+      // --- Choose the engagement side (don't switch every second) -------------
       this._sideTimer -= dt;
       if (this._sideTimer <= 0) {
          this._sideTimer = 12 + this.rng() * 8;
-         // die Seite mit mehr einsatzfaehigen Rohren
+         // the side with more guns still in action
          const p = D.gunFraction("PORT"), s = D.gunFraction("STBD");
          this._side = s > p + 0.12 ? 1 : p > s + 0.12 ? -1 : (rel >= 0 ? 1 : -1);
       }
 
-      // --- Wunschkurs ------------------------------------------------------
+      // --- Desired heading ------------------------------------------------------
       let desired;
       if (this.state === "flee") {
-         // vor dem Wind weglaufen - der schnellste Kurs eines Rahseglers
+         // run before the wind - the fastest point of sail for a square-rigger
          desired = normDeg(ctx.wind.dir + 180);
       } else if (dist > this.engage * 1.35) {
-         // aufkommen, aber schraeg, damit die Breitseite gleich traegt
+         // close in, but at an angle, so the broadside will bear as soon as we arrive
          desired = normDeg(bearing - this._side * 28);
       } else if (dist < this.engage * 0.5) {
-         // zu dicht dran - abfallen, sonst wird man gerammt oder geentert
+         // too close - bear away, or risk being rammed or boarded
          desired = normDeg(bearing + this._side * 125);
       } else {
-         // laengsseit bleiben: Gegner querab halten
+         // stay alongside: keep the enemy abeam
          desired = normDeg(bearing - this._side * 90);
       }
       desired = sailableHeading(desired, ctx.wind.dir, ship.vessel.sail.noGo);
 
-      // --- Ruder legen -----------------------------------------------------
+      // --- Steer the rudder -----------------------------------------------------
       const err = diffDeg(dyn.heading, desired);
       dyn.setRudder(clamp(err / 22, -1, 1));
 
-      // --- Segel setzen oder reffen ---------------------------------------
-      // Ein guter Kapitaen refft rechtzeitig, statt seine Stengen zu verlieren.
+      // --- Set or reef sails ---------------------------------------
+      // A good captain reefs in time, rather than losing his topmasts.
       const w = ctx.wind.speedKts;
       let set = 1;
       if (w > 34) set = 0.35;
@@ -117,7 +117,7 @@ export class Captain {
       if (this.state === "engage" && dist < this.engage * 0.8) set = Math.min(set, 0.75);
       dyn.sailSet = set;
 
-      // --- Feuer ------------------------------------------------------------
+      // --- Fire ------------------------------------------------------------
       if (this.state === "struck") return;
       const side = rel >= 0 ? "PORT" : "STBD"; // a positive bearing is to port
       const absRel = Math.abs(rel);
@@ -141,12 +141,12 @@ export class Captain {
    _chooseAmmo(dist, target) {
       const enemyMasts = target.dmg ? target.dmg.mastsStanding() : 3;
       if (this.doctrine === "rig") {
-         // erst die Takelage zerschlagen, dann den Rumpf
+         // shatter the rigging first, then the hull
          if (enemyMasts > 1 && dist < 300) return "chain";
          if (dist < 110) return "grape";
          return "ball";
       }
-      // britische Doktrin: in den Rumpf, auf kurze Distanz Kartaetsche
+      // British doctrine: into the hull, grapeshot at short range
       if (dist < 100) return "grape";
       return "ball";
    }
@@ -210,13 +210,13 @@ export class Fleet {
 }
 
 // ---------------------------------------------------------------------------
-// Gefechtslagen: was dem Spieler gegenuebersteht, haengt von seinem Schiff ab.
+// Battle scenarios: what the player faces depends on their ship.
 // ---------------------------------------------------------------------------
 export const SCENARIOS = [
    {
       id: "single",
-      title: "Einzelgefecht",
-      desc: "Ein Gegner von vergleichbarer Staerke. Ehrlicher Schlagabtausch.",
+      title: "Single Engagement",
+      desc: "One enemy of comparable strength. An honest exchange of broadsides.",
       forces: {
          yacht: [], hotspur: ["hirondelle"], lydia: ["amelie"], sutherland: ["vengeur"],
       },
@@ -232,8 +232,8 @@ export const SCENARIOS = [
    },
    {
       id: "lineofbattle",
-      title: "Gegen ein Linienschiff",
-      desc: "Ein Vierundsiebziger. Auf Distanz bleiben, die Takelage zerschiessen, weglaufen.",
+      title: "Against a Ship of the Line",
+      desc: "A seventy-four. Keep your distance, shoot up her rigging, and run.",
       forces: {
          yacht: [], hotspur: ["vengeur"], lydia: ["vengeur"], sutherland: ["vengeur", "amelie"],
       },
