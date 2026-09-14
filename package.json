@@ -3,7 +3,7 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "description": "3D Segel-Simulator (Webbasiert) - Semi-realistische Segelphysik mit Freeride/Regatta/Training-Modi",
+  "description": "3D Sailing Simulator (browser-based) - Semi-realistic sailing physics with Freeride/Regatta/Training modes",
   "workspaces": [
     "packages/shared",
     "packages/server",

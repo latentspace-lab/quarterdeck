@@ -1,4 +1,4 @@
-// camera.js - Kamera-Regie: CHASE, COCKPIT, TOP, ORBIT
+// camera.js - camera direction: CHASE, COCKPIT, TOP, ORBIT
 import * as THREE from "three";
 import { DEG } from "./utils.js";
 
@@ -8,18 +8,18 @@ export class CameraRig {
    constructor(camera, canvas) {
       this.camera = camera;
       this.mode = "CHASE";
-      // Vom gewaehlten Schiff gesetzt (vessels.js -> cam). Werte in Metern.
+      // Set by the chosen ship (vessels.js -> cam). Values in metres.
       this.rig = { dist: 15, height: 6.5, cockpitZ: -1.2, cockpitY: 2.4, lead: 8, targetY: 2.0 };
-      this.azimuth = 0; // rad (relativ zur Bootskurs)
+      this.azimuth = 0; // rad (relative to the boat's heading)
       this.elevation = 0.18;
       this.zoom = 1.0;
       this.dragging = false;
-      this.shakeAmt = 0;   // Erschuetterung bei Treffern und Stoessen
+      this.shakeAmt = 0;   // shake from hits and impacts
       this._tmp = new THREE.Vector3();
       this._look = new THREE.Vector3();
       this._pos = new THREE.Vector3();
 
-       // Pointer-Steuerung (free-look / Orbit)
+       // Pointer control (free-look / orbit)
       canvas.addEventListener("pointerdown", (e) => {
          this.dragging = true;
          this._px = e.clientX;
@@ -52,8 +52,8 @@ export class CameraRig {
     setMode(m) {
       if (MODES.includes(m)) this.mode = m;
     }
-    // Kameraabstaende an die Schiffsgroesse anpassen
-    // Kurzer Stoss auf die Kamera (Treffer, Mastbruch, Kollision)
+    // Adjust camera distances to the ship's size
+    // A brief jolt to the camera (hit, mast breaking, collision)
     shake(a) { this.shakeAmt = Math.min(2.5, this.shakeAmt + a); }
 
     setVessel(camSpec) {
@@ -64,22 +64,22 @@ export class CameraRig {
       return MODES;
     }
 
-    // dt in Sekunden, boat: { heading (Grad), pos {x,z}, heel (Grad) }
+    // dt in seconds, boat: { heading (degrees), pos {x,z}, heel (degrees) }
     update(dt, boat) {
       const h = boat.heading * DEG;
       const bx = boat.pos.x;
       const bz = boat.pos.z;
-      const up = boat.heel * 0.05; // leichte Neigung
+      const up = boat.heel * 0.05; // slight tilt
       let target = this._look;
       let camPos = this._pos;
 
       const R = this.rig;
-      const sz = R.dist / 15; // Groessenfaktor relativ zur Yacht
+      const sz = R.dist / 15; // size factor relative to the yacht
 
       if (this.mode === "CHASE") {
          const dist = R.dist * this.zoom;
          const height = R.height * this.zoom + this.elevation * 10 * sz;
-         const back = h + Math.PI + this.azimuth; // hinter dem Boot
+         const back = h + Math.PI + this.azimuth; // behind the boat
          const side = this.elevation * 0.3;
          camPos.set(
              bx + Math.sin(back) * dist * Math.cos(side) + this.azimuth * 0,
@@ -93,7 +93,7 @@ export class CameraRig {
           bz + Math.cos(h) * R.lead
          );
        } else if (this.mode === "COCKPIT") {
-         // Achterdeck / Kommandostand: Blick nach vorn ueber das Schiff
+         // Quarterdeck / command post: looking forward over the ship
          camPos.set(
              bx + Math.sin(h) * R.cockpitZ + this.azimuth * 3 * sz,
           R.cockpitY + this.elevation * 2 * sz,
@@ -124,7 +124,7 @@ export class CameraRig {
          target.set(bx, 1.5 * sz, bz);
        }
 
-       // sanftes Nachfuerhren
+       // gentle follow-up easing
       const k = Math.min(1, dt * (this.mode === "CHASE" ? 7 : 4));
       this.camera.position.lerp(camPos, k);
       if (this.shakeAmt > 0.001) {

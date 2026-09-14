@@ -1,15 +1,15 @@
-// boat.js - realistisches Segelyacht-Modell (forward = +Z, +X = Steuerbord)
-// Yacht (yaw=heading) > Heeler (Kraengung=roll um Z, pitch) > Rumpf/Rigg/Segel.
-// Rumpf: aus Stationsquerschnitten geloift (spitzer Bug, Scheuerlinie, Spiegel).
-// Segel: parametrische Tuch-Flaechen, folgen jeden Frame dem Baum (Gross) bzw.
-// der Schot (Fock), Bauch zeigt immer zur Leeseite, Flattern in der No-Go-Zone.
+// boat.js - realistic sailing yacht model (forward = +Z, +X = starboard)
+// Yacht (yaw=heading) > Heeler (heel = roll around Z, pitch) > hull/rig/sails.
+// Hull: lofted from station cross-sections (pointed bow, sheer line, transom).
+// Sails: parametric cloth surfaces that follow the boom (main) or the sheet
+// (jib) every frame; the belly always points to leeward, and they luff in the no-go zone.
 import * as THREE from "three";
 import { clamp, DEG } from "./utils.js";
 import { palette } from "./style.js";
 
 const UP = new THREE.Vector3(0, 1, 0);
 
-// ---------------- Materialien ----------------
+// ---------------- Materials ----------------
 const matHull = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.35, metalness: 0.05, side: THREE.DoubleSide });
 const matDeck = new THREE.MeshStandardMaterial({ color: 0xcfc4a8, roughness: 0.85, metalness: 0.02, side: THREE.DoubleSide });
 const matHouse = new THREE.MeshStandardMaterial({ color: 0xf1f0ea, roughness: 0.55 });
@@ -19,29 +19,29 @@ const matStay = new THREE.MeshStandardMaterial({ color: 0x8d9196, roughness: 0.3
 const matKeel = new THREE.MeshStandardMaterial({ color: 0x23262b, roughness: 0.5, metalness: 0.3 });
 const matWinch = new THREE.MeshStandardMaterial({ color: 0x9aa0a8, roughness: 0.35, metalness: 0.85 });
 
-// Rumpf-Farben (vertex colors, Wasserlinie bei y=0)
-const COL_TOP = [0.94, 0.955, 0.965]; // Bordwand
-const COL_STRIPE = [0.08, 0.13, 0.23]; // Wasserpass-Band
-const COL_BOTTOM = [0.50, 0.13, 0.11]; // Antifouling
+// Hull colors (vertex colors, waterline at y=0)
+const COL_TOP = [0.94, 0.955, 0.965]; // topsides
+const COL_STRIPE = [0.08, 0.13, 0.23]; // boot-top stripe
+const COL_BOTTOM = [0.50, 0.13, 0.11]; // antifouling
 
-// ---------------- Rumpfform (Profile) ----------------
-// Halbbreite ueber Laengenposition s (0=Bug, 1=Spiegel)
+// ---------------- Hull shape (profiles) ----------------
+// Half-beam over the length position s (0=bow, 1=transom)
 function hbProfile(s) {
    if (s < 0.42) return Math.pow(THREE.MathUtils.smoothstep(s, 0.0, 0.42), 0.85);
    return 1 - 0.22 * Math.pow(THREE.MathUtils.smoothstep(s, 0.42, 1.0), 1.25);
 }
-// Kiellinie: Bug 0.83 (fast bis zur Wasserlinie runter), Mitte 1.0, Heck 0.62
+// Keel line: bow 0.83 (nearly down to the waterline), midships 1.0, stern 0.62
 function kdProfile(s) {
    return 0.83 + 0.17 * THREE.MathUtils.smoothstep(s, 0.0, 0.15)
                 - 0.38 * THREE.MathUtils.smoothstep(s, 0.65, 1.0);
 }
-// Scheuerlinie (Deckshoehe): klassischer Anstieg zu Bug und Heck
+// Sheer line (deck height): classic rise toward bow and stern
 function sheerProfile(s) {
    return 0.52 + 0.42 * Math.pow(THREE.MathUtils.smoothstep(1 - s, 0.0, 1.0), 2.2)
                + 0.16 * THREE.MathUtils.smoothstep(s, 0.55, 1.0);
 }
 
-// Sektionspunkt: s entlang (0=Bug..1=Heck), t um Querschnitt (0=Kiel..1=Decksrand)
+// Section point: s along the length (0=bow..1=stern), t around the cross-section (0=keel..1=deck edge)
 function hullPoint(s, t, side, LOA, BEAM, DRAFT) {
    const z = THREE.MathUtils.lerp(LOA / 2, -LOA / 2, s);
    const hb = hbProfile(s) * (BEAM / 2);
@@ -54,8 +54,8 @@ function hullPoint(s, t, side, LOA, BEAM, DRAFT) {
 }
 
 function buildHull(LOA, BEAM, DRAFT) {
-   const S = 28; // Stationen
-   const M = 12; // Punkte je Querschnitt (Kiel -> Decksrand)
+   const S = 28; // stations
+   const M = 12; // points per cross-section (keel -> deck edge)
    const positions = [];
    const colors = [];
    const indices = [];
@@ -78,7 +78,7 @@ function buildHull(LOA, BEAM, DRAFT) {
          stbd[i].push(pushPoint(hullPoint(s, t, -1, LOA, BEAM, DRAFT)));
       }
    }
-   // Rumpfhaut
+   // Hull skin
    for (let i = 0; i < S - 1; i++) {
       for (let j = 0; j < M; j++) {
          for (const side of [port, stbd]) {
@@ -88,7 +88,7 @@ function buildHull(LOA, BEAM, DRAFT) {
          }
       }
    }
-   // Spiegel (Heck-Flaeche) als Faecher ueber den Rand der letzten Station
+   // Transom (stern face) as a fan over the rim of the last station
    const rim = [];
    for (let j = 0; j <= M; j++) rim.push(port[S - 1][j]);
    for (let j = M; j >= 0; j--) rim.push(stbd[S - 1][j]);
@@ -126,7 +126,7 @@ function buildDeck(LOA, BEAM) {
       const z = THREE.MathUtils.lerp(LOA / 2, -LOA / 2, s);
       const hb = Math.max(hbProfile(s) * (BEAM / 2) * 0.985, 0.001);
       const sh = sheerProfile(s);
-      positions.push(hb, sh, z, 0, sh + 0.055, z, -hb, sh, z); // Kante, Mitte (gekaemmert), Kante
+      positions.push(hb, sh, z, 0, sh + 0.055, z, -hb, sh, z); // edge, centre (crowned), edge
    }
    for (let i = 0; i < S - 1; i++) {
       const a = i * 3, b = (i + 1) * 3;
@@ -142,7 +142,7 @@ function buildDeck(LOA, BEAM) {
    return deck;
 }
 
-// ---------------- Draht/Stay zwischen zwei Punkten ----------------
+// ---------------- Wire/stay between two points ----------------
 function stay(a, b, r, mat) {
    const dir = new THREE.Vector3().subVectors(b, a);
    const len = dir.length();
@@ -152,7 +152,7 @@ function stay(a, b, r, mat) {
    return m;
 }
 
-// ---------------- Segel (parametrisches Tuch) ----------------
+// ---------------- Sails (parametric cloth) ----------------
 const SAIL_VERT = `
 varying vec3 vN;
 varying vec3 vW;
@@ -176,7 +176,7 @@ void main() {
    vec3 N = normalize(vN);
    vec3 L = normalize(uSunDir);
    float diff = clamp(dot(N, L), 0.0, 1.0);
-   float back = clamp(dot(-N, L), 0.0, 1.0); // Licht, das durch das Tuch faellt
+   float back = clamp(dot(-N, L), 0.0, 1.0); // light that passes through the cloth
    float panel = 0.952 + 0.048 * smoothstep(0.46, 0.54, fract(vUv.y * 5.0));
    float seam = 0.965 + 0.035 * smoothstep(0.46, 0.54, fract(vUv.x * 7.0));
    float shade = 0.52 + 0.48 * diff + 0.16 * back;
@@ -193,8 +193,8 @@ function makeSail({ gridU = 18, gridV = 10, color = 0xf7f4ec } = {}) {
    let vi = 0;
    for (let iu = 0; iu <= U; iu++) {
       for (let iv = 0; iv <= V; iv++) {
-         uvs[vi * 2] = iu / U; // u: laengs Vorliek (Tack -> Head)
-         uvs[vi * 2 + 1] = iv / V; // v: Schnitt vom Vor- zum Achterliek
+         uvs[vi * 2] = iu / U; // u: along the luff (tack -> head)
+         uvs[vi * 2 + 1] = iv / V; // v: cross-section from luff to leech
          vi++;
       }
    }
@@ -231,7 +231,7 @@ function makeSail({ gridU = 18, gridV = 10, color = 0xf7f4ec } = {}) {
    return mesh;
 }
 
-// Arbeits-Vektoren (kein Muell pro Frame)
+// Working vectors (no garbage per frame)
 const _foot = new THREE.Vector3();
 const _camDir = new THREE.Vector3();
 const _luff = new THREE.Vector3();
@@ -239,8 +239,8 @@ const _a = new THREE.Vector3();
 const _b = new THREE.Vector3();
 const _p = new THREE.Vector3();
 
-// Segel-Geometrie neu berechnen: Tack/Head fest (Mast bzw. Vorstag), Clew am
-// Baum-Ende. Bauch senkrecht zum Tuch, immer zur Leeseite (leeX: +1=Stb, -1=Bb).
+// Recompute sail geometry: tack/head fixed (mast or forestay), clew at the
+// boom end. Belly perpendicular to the cloth, always to leeward (leeX: +1=stbd, -1=port).
 function updateSail(mesh, { tack, head, clew, camber, flutter, time, leeX }) {
    const geo = mesh.geometry;
    const pos = geo.attributes.position;
@@ -256,17 +256,17 @@ function updateSail(mesh, { tack, head, clew, camber, flutter, time, leeX }) {
    _luff.subVectors(head, tack);
    let vi = 0;
    for (let iu = 0; iu <= U; iu++) {
-      const u = iu / U; // Hoehe: 0=Tack, 1=Head
-      _a.copy(tack).addScaledVector(_luff, u); // Punkt am Vorliek
-      _b.copy(clew).lerp(head, u); // Punkt am Achterliek
+      const u = iu / U; // height: 0=tack, 1=head
+      _a.copy(tack).addScaledVector(_luff, u); // point on the luff
+      _b.copy(clew).lerp(head, u); // point on the leech
       for (let iv = 0; iv <= V; iv++) {
          const v = iv / V;
-         const vv = v * (1 - u); // Parameter falten das Quadrat ins Dreieck
+         const vv = v * (1 - u); // fold the square parameter into the triangle
          _p.copy(_a).lerp(_b, vv);
-         // Bauch: Maximum mittig im Schnitt, oben etwas flacher
+         // Belly: maximum at mid cross-section, flatter near the top
          let bulge = camber * Math.sin(Math.PI * v) * (1 - 0.38 * u);
          if (flutter > 0.01) {
-            // Kill: Tuch flattert, Bauch bricht ein, Wellen laufen uebers Segel
+            // Luffing: cloth flutters, the belly collapses, waves ripple across the sail
             bulge *= 1 - 0.8 * flutter;
             bulge += flutter * (0.14 * Math.sin(v * 6.283 + time * 16.0 + u * 7.0)
                               + 0.06 * Math.sin(u * 9.4 - time * 22.0));
@@ -297,10 +297,10 @@ export function buildSailboat(opts = {}) {
    const BOOM_Y = 1.35, BOOM_LEN = 4.6;
    const JIB_FOOT = 3.3;
 
-   // Rumpf + Deck
+   // Hull + deck
    heeler.add(buildHull(LOA, BEAM, DRAFT), buildDeck(LOA, BEAM));
 
-   // Kiel (Flosse) + Rumpfbirne
+   // Keel (fin) + bulb
    const keel = new THREE.Mesh(new THREE.BoxGeometry(0.15, 1.55, 1.5), matKeel);
    keel.position.set(0, -1.35, 0.35);
    const bulb = new THREE.Mesh(new THREE.CapsuleGeometry(0.17, 1.05, 6, 12), matKeel);
@@ -308,7 +308,7 @@ export function buildSailboat(opts = {}) {
    bulb.position.set(0, -2.05, 0.30);
    heeler.add(keel, bulb);
 
-   // Ruder (schwenkt um seine Achse)
+   // Rudder (pivots around its axis)
    const rudderPivot = new THREE.Group();
    rudderPivot.position.set(0, -0.02, -LOA / 2 + 0.55);
    const rudderBlade = new THREE.Mesh(new THREE.BoxGeometry(0.055, 1.1, 0.42), matKeel);
@@ -316,13 +316,13 @@ export function buildSailboat(opts = {}) {
    rudderPivot.add(rudderBlade);
    heeler.add(rudderPivot);
 
-   // Mast (konisch)
+   // Mast (tapered)
    const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.105, MAST_H, 10), matRig);
    mast.position.set(0, MAST_BASE + MAST_H / 2, MAST_Z);
    mast.castShadow = true;
    heeler.add(mast);
 
-   // Baum am Mast (Pivot am Niederhalter)
+   // Boom at the mast (pivot at the gooseneck)
    const boomPivot = new THREE.Group();
    boomPivot.position.set(0, BOOM_Y, MAST_Z);
    const boomGeo = new THREE.CylinderGeometry(0.05, 0.065, BOOM_LEN, 8);
@@ -333,19 +333,19 @@ export function buildSailboat(opts = {}) {
    boomPivot.add(boom);
    heeler.add(boomPivot);
 
-   // Stage und Wanten
+   // Stays and shrouds
    const masthead = new THREE.Vector3(0, MAST_TOP, MAST_Z);
    const bowDeck = new THREE.Vector3(0, 0.98, LOA / 2 - 0.10);
    const sternDeck = new THREE.Vector3(0, 0.74, -LOA / 2 + 0.15);
    const upper = new THREE.Vector3(0, MAST_TOP - 2.2, MAST_Z);
    const shroudP = new THREE.Vector3(1.55, 0.70, 0.6);
    const shroudS = new THREE.Vector3(-1.55, 0.70, 0.6);
-   heeler.add(stay(masthead, bowDeck, 0.016, matStay)); // Vorstag
-   heeler.add(stay(masthead, sternDeck, 0.013, matStay)); // Backstag
+   heeler.add(stay(masthead, bowDeck, 0.016, matStay)); // forestay
+   heeler.add(stay(masthead, sternDeck, 0.013, matStay)); // backstay
    heeler.add(stay(upper, shroudP, 0.012, matStay));
    heeler.add(stay(upper, shroudS, 0.012, matStay));
 
-   // Kajueste + Cockpit
+   // Cabin house + cockpit
    const cabin = new THREE.Mesh(new THREE.BoxGeometry(1.75, 0.62, 2.3), matHouse);
    cabin.position.set(0, 0.64 + 0.31, -0.35);
    cabin.castShadow = true;
@@ -368,7 +368,7 @@ export function buildSailboat(opts = {}) {
    wheel.position.set(0, 0.64 + 0.44, -2.35);
    heeler.add(wheel);
 
-   // Relingsstaender + Lebenslinien
+   // Stanchions + lifelines
    const railZ = [3.3, 1.7, -0.5, -2.4, -4.1];
    const topsP = [], topsS = [];
    for (const z of railZ) {
@@ -388,7 +388,7 @@ export function buildSailboat(opts = {}) {
       heeler.add(stay(topsS[i], topsS[i + 1], 0.011, matStay));
    }
 
-   // Wimpel am Masttop (zeigt mit dem scheinbaren Wind nach Lee)
+   // Pennant at the masthead (points to leeward with the apparent wind)
    const flagPivot = new THREE.Group();
    flagPivot.position.set(0, MAST_TOP + 0.12, MAST_Z);
    const flagGeo = new THREE.PlaneGeometry(0.85, 0.28);
@@ -400,7 +400,7 @@ export function buildSailboat(opts = {}) {
    flagPivot.add(flag);
    heeler.add(flagPivot);
 
-   // Segel
+   // Sails
    const mainsail = makeSail({ gridU: 20, gridV: 12, color: 0xf7f4ec });
    const jib = makeSail({ gridU: 16, gridV: 10, color: 0xfaf8f0 });
    mainsail.castShadow = true;
@@ -411,7 +411,7 @@ export function buildSailboat(opts = {}) {
    const jibTack = new THREE.Vector3(0, 1.05, LOA / 2 - 0.40);
    const jibHead = bowDeck.clone().lerp(masthead, 0.86);
 
-   // Startgeometrie (Mastnah, bevor das Spiel animate() ruft)
+   // Starting geometry (close to the mast, before the game calls animate())
    updateSail(mainsail, {
       tack: tackMain, head: headMain,
       clew: new THREE.Vector3(0, BOOM_Y, MAST_Z - BOOM_LEN),
@@ -433,7 +433,7 @@ export function buildSailboat(opts = {}) {
       vesselId: "yacht",
    };
 
-   // Animation: Ruder, Baum, Segel, Wimpel
+   // Animation: rudder, boom, sails, pennant
    let boomCur = 0, jibCur = 0, flutterCur = 0, rudderCur = 0, leeX = 1;
    const clewMain = new THREE.Vector3();
    const clewJib = new THREE.Vector3();
@@ -441,11 +441,11 @@ export function buildSailboat(opts = {}) {
    yacht.animate = function (dt, o = {}) {
       const time = o.time || 0;
 
-      // Ruder nachfuehren
+      // Follow the rudder
       rudderCur += ((o.rudderAngle || 0) - rudderCur) * Math.min(1, dt * 8);
       rudderPivot.rotation.y = -THREE.MathUtils.degToRad(rudderCur);
 
-      // Baumwinkel (Grad, + = nach Steuerbord, - = nach Backbord = Leeseite)
+      // Boom angle (degrees, + = to starboard, - = to port = leeward)
       const boomDeg = clamp(o.boomAngleDeg || 0, -95, 95);
       if (Math.abs(boomDeg) > 0.5) leeX = boomDeg > 0 ? 1 : -1;
       const boomTarget = THREE.MathUtils.degToRad(boomDeg);
@@ -454,17 +454,17 @@ export function buildSailboat(opts = {}) {
       jibCur += (jibTarget - jibCur) * Math.min(1, dt * 3.0);
       boomPivot.rotation.y = -boomCur;
 
-      // Flattern (No-Go-Zone) weich einblenden
+      // Fade in luffing (no-go zone) smoothly
       flutterCur += ((o.luffing ? 1 : 0) - flutterCur) * Math.min(1, dt * 2.5);
 
-      // Segel-Bauch: auf Raumwinden voller, oben flacher; Windstaerke skaliert
+      // Sail belly: fuller on a reach, flatter up high; scaled by wind strength
       const windF = clamp(0.45 + (o.windKts || 10) * 0.055, 0.45, 1.25);
       const ease = Math.min(Math.abs(boomCur) / (Math.PI / 2), 1);
       const camberMain = (0.34 + 0.5 * ease) * windF;
       const camberJib = (0.27 + 0.38 * ease) * windF;
 
-      // Grosssegel: Clew exakt am transformierten Baum-Ende
-      const theta = -boomCur; // identische Drehung wie das Baum-Mesh
+      // Mainsail: clew exactly at the transformed boom end
+      const theta = -boomCur; // same rotation as the boom mesh
       clewMain.set(
          boomPivot.position.x - BOOM_LEN * Math.sin(theta),
          boomPivot.position.y,
@@ -475,7 +475,7 @@ export function buildSailboat(opts = {}) {
          camber: camberMain, flutter: flutterCur, time, leeX,
       });
 
-      // Fock: Clew an ihrer Schot (etwas weiter ausserhalb als der Baum)
+      // Jib: clew at its sheet (a little further outboard than the boom)
       const thetaJ = -jibCur;
       clewJib.set(
          jibTack.x - JIB_FOOT * Math.sin(thetaJ),
@@ -487,7 +487,7 @@ export function buildSailboat(opts = {}) {
          camber: camberJib, flutter: flutterCur * 0.9, time: time + 1.7, leeX,
       });
 
-      // Wimpel: zeigt mit dem scheinbaren Wind nach Lee
+      // Pennant: points to leeward with the apparent wind
       let awaRel = o.awaRel;
       if (awaRel === undefined) awaRel = leeX > 0 ? -90 : 90;
       flagPivot.rotation.y = normHalfDeg(awaRel + 180) * DEG;

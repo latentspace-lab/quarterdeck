@@ -1,5 +1,5 @@
-// controls.js - Eingabe (Tastatur + Maus)
-// Gibt jedes Frame ein Input-Objekt und liefert Edge-Ereignisse ueber eine Queue.
+// controls.js - input (keyboard + mouse)
+// Produces an input object every frame and delivers edge events via a queue.
 
 /** True when the key event comes from an element the user is typing into. */
 export function isTyping(e) {
@@ -28,7 +28,7 @@ export class Controls {
          // menu) must not steer the ship: every "h" would hide the HUD,
          // every "q" fire a broadside.
          if (isTyping(e)) return;
-         if (this.keys[e.code]) return; // kein Auto-Repeat
+         if (this.keys[e.code]) return; // no auto-repeat
          this.keys[e.code] = true;
          this._handle(e, true);
        };
@@ -84,7 +84,7 @@ export class Controls {
     }
 
     _release(e) {
-      // Ruder beim Loslassen auf 0 (langsam)
+      // Rudder back to 0 on release (slowly)
       switch (e.code) {
          case "ArrowLeft":
           case "KeyA":
@@ -100,13 +100,13 @@ export class Controls {
     }
 
     read(dt) {
-      // Rohes Ruderkommando aus den Tasten: -1, 0 oder +1.
+      // Raw rudder command from the keys: -1, 0 or +1.
       //
-      // Frueher wurde hier mit dt*8 geglaettet und in BoatDynamics.setRudder()
-      // noch einmal mit festem Faktor 0.3 je Aufruf. Zwei Glaettungen, davon
-      // eine aufrufabhaengig - das laesst sich auf dem Server nicht
-      // nachrechnen. Seit Phase 0B' gibt es genau einen dt-invarianten
-      // Smoother, und der sitzt im Simulationsschritt.
+      // This used to be smoothed here with dt*8, and again in
+      // BoatDynamics.setRudder() with a fixed factor of 0.3 per call. Two
+      // smoothing passes, one of them call-rate dependent - that can't be
+      // reproduced on the server. Since Phase 0B' there is exactly one
+      // dt-invariant smoother, and it lives in the simulation step.
       this.rudder = (this.keys["ArrowRight"] ? 1 : 0) - (this.keys["ArrowLeft"] ? 1 : 0) +
           (this.keys["KeyD"] ? 1 : 0) - (this.keys["KeyA"] ? 1 : 0);
       return {

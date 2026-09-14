@@ -13,31 +13,31 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          # 22.18+ liefert TypeScript-Stripping ohne Flag - die Tests
-          # importieren packages/server/src/headless.ts direkt.
+          # 22.18+ provides TypeScript stripping without a flag - the tests
+          # import packages/server/src/headless.ts directly.
           node-version: 22
           cache: npm
       - run: npm ci
 
-      # Typen zuerst: ein Typfehler soll nicht als Testfehler auftauchen.
-      - name: Typen pruefen
+      # Types first: a type error shouldn't show up as a test failure.
+      - name: Check types
         run: npm run typecheck
 
-      # Schnelle Ebenen zuerst - sie zeigen die meisten Fehler in unter einer
-      # Sekunde und machen den Log lesbar.
-      - name: Unit-Tests
+      # Fast levels first - they surface most failures in under a second
+      # and keep the log readable.
+      - name: Unit tests
         run: npm run test:unit
 
-      - name: Regressionstests
+      - name: Regression tests
         run: npm run test:regression
 
-      # Der Boot-Smoke-Test faehrt das GEBAUTE Spiel im Browser - er braucht
-      # also den Build und Chromium. Ohne beides ueberspringt er sich selbst.
+      # The boot smoke test runs the BUILT game in the browser - so it needs
+      # the build and Chromium. Without either, it skips itself.
       - name: Build
         run: npm run build
 
-      - name: Chromium installieren
+      - name: Install Chromium
         run: npx playwright install --with-deps chromium
 
-      - name: Integrationstests
+      - name: Integration tests
         run: npm run test:integration

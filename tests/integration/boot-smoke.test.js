@@ -1,15 +1,15 @@
-// tests/integration/boot-smoke.test.js - startet das gebaute Spiel im Browser.
+// tests/integration/boot-smoke.test.js - starts the built game in a browser.
 //
-// Warum es diese Ebene braucht: alle anderen Suiten importieren Module
-// einzeln. Ein FEHLENDER Import in game.js faellt dabei nie auf - erst der
-// Browser fuehrt die Datei als Ganzes aus. Genau so ist auf main ein
-// `voiceAnnounce(TRIGGER.ahoi)` ohne zugehoerigen Import stehengeblieben: der
-// Simulator-Konstruktor warf eine ReferenceError, das Spiel startete nicht,
-// und 600 gruene Unit-Tests haben es nicht gemerkt.
+// Why this layer is needed: every other suite imports modules individually.
+// A MISSING import in game.js never shows up that way - only the browser
+// runs the file as a whole. That is exactly how a
+// `voiceAnnounce(TRIGGER.ahoi)` without its import ended up stuck on main:
+// the Simulator constructor threw a ReferenceError, the game never started,
+// and 600 green unit tests never noticed.
 //
-// Der Test braucht einen Build (npm run build) und Chromium. Fehlt eines von
-// beidem, meldet er das und ueberspringt - er soll niemanden blockieren, der
-// nur schnell die Physik pruefen will.
+// This test needs a build (npm run build) and Chromium. Missing either, it
+// reports that and skips - it should not block anyone who just wants to
+// check the physics quickly.
 import { createServer } from "node:http";
 import { readFile, stat } from "node:fs/promises";
 import { existsSync } from "node:fs";
@@ -17,7 +17,7 @@ import { fileURLToPath } from "node:url";
 import { dirname, join, extname, normalize } from "node:path";
 import { createSuite } from "../lib/harness.js";
 
-const suite = createSuite("Boot-Smoke (Browser)");
+const suite = createSuite("Boot smoke (browser)");
 const { ok, eq } = suite;
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -33,7 +33,7 @@ const MIME = {
 
 async function run() {
    if (!existsSync(join(DIST, "index.html"))) {
-      suite.note("uebersprungen: kein Build unter packages/client/dist - erst `npm run build`");
+      suite.note("skipped: no build under packages/client/dist - run `npm run build` first");
       return suite.done();
    }
 
@@ -41,7 +41,7 @@ async function run() {
    try {
       ({ chromium } = await import("playwright"));
    } catch {
-      suite.note("uebersprungen: playwright ist nicht installiert");
+      suite.note("skipped: playwright is not installed");
       return suite.done();
    }
 
@@ -63,14 +63,14 @@ async function run() {
    await new Promise((r) => server.listen(0, "127.0.0.1", r));
    const url = `http://127.0.0.1:${server.address().port}${BASE}`;
 
-   // Playwright bringt seine eigene Chromium-Version mit; ist die installierte
-   // eine andere (wie im vorinstallierten Container), wird sie direkt benannt.
+   // Playwright ships its own Chromium build; if the installed one is
+   // different (as in the pre-installed container), name it directly.
    const candidates = [
       process.env.CHROMIUM_PATH,
       process.env.PLAYWRIGHT_BROWSERS_PATH
          ? join(process.env.PLAYWRIGHT_BROWSERS_PATH, "chromium")
          : null,
-      undefined, // Playwright selbst suchen lassen
+      undefined, // let Playwright find it itself
    ].filter((v) => v !== null);
 
    let browser;
@@ -87,8 +87,8 @@ async function run() {
       }
    }
    if (!browser) {
-      const err = launchErr || new Error("kein Chromium gefunden");
-      suite.note("uebersprungen: Chromium laesst sich nicht starten (" + err.message.split("\n")[0] + ")");
+      const err = launchErr || new Error("no Chromium found");
+      suite.note("skipped: Chromium won't launch (" + err.message.split("\n")[0] + ")");
       server.close();
       return suite.done();
    }
@@ -99,11 +99,11 @@ async function run() {
    page.on("console", (m) => { if (m.type() === "error" && !/404|Failed to load resource/.test(m.text())) errors.push(m.text()); });
 
    try {
-      suite.section("Die Seite startet");
+      suite.section("The page starts");
       await page.goto(url, { waitUntil: "load", timeout: 30000 });
       await page.waitForTimeout(2500);
 
-      eq(errors.length, 0, "keine Fehler beim Laden",
+      eq(errors.length, 0, "no errors while loading",
          errors.length ? errors.slice(0, 3).join(" | ") : undefined);
 
       const booted = await page.evaluate(() => ({
@@ -111,18 +111,18 @@ async function run() {
          menuOpen: window.__sim ? window.__sim.menuOpen : null,
          ships: [...document.querySelectorAll("button")].length,
       }));
-      ok(booted.sim, "der Simulator wird erzeugt (window.__sim)");
-      ok(booted.menuOpen === true, "und oeffnet das Startmenue");
-      ok(booted.ships > 4, "das Menue bietet Schiffe an", booted.ships + " Schaltflaechen");
+      ok(booted.sim, "the simulator is created (window.__sim)");
+      ok(booted.menuOpen === true, "and opens the start menu");
+      ok(booted.ships > 4, "the menu offers ships", booted.ships + " buttons");
 
-      suite.section("Die Schleife laeuft im Menue weiter");
+      suite.section("The loop keeps running in the menu");
       const t0 = await page.evaluate(() => window.__sim.t);
       await page.waitForTimeout(1200);
       const t1 = await page.evaluate(() => ({ t: window.__sim.t, phaseT: window.__sim.sea.phaseT }));
-      ok(t1.t > t0, "die Simulationszeit laeuft", t0.toFixed(2) + " -> " + t1.t.toFixed(2) + " s");
-      ok(t1.phaseT > 0, "und das Wasser bewegt sich auch im Menue", t1.phaseT.toFixed(2) + " s");
+      ok(t1.t > t0, "the simulation clock runs", t0.toFixed(2) + " -> " + t1.t.toFixed(2) + " s");
+      ok(t1.phaseT > 0, "and the water moves even in the menu", t1.phaseT.toFixed(2) + " s");
 
-      suite.section("Ein Segeltoern");
+      suite.section("A sailing trip");
       const started = await page.evaluate(() => {
          const all = [...document.querySelectorAll("button")];
          const go = all.filter((b) => b.textContent.includes("·") && b.textContent.trim().length < 40).pop();
@@ -130,7 +130,7 @@ async function run() {
          go.click();
          return go.textContent.trim();
       });
-      ok(started, "die Startschaltflaeche laesst sich druecken", started);
+      ok(started, "the start button can be pressed", started);
       await page.waitForTimeout(6000);
 
       const s = await page.evaluate(() => {
@@ -145,25 +145,25 @@ async function run() {
             rendererCalls: sim.renderer.info.render.calls,
          };
       });
-      eq(s.menuOpen, false, "das Menue schliesst sich");
-      ok(s.speed > 0.5, "das Boot nimmt Fahrt auf", s.speed.toFixed(2) + " kn");
-      ok(Number.isFinite(s.heading) && Number.isFinite(s.modelY), "Kurs und Lage sind endlich");
-      ok(s.hasPoses, "die Interpolation hat zwei Lagen (Phase 0B')");
-      ok(s.rendererCalls > 0, "es wird tatsaechlich gezeichnet", s.rendererCalls + " Draw-Calls");
-      eq(errors.length, 0, "auch beim Segeln keine Fehler",
+      eq(s.menuOpen, false, "the menu closes");
+      ok(s.speed > 0.5, "the boat gathers way", s.speed.toFixed(2) + " kn");
+      ok(Number.isFinite(s.heading) && Number.isFinite(s.modelY), "course and pose are finite");
+      ok(s.hasPoses, "the interpolation has two poses (Phase 0B')");
+      ok(s.rendererCalls > 0, "something is actually being drawn", s.rendererCalls + " draw calls");
+      eq(errors.length, 0, "no errors while sailing either",
          errors.length ? errors.slice(0, 3).join(" | ") : undefined);
 
-      suite.section("Die Ruderglaettung greift");
-      // Echte Tastendruecke statt synthetischer Events - der Test soll den
-      // Weg gehen, den ein Spieler geht.
+      suite.section("The rudder smoothing kicks in");
+      // Real key presses instead of synthetic events - the test should take
+      // the path a player takes.
       await page.keyboard.down("ArrowRight");
       await page.waitForTimeout(1500);
       const turning = await page.evaluate(() => ({ rudder: window.__sim.boat.rudder }));
-      ok(turning.rudder > 0.5, "die Taste legt das Ruder um", turning.rudder.toFixed(3));
+      ok(turning.rudder > 0.5, "the key puts the rudder over", turning.rudder.toFixed(3));
       await page.keyboard.up("ArrowRight");
       await page.waitForTimeout(1500);
       const centred = await page.evaluate(() => window.__sim.boat.rudder);
-      ok(Math.abs(centred) < 0.2, "und laesst es wieder mittschiffs laufen", centred.toFixed(3));
+      ok(Math.abs(centred) < 0.2, "and lets it run back amidships", centred.toFixed(3));
    } finally {
       await browser.close().catch(() => {});
       server.close();

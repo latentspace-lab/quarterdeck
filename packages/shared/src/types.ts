@@ -1,26 +1,26 @@
-// types.ts - das Protokoll zwischen Client und Server.
+// types.ts - the protocol between client and server.
 //
-// Phase 0 verschickt noch nichts. Die Typen stehen trotzdem jetzt schon fest,
-// weil sie die Schnittstelle definieren, gegen die der Rest der Phase 0
-// geschnitten wird: was hier drin steht, muss der Server besitzen und der
-// Client nachsimulieren koennen.
+// Phase 0 doesn't send anything over the wire yet. The types are already
+// fixed nonetheless, because they define the interface the rest of Phase 0
+// is cut against: whatever lives in here, the server must own and the
+// client must be able to resimulate.
 
 import type { Tack } from "./physics.ts";
 import type { Side } from "./damage.ts";
 import type { XYZ } from "./ballistics.ts";
 
 /**
- * Zustand eines Schiffs, wie ihn der Server je Tick veroeffentlicht.
+ * State of a ship, as published by the server each tick.
  *
- * Die Felder driveMul..wreckDrag sind keine Anzeigewerte: sie sind die
- * Eingaben, mit denen BoatDynamics.step() gerechnet hat. Der Client muss von
- * einem bestaetigten Snapshot aus NACH-simulieren, also gehoeren sie dazu.
+ * The fields driveMul..wreckDrag are not display values: they are the
+ * inputs BoatDynamics.step() computed with. The client must resimulate
+ * forward from a confirmed snapshot, so they belong here.
  */
 export interface ShipState {
    id: string;
    vesselId: string;
 
-   // --- Fahrzustand ---
+   // --- Sailing state ---
    x: number;
    z: number;
    heading: number;
@@ -36,7 +36,7 @@ export interface ShipState {
    isCapsized: boolean;
    alive: boolean;
 
-   // --- Schadenszustand ---
+   // --- Damage state ---
    hullIntegrity: number;
    mastsStanding: number;
    flooding: number;
@@ -65,7 +65,7 @@ export interface ShipState {
    mastMainState: number;
    mastMizzenState: number;
 
-   // --- Batterie ---
+   // --- Battery ---
    reloadPort: number;
    reloadStbd: number;
    /** seconds a full reload takes (crew-dependent) */
@@ -74,7 +74,7 @@ export interface ShipState {
    /** guns per side */
    guns: number;
 
-   // --- Server-seitige Eingaben in BoatDynamics.step() ---
+   // --- Server-side inputs to BoatDynamics.step() ---
    driveMul: number;
    rudderMul: number;
    dragMul: number;
@@ -83,7 +83,7 @@ export interface ShipState {
    stopped: boolean;
    wreckDrag: number;
 
-   /** Letztes vom Server angewandtes InputCommand (Bestaetigung der Vorhersage) */
+   /** Last InputCommand applied by the server (confirms the prediction) */
    lastSeq: number;
 
    // --- Race (regatta rooms; zero elsewhere) ---
@@ -100,29 +100,29 @@ export interface ShipState {
 }
 
 /**
- * Der Wasserzustand. Beides wird integriert und laesst sich nicht aus der
- * Tickzahl allein ausrechnen - deshalb gehoert es in den Snapshot.
+ * The water state. Both values are integrated and can't be computed from
+ * the tick count alone - which is why they belong in the snapshot.
  */
 export interface SeaSync {
-   /** nachlaufender Seegang (kn), server-integriert */
+   /** lagging sea state (kn), server-integrated */
    seaWind: number;
-   /** aufsummierte Wellenphase (s), server-integriert */
+   /** accumulated wave phase (s), server-integrated */
    phaseT: number;
 }
 
-/** Ein Eingabekommando des Clients fuer genau einen Tick. */
+/** One input command from the client, for exactly one tick. */
 export interface InputCommand {
    seq: number;
    /** -1..1 */
    rudder: number;
-   /** 0.25..1 (nur Rahsegler) */
+   /** 0.25..1 (square-riggers only) */
    sailSet?: number;
    fire?: Side | "BOTH";
    ammo?: string;
    cutWreck?: boolean;
 }
 
-/** Was einen Raum beim Betreten vollstaendig beschreibt. */
+/** Everything that fully describes a room when entering it. */
 export interface WorldParams {
    windBaseDir: number;
    windBaseSpeed: number;
@@ -132,7 +132,7 @@ export interface WorldParams {
    tickRate: number;
 }
 
-/** Vollstaendiger Snapshot eines Ticks. */
+/** Complete snapshot of one tick. */
 export interface WorldSnapshot {
    tick: number;
    sea: SeaSync;

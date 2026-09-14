@@ -1,27 +1,28 @@
-// tests/pending/factions.test.js - NOCH NICHT IMPLEMENTIERT
+// tests/pending/factions.test.js - NOT YET IMPLEMENTED
 //
-// Diese Faelle standen bis Phase 0 in tests/damage.test.js und haben dort
-// verhindert, dass `npm test` ueberhaupt startet: die Datei importierte
-// `forcesFor`, `shipsOfFaction` und `shipOfTier`, die es nirgends im Projekt
-// gibt. Der Import schlug fehl, also lief KEINER der 100+ uebrigen Faelle in
-// damage.test.js - auch die nicht, die laengst gruen gewesen waeren.
+// These cases lived in tests/damage.test.js until Phase 0 and, while there,
+// prevented `npm test` from even starting: the file imported `forcesFor`,
+// `shipsOfFaction` and `shipOfTier`, none of which exist anywhere in the
+// project. The import failed, so NONE of the 100+ other cases in
+// damage.test.js ran - not even the ones that would long since have been
+// green.
 //
-// Was fehlt, damit diese Datei laufen kann:
+// What is missing before this file can run:
 //
-//   1. vessels: die Felder `faction`, `tier` und `paint` an jedem Eintrag.
-//   2. vessels: sechs Schiffe, die factions.js bereits namentlich auffuehrt,
-//      aber die es im Katalog nicht gibt - descubierta, gamo, nepomuceno
-//      (Armada) sowie seeteufel, rache, schwarzekrone (Piraten).
-//      getVessel() faellt fuer sie stillschweigend auf die Yacht zurueck.
-//   3. vessels: shipsOfFaction(factionId) und shipOfTier(factionId, tier).
-//   4. fleet: forcesFor(scenarioId, vessel, enemyFaction) - Gegner passend
-//      zur Partei statt der fest verdrahteten SCENARIOS[].forces-Tabelle.
-//   5. damage: die Option `neverStrikes`, damit Piraten die Flagge nie
-//      streichen (factions.js kennt das Flag bereits).
+//   1. vessels: the fields `faction`, `tier` and `paint` on every entry.
+//   2. vessels: six ships that factions.js already names but which do not
+//      exist in the catalogue - descubierta, gamo, nepomuceno (Armada), and
+//      seeteufel, rache, schwarzekrone (pirates). getVessel() silently falls
+//      back to the yacht for them.
+//   3. vessels: shipsOfFaction(factionId) and shipOfTier(factionId, tier).
+//   4. fleet: forcesFor(scenarioId, vessel, enemyFaction) - opponents that
+//      fit the faction instead of the hardwired SCENARIOS[].forces table.
+//   5. damage: the `neverStrikes` option, so pirates never strike their
+//      colours (factions.js already knows the flag).
 //
-// Das ist ein Inhalts-Feature, kein Teil der Multiplayer-Umstellung, deshalb
-// liegt es hier und nicht in der Standard-Suite. `node tests/run.js --pending`
-// fuehrt es mit aus.
+// This is a content feature, not part of the multiplayer conversion, which
+// is why it lives here and not in the standard suite. `node tests/run.js
+// --pending` runs it as well.
 
 import * as THREE from "three";
 import { DamageModel, AMMO } from "../../packages/client/src/damage.js";
@@ -31,33 +32,33 @@ import { SCENARIOS, forcesFor } from "../../packages/client/src/fleet.js";
 
 import { createSuite } from "../lib/harness.js";
 
-const suite = createSuite("Parteien (offen)");
+const suite = createSuite("Factions (open)");
 const ok = suite.ok;
 
 ok(ENEMIES.length === 3 && ENEMIES.every((v) => v.faction === "fr"),
-   "drei franzoesische Schiffe im Katalog");
+   "three French ships in the catalogue");
 
-// ---- Parteien -------------------------------------------------------------
-console.log("\n== Parteien ==");
-ok(FACTIONS.length === 4, "vier Parteien", FACTIONS.map((f) => f.short).join(" "));
+// ---- Factions ---------------------------------------------------------
+console.log("\n== Factions ==");
+ok(FACTIONS.length === 4, "four factions", FACTIONS.map((f) => f.short).join(" "));
 for (const f of FACTIONS) {
    const list = shipsOfFaction(f.id);
-   ok(list.length >= 3, f.name + ": mindestens drei Schiffe", list.map((v) => v.name).join(", "));
-   // shipOfTier() braucht jede Groessenklasse besetzt. Mehrere Schiffe in
-   // derselben Klasse sind erlaubt - als Gegner zieht es davon das erste.
+   ok(list.length >= 3, f.name + ": at least three ships", list.map((v) => v.name).join(", "));
+   // shipOfTier() needs every size class filled. Several ships in the same
+   // class are allowed - as an opponent it picks the first of them.
    ok([1, 2, 3].every((t) => list.some((v) => v.tier === t)),
-      f.name + ": jede Groessenklasse besetzt", list.map((v) => v.tier).join());
+      f.name + ": every size class filled", list.map((v) => v.tier).join());
    ok(list.every((v) => v.guns && v.paint && v.rig === "square"),
-      f.name + ": alle bewaffnet, eigener Anstrich");
+      f.name + ": all armed, each with its own paint scheme");
 }
 ok(shipsOfFaction("yacht").length === 0 && getVessel("yacht").faction === null,
-   "die Yacht gehoert keiner Partei an");
-// Jede Partei hat einen Gegner, und nie sich selbst
+   "the yacht belongs to no faction");
+// Every faction has an enemy, and never itself
 for (const f of FACTIONS) {
    const e = enemyFactionFor(f.id);
-   ok(e && e.id !== f.id, f.name + " hat einen Gegner", e.name);
+   ok(e && e.id !== f.id, f.name + " has an enemy", e.name);
 }
-// Gefechtslagen funktionieren mit jeder Paarung
+// Battle scenarios work with every pairing
 let combos = 0, bad = 0;
 for (const f of FACTIONS) {
    for (const v of shipsOfFaction(f.id)) {
@@ -68,15 +69,16 @@ for (const f of FACTIONS) {
       }
    }
 }
-ok(bad === 0, "jede Kombination aus Partei, Schiff und Lage ergibt Gegner",
-   combos + " Kombinationen geprueft");
-ok(shipOfTier("es", 3).name === "San Juan Nepomuceno", "Groessenklasse 3 der Armada");
-// Die Indefatigable teilt sich die zweite Klasse mit der Lydia. Gegner bleibt
-// die Lydia - sonst haette ein fahrbares Schiff die Gegnerliste verschoben.
-ok(shipOfTier("gb", 2).name === "Lydia", "britischer Zweier bleibt die Lydia",
+ok(bad === 0, "every combination of faction, ship and scenario yields opponents",
+   combos + " combinations checked");
+ok(shipOfTier("es", 3).name === "San Juan Nepomuceno", "size class 3 of the Armada");
+// The Indefatigable shares the second class with the Lydia. The opponent
+// stays the Lydia - otherwise a playable ship would have shifted the
+// opponent list.
+ok(shipOfTier("gb", 2).name === "Lydia", "the British class-two ship stays the Lydia",
    shipOfTier("gb", 2).name);
 
-// Piraten streichen nie die Flagge
+// Pirates never strike their colours
 {
    const pir = shipsOfFaction("pirate")[1];
    const d = new DamageModel(pir, { isPlayer: false, neverStrikes: true });
@@ -85,14 +87,14 @@ ok(shipOfTier("gb", 2).name === "Lydia", "britischer Zweier bleibt die Lydia",
          ammo: AMMO.ball, lb: 24, range01: 0.1, freeboard: 4 });
    }
    d.update(0.1, {});
-   ok(d.beaten() && !d.struck, "ein geschlagener Pirat streicht trotzdem nicht");
+   ok(d.beaten() && !d.struck, "a beaten pirate still does not strike");
    const nav = new DamageModel(pir, { isPlayer: false });
    for (let i = 0; i < 200; i++) {
       nav.applyHit({ side: "STBD", s: 0.15 + Math.random() * 0.7, y: 2.6,
          ammo: AMMO.ball, lb: 24, range01: 0.1, freeboard: 4 });
    }
    nav.update(0.1, {});
-   ok(nav.struck, "ein Kriegsschiff derselben Bauart schon");
+   ok(nav.struck, "a warship of the same build does");
 }
 
 export default () => suite.done();
