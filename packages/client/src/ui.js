@@ -938,6 +938,17 @@ export class UI {
             <div class="mode-grid m4">${modeHtml}</div>
             ${mpHtml}
             ${scenarioHtml}
+            <div class="sec-label">Rendering Style</div>
+            <div class="mode-grid m2">
+               <button class="mode-btn style-btn${m.style !== "aquatint" ? " active" : ""}" data-style="plain">
+                  <div class="mb-title">Modern</div>
+                  <div class="mb-desc">Realistic colours, no post-processing</div>
+               </button>
+               <button class="mode-btn style-btn${m.style === "aquatint" ? " active" : ""}" data-style="aquatint">
+                  <div class="mb-title">Aquatint</div>
+                  <div class="mb-desc">Hand-coloured naval print of 1800</div>
+               </button>
+            </div>
             <div class="menu-controls">
                <label class="ctrl">
                   <span>Wind direction</span>
@@ -981,6 +992,14 @@ export class UI {
          b.onclick = () => {
             m.vesselId = b.dataset.vessel;
             m.onVesselChange(m.vesselId);
+            this.renderMenu(m);
+         };
+      });
+      // Rendering style toggle
+      this.menuEl.querySelectorAll(".style-btn").forEach((b) => {
+         b.onclick = () => {
+            m.style = b.dataset.style;
+            if (m.onStyleChange) m.onStyleChange(m.style);
             this.renderMenu(m);
          };
       });

@@ -363,6 +363,8 @@ export class Simulator {
             this.menuOpen = false;
             this.paused = false;
          },
+         style: this.style,
+         onStyleChange: (name) => this.setStyle(name),
          onHelp: () => this._showHelp(),
       });
    }
