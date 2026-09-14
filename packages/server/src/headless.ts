@@ -2,10 +2,10 @@
 //
 //   npm run server:headless
 //
-// A quick proof that @segel/shared and the server simulation run in plain
+// A quick proof that @quarterdeck/shared and the server simulation run in plain
 // Node and how fast: two ships, two minutes of game time, one number.
 
-import { SIM_HZ, makeRng } from "@segel/shared";
+import { SIM_HZ, makeRng } from "@quarterdeck/shared";
 import { Simulation, DEFAULT_PARAMS } from "./sim/Simulation.ts";
 
 export { Simulation, DEFAULT_PARAMS } from "./sim/Simulation.ts";

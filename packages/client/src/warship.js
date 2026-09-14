@@ -23,7 +23,7 @@ import {
    freeboardOf as sharedFreeboardOf,
    smooth, hbStation, kdStation, sheerStation, beamFactor, makeHullGeom,
    gunLayout, barrelLengthOf, rigTopOf, rigHalfWidthOf,
-} from "@segel/shared";
+} from "@quarterdeck/shared";
 
 import { palette } from "./style.js";
 
@@ -46,7 +46,7 @@ const C = VESSEL_COLORS;
 // Hull form
 // =========================================================================
 // The station profiles (hbStation, kdStation, sheerStation, beamFactor) and
-// the hull point function (makeHullGeom) live in @segel/shared/hull: the
+// the hull point function (makeHullGeom) live in @quarterdeck/shared/hull: the
 // server places gun ports and hit boxes on the same hull, so the maths has to
 // be one source. They are imported above.
 
@@ -490,7 +490,7 @@ function waveFlag(mesh, time, strength) {
    pos.needsUpdate = true;
 }
 
-// Freeboard to the top of the bulwark. The formula lives in @segel/shared
+// Freeboard to the top of the bulwark. The formula lives in @quarterdeck/shared
 // (pose.ts) because the server's swamp check needs the same number; this
 // wrapper keeps the vessel-taking signature the client code uses.
 export function freeboardOf(vessel) {

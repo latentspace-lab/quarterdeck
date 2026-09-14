@@ -14,7 +14,7 @@ import {
    type Rng,
    type Side,
    type TargetBox,
-} from "@segel/shared";
+} from "@quarterdeck/shared";
 import type { Matrix4 } from "three/src/math/Matrix4.js";
 import type { ServerShip } from "./ServerShip.ts";
 

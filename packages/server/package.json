@@ -1,5 +1,5 @@
 {
-  "name": "@segel/server",
+  "name": "@quarterdeck/server",
   "private": true,
   "version": "1.0.0",
   "type": "module",
@@ -15,7 +15,7 @@
     "@colyseus/core": "^0.18.13",
     "@colyseus/schema": "^5.0.31",
     "@colyseus/ws-transport": "^0.18.2",
-    "@segel/shared": "*",
+    "@quarterdeck/shared": "*",
     "colyseus": "^0.18.5"
   },
   "devDependencies": {

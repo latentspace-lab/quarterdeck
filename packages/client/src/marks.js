@@ -1,8 +1,8 @@
 // marks.js - the regatta course: buoys and lines in the scene, and the race
-// judged by the shared course tracker (@segel/shared/course), which is what
+// judged by the shared course tracker (@quarterdeck/shared/course), which is what
 // the server runs in a regatta room. Wind from the north: +Z is upwind.
 import * as THREE from "three";
-import { courseLayout, newRace, raceStep, SIM_DT } from "@segel/shared";
+import { courseLayout, newRace, raceStep, SIM_DT } from "@quarterdeck/shared";
 
 // ---------- Buoy (floater / committee) ----------
 export function makeBuoy(color, type = "float") {

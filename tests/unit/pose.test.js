@@ -3,7 +3,7 @@
 // This math helps decide whether a shot goes below the waterline, into the
 // hull, or into the rig. If the server computed a different pose than the
 // client, the same shot would get two different results.
-import { shipPose, railClearance, lerpPose, lerpVec, shortestAngle, getVessel, DEG, seaHeight } from "@segel/shared";
+import { shipPose, railClearance, lerpPose, lerpVec, shortestAngle, getVessel, DEG, seaHeight } from "@quarterdeck/shared";
 import { createSuite } from "../lib/harness.js";
 
 const suite = createSuite("pose");
@@ -154,4 +154,4 @@ suite.section("Purity");
 
 export default () => suite.done();
 
-if (!process.env.SEGEL_TEST_RUNNER) suite.done();
+if (!process.env.QUARTERDECK_TEST_RUNNER) suite.done();

@@ -8,7 +8,7 @@
 // moment. This is the standard technique of networked games: never
 // extrapolate, never jump, pay a fixed small latency for it.
 
-import { shortestAngle } from "@segel/shared";
+import { shortestAngle } from "@quarterdeck/shared";
 
 /** Fields that are angles in degrees and must wrap the short way. */
 const ANGLE_FIELDS = new Set(["heading", "twa"]);

@@ -10,7 +10,7 @@
 import * as THREE from "three";
 import { DamageModel, AMMO } from "../../packages/client/src/damage.js";
 import { getVessel } from "../../packages/client/src/vessels.js";
-import { makeRng } from "@segel/shared";
+import { makeRng } from "@quarterdeck/shared";
 import { Ship } from "../../packages/client/src/ship.js";
 import { DebrisField } from "../../packages/client/src/debris.js";
 import { Captain } from "../../packages/client/src/fleet.js";
@@ -88,4 +88,4 @@ suite.section("2) Do the captains close to fighting range?");
 
 export default () => suite.done();
 
-if (!process.env.SEGEL_TEST_RUNNER) suite.done();
+if (!process.env.QUARTERDECK_TEST_RUNNER) suite.done();

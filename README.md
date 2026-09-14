@@ -1,6 +1,6 @@
-# ⛵ Sailing Simulator 3D — Browser-based
+# ⛵ Quarterdeck — Browser-based
 
-A playable **3D sailing simulator** in the browser, built with **Vite + Three.js**.
+**Quarterdeck** is a playable 3D sailing simulator in the browser, built with **Vite + Three.js**.
 Pure 3D visuals (water shader, waves, sky, sun, clouds, ship with masts & sails)
 and **semi-realistic sailing physics**: apparent wind, points of sail (TWA/point-of-sail),
 polar curve, VMG, yaw (heel), capsize, luffing — plus **three game modes**.
@@ -38,7 +38,7 @@ npm test          # all test levels
 
 ```bash
 npm run server   # terminal 1: game server on ws://0.0.0.0:2567
-npm run dev      # terminal 2: client on http://localhost:5173/sailing/
+npm run dev      # terminal 2: client on http://localhost:5173/quarterdeck/
 ```
 
 In the menu choose **Multiplayer**: the open rooms on the server are listed
@@ -48,7 +48,7 @@ and the AI enemies from the scenario cards. **Regatta** rooms race the
 windward-leeward course: the server judges the line, the marks and the laps
 for every boat. **Practice** creates a private one-seat room against the AI
 on the server. Deep link:
-`http://localhost:5173/sailing/?mp=1&server=ws://localhost:2567&vessel=lydia&name=Hornblower&enemies=amelie&roomName=Trafalgar`
+`http://localhost:5173/quarterdeck/?mp=1&server=ws://localhost:2567&vessel=lydia&name=Hornblower&enemies=amelie&roomName=Trafalgar`
 (`&mode=practice` for a practice room, `&room=<id>` to join a specific one).
 
 What is shared: ships, wind, sea, damage, masts, collisions, grounding and
@@ -448,7 +448,7 @@ worn / critical. All colours are CSS tokens on `:root`; the
 The **plain** style is the unprocessed modern rendering, useful for
 comparison and as a fallback on weak GPUs. Switch with the **P** key, with
 `?style=plain` (or `?style=aquatint`) in the address, or by the stored
-preference (`localStorage["segel.style"]`, written whenever you press P).
+preference (`localStorage["quarterdeck.style"]`, written whenever you press P).
 In the plain style the frame goes straight to the canvas, so it renders
 exactly as before the aquatint work.
 
@@ -462,9 +462,9 @@ strict: `shared/` holds pure logic with no DOM and no renderer, `client/`
 holds everything visible.
 
 ```
-segel-simulator/
+quarterdeck/
 ├─ packages/
-│  ├─ shared/            # @segel/shared — pure logic (TypeScript, no Three.js renderer)
+│  ├─ shared/            # @quarterdeck/shared — pure logic (TypeScript, no Three.js renderer)
 │  │  └─ src/
 │  │     ├─ utils.ts         # angles, interpolation, approach() (dt-invariant smoothing)
 │  │     ├─ rng.ts           # mulberry32, derived streams, gauss()
@@ -482,7 +482,7 @@ segel-simulator/
 │  │     ├─ vessels.ts       # ship catalogue: mass, polar curves, dynamics, batteries
 │  │     └─ factions.ts      # factions: doctrine, training level, flag
 │  │
-│  ├─ server/            # @segel/server — the game server (Colyseus 0.18)
+│  ├─ server/            # @quarterdeck/server — the game server (Colyseus 0.18)
 │  │  ├─ src/index.ts        # startServer(): HTTP + WebSocket transport, room registry
 │  │  ├─ src/rooms/BattleRoom.ts  # clients -> ships, messages -> inputs, tick -> patches
 │  │  ├─ src/state/GameState.ts   # synchronised schema: ships, wind, sea, tick
@@ -492,16 +492,16 @@ segel-simulator/
 │  │  ├─ src/sim/Captain.ts       # AI captain (port of the client's fleet.js)
 │  │  └─ src/headless.ts          # CLI: run a simulation headless and print timings
 │  │
-│  └─ client/            # @segel/client — browser: Three.js, input, HUD
+│  └─ client/            # @quarterdeck/client — browser: Three.js, input, HUD
 │     ├─ index.html
 │     ├─ vite.config.js
 │     └─ src/
 │        ├─ main.js          # game loop: fixed simulation, free-running rendering
 │        ├─ game.js          # stepFixed() (simulation) + render(alpha) (frame)
 │        ├─ ship.js          # ship as a unit: model + motion + damage + battery
-│        ├─ guns.js          # broadside RENDERING (ballistics live in @segel/shared)
-│        ├─ ocean.js         # wave mesh and shader (math lives in @segel/shared)
-│        ├─ terrain.js       # terrain mesh and surf (sea chart lives in @segel/shared)
+│        ├─ guns.js          # broadside RENDERING (ballistics live in @quarterdeck/shared)
+│        ├─ ocean.js         # wave mesh and shader (math lives in @quarterdeck/shared)
+│        ├─ terrain.js       # terrain mesh and surf (sea chart lives in @quarterdeck/shared)
 │        ├─ scene.js         # scene: sky, sun, lights, clouds
 │        ├─ boat.js          # 3D yacht: lofted hull, rig, wind-driven sails
 │        ├─ warship.js       # 3D square-rigger: hull with gunports, masts, square sails
@@ -516,7 +516,7 @@ segel-simulator/
 │        ├─ ui.js            # 2D HUD + 2D compass + menu + training panel
 │        ├─ audio.js         # voice announcements per nation
 │        ├─ styles.css       # look and feel
-│        └─ physics.js …     # re-exports from @segel/shared (legacy import paths)
+│        └─ physics.js …     # re-exports from @quarterdeck/shared (legacy import paths)
 └─ tests/                # see below
 ```
 

@@ -8,7 +8,7 @@
 // browser.
 import { Simulation, ServerShip, DEFAULT_PARAMS } from "../../packages/server/src/headless.ts";
 import { wreckLoadFor } from "../../packages/server/src/sim/ServerShip.ts";
-import { SIM_HZ, SIM_DT, SeaState, getVessel } from "@segel/shared";
+import { SIM_HZ, SIM_DT, SeaState, getVessel } from "@quarterdeck/shared";
 import { createSuite, fingerprint } from "../lib/harness.js";
 
 const suite = createSuite("Headless simulation");
@@ -248,4 +248,4 @@ suite.section("Speed");
 
 export default () => suite.done();
 
-if (!process.env.SEGEL_TEST_RUNNER) suite.done();
+if (!process.env.QUARTERDECK_TEST_RUNNER) suite.done();

@@ -5,7 +5,7 @@ import {
    rangeForElevation, elevationForRange, segmentBox, spawnSalvo,
    dischargeShots, stepProjectile, checkProjectileHits, rangeToTarget,
    makeRng, AMMO, SIM_DT, getVessel,
-} from "@segel/shared";
+} from "@quarterdeck/shared";
 import { createSuite, fingerprint } from "../lib/harness.js";
 
 const suite = createSuite("ballistics");
@@ -235,4 +235,4 @@ suite.section("rangeToTarget(): what stands in the broadside");
 
 export default () => suite.done();
 
-if (!process.env.SEGEL_TEST_RUNNER) suite.done();
+if (!process.env.QUARTERDECK_TEST_RUNNER) suite.done();

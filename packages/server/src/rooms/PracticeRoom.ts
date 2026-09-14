@@ -7,7 +7,7 @@
 // online.
 
 import { BattleRoom } from "./BattleRoom.ts";
-import type { RoomCreateOptions } from "@segel/shared";
+import type { RoomCreateOptions } from "@quarterdeck/shared";
 
 export class PracticeRoom extends BattleRoom {
    maxClients = 1;

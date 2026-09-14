@@ -37,7 +37,7 @@ import {
    type SwampState,
    type TargetBox,
    type ProjectileHit,
-} from "@segel/shared";
+} from "@quarterdeck/shared";
 import { ServerBattery } from "./ServerBattery.ts";
 
 export interface ServerShipOptions {
