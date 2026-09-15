@@ -68,6 +68,7 @@ function frame(now) {
 
    const steps = acc.advance(now);
    try {
+      if (steps === 0) console.debug("[quarterdeck] no steps this frame, acc.acc=", acc.acc, "elapsed=", (now - acc.last) / 1000);
       for (let i = 0; i < steps; i++) sim.stepFixed(SIM_DT);
       sim.render(acc.alpha, SIM_DT * Math.max(steps, 1));
       if (errShown && splashLoading) {
