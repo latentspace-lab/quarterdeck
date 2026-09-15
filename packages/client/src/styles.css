@@ -39,16 +39,17 @@
    --bg: #c3d0cc;
    --paper: #ece3cc;
    --paper-2: #e1d6b6;
-   /* the pane: a light, mostly transparent glass, the paper tint only a hint */
-   --paper-glass: rgba(244, 240, 226, 0.2);
+   /* the pane: a light, mostly transparent glass, the paper tint only a hint.
+    * Opacity raised from 0.2 → 0.42 so the 3D scene does not wash out text. */
+   --paper-glass: rgba(244, 240, 226, 0.42);
    --paper-solid: rgba(236, 226, 200, 0.96);
-   --paper-deep: rgba(225, 214, 182, 0.55);
+   --paper-deep: rgba(225, 214, 182, 0.7);
    --ink: #2a231c;
-   --ink-2: rgba(42, 35, 28, 0.74);
-   --ink-3: rgba(42, 35, 28, 0.5);
-   --rule: rgba(42, 35, 28, 0.55);
-   --rule-2: rgba(42, 35, 28, 0.26);
-   --track: rgba(42, 35, 28, 0.14);
+   --ink-2: rgba(42, 35, 28, 0.88);
+   --ink-3: rgba(42, 35, 28, 0.68);
+   --rule: rgba(42, 35, 28, 0.65);
+   --rule-2: rgba(42, 35, 28, 0.4);
+   --track: rgba(42, 35, 28, 0.22);
    --text: var(--ink);
    --text-2: var(--ink-2);
    --text-big: var(--ink);
@@ -58,21 +59,21 @@
    --warn: #b8862b;
    --bad: #8a2f24;
    --accent: #3a5468;
-   --gold: #7a5a1e;
+   --gold: #6b4a12;
    --t-mode: var(--ink);
    --t-panel: var(--ink);
    --t-gun: var(--gold);
    --t-foe: var(--bad);
    --t-train: var(--gold);
    --name: var(--gold);
-   --label: var(--ink-3);
+   --label: rgba(42, 35, 28, 0.7);
    --pos-luff: var(--bad); --pos-nogo: #b8602b; --pos-close: var(--warn);
    --pos-reach: var(--ok); --pos-broad: var(--accent); --pos-run: #2f4358;
    --fill-ok: var(--ok); --fill-warn: var(--warn); --fill-bad: var(--bad);
-   --fill-loading: rgba(58, 84, 104, 0.55); --fill-ready: var(--warn); --fill-out: rgba(138, 47, 36, 0.55);
+   --fill-loading: rgba(58, 84, 104, 0.7); --fill-ready: var(--warn); --fill-out: rgba(138, 47, 36, 0.7);
    --fill-foe: var(--bad);
-   --plan-line: rgba(42, 35, 28, 0.7);
-   --plan-line-2: rgba(42, 35, 28, 0.35);
+   --plan-line: rgba(42, 35, 28, 0.8);
+   --plan-line-2: rgba(42, 35, 28, 0.5);
    --plan-gone: #3b2f28;
 
    /* surfaces */
@@ -221,7 +222,7 @@ html, body {
 .panel.bl { bottom: 16px; left: 12px; min-width: 150px; text-align: left; }
 .panel.bc { bottom: 16px; left: 50%; transform: translateX(-50%); text-align: center; min-width: 280px; }
 
-small, .small { font-size: 11px; opacity: 0.85; }
+small, .small { font-size: 11px; opacity: 0.92; }
 
 /* Panel titles: small capitals with letter-spacing, the way a chart or a
  * ship's log heads its columns. */
@@ -250,7 +251,7 @@ small, .small { font-size: 11px; opacity: 0.85; }
 .wind-title { color: var(--t-panel); font-size: 12px; }
 .wind-dir { font-size: 22px; font-weight: var(--wb); margin: 2px 0; }
 .wind-speed { font-size: 16px; }
-.awa { font-size: 11px; opacity: 0.85; margin-top: 2px; }
+.awa { font-size: 11px; opacity: 0.92; margin-top: 2px; }
 
 .pos {
    font-size: 16px; font-weight: var(--wb); margin: 2px 0;
@@ -281,7 +282,7 @@ small, .small { font-size: 11px; opacity: 0.85; }
 }
 :root:not([data-style="plain"]) .rudder-ind { box-shadow: none; }
 
-.hint { font-size: 10px; opacity: 0.65; }
+.hint { font-size: 10px; opacity: 0.8; }
 .readbig.luff, .readbig.luff span { color: var(--bad) !important; text-shadow: 0 0 10px var(--bad); }
 :root:not([data-style="plain"]) .readbig.luff, :root:not([data-style="plain"]) .readbig.luff span { text-shadow: none; }
 
@@ -306,7 +307,7 @@ button.cmd.ready { border-color: var(--btn-on-border); color: var(--btn-on-fg); 
 button.cmd.on { background: var(--btn-on-bg); color: var(--btn-on-fg); border-color: var(--btn-on-border); }
 .cmd kbd { font: inherit; font-size: 9px; opacity: 0.55; border: 1px solid var(--rule);
    border-radius: 3px; padding: 0 4px; }
-.cmd-state { font-size: 10px; opacity: 0.7; margin-left: auto; }
+.cmd-state { font-size: 10px; opacity: 0.85; margin-left: auto; }
 
 .msgwrap {
    position: absolute; top: 22%; left: 50%;
@@ -405,7 +406,7 @@ button.cmd.on { background: var(--btn-on-bg); color: var(--btn-on-fg); border-co
    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
    background-clip: text;
 }
-.subm { color: var(--text-2); opacity: 0.85; font-size: 12px; margin: 0 0 16px; }
+.subm { color: var(--text-2); opacity: 0.92; font-size: 12px; margin: 0 0 16px; }
 :root:not([data-style="plain"]) .subm { font-style: italic; font-size: 13px; }
 
 .mode-grid {
@@ -431,7 +432,7 @@ button.cmd.on { background: var(--btn-on-bg); color: var(--btn-on-fg); border-co
    border-color: var(--accent); box-shadow: 0 0 0 2px var(--btn-active) inset; }
 .mb-title { font-size: 16px; font-weight: var(--wb); color: var(--accent); margin-bottom: 4px; }
 :root:not([data-style="plain"]) .mb-title { font-family: var(--font-sc); text-transform: lowercase; font-variant-caps: small-caps; letter-spacing: 0.06em; color: var(--ink); }
-.mb-desc { font-size: 12px; opacity: 0.85; }
+.mb-desc { font-size: 12px; opacity: 0.92; }
 
 .menu-controls {
    display: grid; grid-template-columns: 1fr 1fr; gap: 10px 20px;
@@ -452,7 +453,7 @@ button.cmd.on { background: var(--btn-on-bg); color: var(--btn-on-fg); border-co
 .room-name { font-weight: var(--wb); }
 .room-kind { font-weight: 400; font-size: 11px; opacity: 0.7; margin-left: 6px; padding: 1px 6px; border-radius: var(--r); border: 1px solid var(--rule-2); }
 .mode-grid.m3 { grid-template-columns: repeat(3, 1fr); }
-.room-info { opacity: 0.75; font-size: 12px; }
+.room-info { opacity: 0.85; font-size: 12px; }
 .room-join { padding: 5px 12px; border-radius: var(--r); border: 0; background: var(--primary-bg); color: var(--primary-fg); font: inherit; font-weight: var(--wb); cursor: pointer; }
 :root[data-style="plain"] .room-join { background: #3da3ff; color: #061019; border-radius: 8px; }
 .room-join:disabled { cursor: default; opacity: 0.5; }
@@ -560,7 +561,7 @@ button.help-close {
 }
 .gun-fill.is-ready { background: var(--fill-ready); }
 .gun-fill.is-out { background: var(--fill-out); }
-.gun-state { width: 62px; text-align: right; font-weight: var(--wb); color: var(--text-2); opacity: 0.7; }
+.gun-state { width: 62px; text-align: right; font-weight: var(--wb); color: var(--text-2); opacity: 0.85; }
 .gun-state.is-ready { color: var(--btn-on-fg); opacity: 1; }
 .gun-state.is-out { color: var(--bad); opacity: 1; }
 :root[data-style="plain"] .gun-state { color: rgba(210, 230, 250, 0.6); opacity: 1; }
@@ -608,12 +609,12 @@ button.help-close {
 .sb-head { display: flex; align-items: baseline; justify-content: space-between; gap: 6px; }
 .sb-name { font-size: 14px; font-weight: var(--wb); color: var(--name); }
 :root:not([data-style="plain"]) .sb-name { font-style: italic; font-size: 15px; }
-.sb-era { font-size: 10px; opacity: 0.55; }
+.sb-era { font-size: 10px; opacity: 0.75; }
 .sb-rate { font-size: 11px; color: var(--accent); margin: 1px 0 5px; }
-.sb-desc { font-size: 10px; line-height: 1.3; opacity: 0.78; min-height: 39px; }
+.sb-desc { font-size: 10px; line-height: 1.3; opacity: 0.88; min-height: 39px; }
 .sb-stats {
    display: flex; gap: 8px; flex-wrap: wrap;
-   font-size: 10px; opacity: 0.65; margin-top: 6px;
+   font-size: 10px; opacity: 0.8; margin-top: 6px;
 }
 .sb-foot { font-size: 10px; margin-top: 4px; color: var(--t-gun); opacity: 0.9; }
 
@@ -625,7 +626,7 @@ button.help-close {
 .dmg-title { font-size: 11px; color: var(--t-panel); margin-bottom: 6px; }
 .dmg-row { display: flex; align-items: center; gap: 7px; margin: 3px 0; font-size: 10px; }
 .dl { width: 54px; color: var(--text-2); }
-.dv { width: 34px; text-align: right; opacity: 0.8; }
+.dv { width: 34px; text-align: right; opacity: 0.9; }
 .dmg-track { position: relative; flex: 1; height: 6px; background: var(--track);
    border-radius: 3px; overflow: hidden; }
 .dmg-fill { position: absolute; left: 0; top: 0; height: 100%; width: 100%;
@@ -663,7 +664,7 @@ button.help-close {
    font-weight: var(--wb); color: var(--name); gap: 6px; }
 :root:not([data-style="plain"]) .foe-name { font-style: italic; }
 .foe-dist { font-weight: 400; color: var(--text-2); font-size: 11px; font-style: normal; }
-.foe-sub { font-size: 9.5px; opacity: 0.65; }
+.foe-sub { font-size: 9.5px; opacity: 0.8; }
 .foe-bar { height: 5px; background: var(--track); border-radius: 3px;
    overflow: hidden; margin: 3px 0; }
 .foe-fill { height: 100%; background: var(--fill-foe); border-radius: 3px;
@@ -686,7 +687,7 @@ button.help-close {
 .sc-btn.off { opacity: 0.45; }
 .sc-title { font-size: 13px; font-weight: var(--wb); color: var(--t-foe); }
 :root:not([data-style="plain"]) .sc-title { font-family: var(--font-sc); text-transform: lowercase; font-variant-caps: small-caps; letter-spacing: 0.05em; }
-.sc-desc { font-size: 10px; opacity: 0.75; line-height: 1.3; margin: 3px 0; min-height: 26px; }
+.sc-desc { font-size: 10px; opacity: 0.85; line-height: 1.3; margin: 3px 0; min-height: 26px; }
 .sc-force { font-size: 10px; color: var(--name); }
 .sc-hint { font-size: 11px; color: var(--t-foe); margin: -10px 0 16px; }
 :root:not([data-style="plain"]) .sc-hint { font-style: italic; }
@@ -699,7 +700,7 @@ button.help-close {
    font-family: var(--font); text-transform: none; font-variant-caps: normal; }
 .crew-row { display: flex; align-items: center; gap: 7px; margin: 3px 0; font-size: 10px; }
 .cl { width: 76px; color: var(--text-2); }
-.cv { width: 26px; text-align: right; opacity: 0.8; }
+.cv { width: 26px; text-align: right; opacity: 0.9; }
 .crew-track { position: relative; flex: 1; height: 5px; background: var(--track);
    border-radius: 3px; overflow: hidden; }
 .crew-fill { position: absolute; left: 0; top: 0; height: 100%; border-radius: 3px;
@@ -759,14 +760,14 @@ button.help-close {
 :root:not([data-style="plain"]) .rt,
 :root:not([data-style="plain"]) .hint,
 :root:not([data-style="plain"]) .cmd-state,
-:root:not([data-style="plain"]) .sb-era { font-size: 11.5px; }
+:root:not([data-style="plain"]) .sb-era { font-size: 12px; }
 :root:not([data-style="plain"]) .cmd-label,
 :root:not([data-style="plain"]) .cmd kbd,
 :root:not([data-style="plain"]) .ammo,
 :root:not([data-style="plain"]) .ammo-key,
 :root:not([data-style="plain"]) .mast,
 :root:not([data-style="plain"]) .mast b,
-:root:not([data-style="plain"]) .plan-x { font-size: 10.5px; }
+:root:not([data-style="plain"]) .plan-x { font-size: 11px; }
 :root:not([data-style="plain"]) button.cmd { font-size: 12.5px; }
 :root:not([data-style="plain"]) .gun-row,
 :root:not([data-style="plain"]) .dmg-row,
@@ -779,7 +780,7 @@ button.help-close {
 :root:not([data-style="plain"]) .sc-desc,
 :root:not([data-style="plain"]) .sc-force,
 :root:not([data-style="plain"]) .foe-sub,
-:root:not([data-style="plain"]) .mode-grid.m4 .mb-desc { font-size: 11.5px; }
+:root:not([data-style="plain"]) .mode-grid.m4 .mb-desc { font-size: 12px; }
 :root:not([data-style="plain"]) .sb-rate,
 :root:not([data-style="plain"]) .sc-hint,
 :root:not([data-style="plain"]) .room-kind,
