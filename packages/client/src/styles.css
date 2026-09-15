@@ -106,6 +106,39 @@
    --compass-vignette: none;
 }
 
+/* Splash screen — shown on load, fades out when the 3D engine is ready */
+#splash {
+   position: fixed;
+   inset: 0;
+   z-index: 50;
+   display: flex;
+   flex-direction: column;
+   align-items: center;
+   justify-content: center;
+   background: #1a1a1a;
+   transition: opacity 0.8s ease;
+   cursor: pointer;
+}
+#splash.hidden { opacity: 0; pointer-events: none; }
+#splash img {
+   width: 100%;
+   height: 100%;
+   object-fit: cover;
+   opacity: 0.95;
+}
+#splash .splash-loading {
+   position: absolute;
+   bottom: 5%;
+   left: 50%;
+   transform: translateX(-50%);
+   color: #e8d9b0;
+   font-family: var(--font);
+   font-size: 14px;
+   letter-spacing: 0.1em;
+   text-shadow: 0 2px 8px rgba(0,0,0,0.8);
+   white-space: nowrap;
+}
+
 /* The modern glass look, value for value what the HUD had before. */
 :root[data-style="plain"] {
    --font: "Segoe UI", system-ui, sans-serif;
