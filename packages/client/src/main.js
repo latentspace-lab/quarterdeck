@@ -2,19 +2,16 @@
 import { Simulator } from "./game.js";
 import { Accumulator, SIM_DT } from "@quarterdeck/shared";
 
-// Start overlay (stays visible until the renderer is running)
-const boot = document.createElement("div");
-// Colours and font come from the stylesheet tokens so the overlay follows the
-// rendering style (styles.css).
-boot.style.cssText =
-    "position:fixed;left:50%;bottom:14px;transform:translateX(-50%);color:var(--text);font-family:var(--font);font-size:13px;opacity:.9;z-index:30;pointer-events:none;text-align:center;background:var(--paper-solid);border:1px solid var(--rule);padding:6px 14px;border-radius:var(--r-pill)";
-boot.textContent = "Quarterdeck — initializing…";
-document.body.appendChild(boot);
+// Splash screen element (declared in index.html, fades out when the
+// renderer is up). Replaces the old inline boot text.
+const splash = document.getElementById("splash");
+const splashLoading = splash ? splash.querySelector(".splash-loading") : null;
 
 function showError(msg) {
-   boot.textContent = "Error: " + msg;
-   boot.style.color = "var(--bad)";
-   boot.style.opacity = "1";
+   if (splashLoading) {
+      splashLoading.textContent = "Error: " + msg;
+      splashLoading.style.color = "var(--bad)";
+   }
    console.error("[quarterdeck] initialization error:", msg);
 }
 
@@ -22,16 +19,27 @@ let sim = null;
 try {
    sim = new Simulator();
    window.__sim = sim;
-   // fade out the boot text after a short delay
+   // Fade out the splash screen once the renderer is running
    setTimeout(() => {
-      boot.style.opacity = "0";
-      setTimeout(() => boot.remove(), 600);
+      if (splash) {
+         splash.classList.add("hidden");
+         setTimeout(() => splash.remove(), 800);
+      }
    }, 1200);
+
+   // Allow click/tap to dismiss the splash early
+   if (splash) {
+      splash.addEventListener("click", () => {
+         splash.classList.add("hidden");
+         setTimeout(() => splash.remove(), 800);
+      });
+   }
 } catch (err) {
    showError(err && err.message ? err.message : String(err));
+   if (splash) splash.style.cursor = "default";
    const hint = document.createElement("div");
    hint.style.cssText =
-       "position:fixed;left:50%;top:18%;transform:translateX(-50%);color:var(--text);font-family:var(--font);text-align:center;z-index:30;max-width:560px;line-height:1.5";
+       "position:fixed;left:50%;top:18%;transform:translateX(-50%);color:#e8d9b0;font-family:var(--font);text-align:center;z-index:60;max-width:560px;line-height:1.5;text-shadow:0 2px 8px rgba(0,0,0,0.8)";
    hint.innerHTML =
        "The 3D renderer could not be started.<br>" +
        "Possible causes: WebGL disabled in the browser, old/insecure TLS, or the server isn't running.<br>" +
@@ -55,27 +63,26 @@ const acc = new Accumulator(SIM_DT);
 let errShown = false;
 
 function frame(now) {
-   requestAnimationFrame(frame);
    if (!sim) return;
+   requestAnimationFrame(frame);
 
    const steps = acc.advance(now);
    try {
       for (let i = 0; i < steps; i++) sim.stepFixed(SIM_DT);
       sim.render(acc.alpha, SIM_DT * Math.max(steps, 1));
-      if (errShown) {
+      if (errShown && splashLoading) {
          errShown = false;
-         boot.style.color = "var(--text)";
-         boot.textContent = "Quarterdeck";
+         splashLoading.style.color = "";
+         splashLoading.textContent = "Quarterdeck";
       }
    } catch (err) {
       console.error("[quarterdeck] frame error:", err);
       sim.renderOnly(); // show a frame anyway
       acc.reset(now);   // after an error, don't make up for the lost time
-      if (!errShown) {
+      if (!errShown && splashLoading) {
          errShown = true;
-         boot.style.opacity = "1";
-         boot.style.color = "var(--bad)";
-         boot.textContent = "Error: " + (err && err.message ? err.message : String(err));
+         splashLoading.textContent = "Error: " + (err && err.message ? err.message : String(err));
+         splashLoading.style.color = "var(--bad)";
       }
    }
 }
