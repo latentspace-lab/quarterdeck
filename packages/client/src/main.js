@@ -63,8 +63,8 @@ const acc = new Accumulator(SIM_DT);
 let errShown = false;
 
 function frame(now) {
-   requestAnimationFrame(frame);
    if (!sim) return;
+   requestAnimationFrame(frame);
 
    const steps = acc.advance(now);
    try {
