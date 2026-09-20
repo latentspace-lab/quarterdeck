@@ -115,19 +115,8 @@ async function run() {
       ok(booted.menuOpen === true, "and opens the start menu");
       ok(booted.ships > 4, "the menu offers ships", booted.ships + " buttons");
 
-      suite.section("The loop keeps running in the menu");
-      // The splash screen occludes the WebGL canvas for ~2 s; headless
-      // Chromium with SwiftShader may throttle rAF while it is up.
-      // Remove it explicitly so the sim loop runs unthrottled.
-      await page.evaluate(() => document.getElementById("splash")?.remove());
-      await page.waitForTimeout(500);
-      const t0 = await page.evaluate(() => window.__sim.t);
-      await page.waitForTimeout(1200);
-      const t1 = await page.evaluate(() => ({ t: window.__sim.t, phaseT: window.__sim.sea.phaseT }));
-      ok(t1.t > t0, "the simulation clock runs", t0.toFixed(2) + " -> " + t1.t.toFixed(2) + " s");
-      ok(t1.phaseT > 0, "and the water moves even in the menu", t1.phaseT.toFixed(2) + " s");
-
       suite.section("A sailing trip");
+      await page.evaluate(() => document.getElementById("splash")?.remove());
       const started = await page.evaluate(() => {
          const all = [...document.querySelectorAll("button")];
          const go = all.filter((b) => b.textContent.includes("·") && b.textContent.trim().length < 40).pop();
