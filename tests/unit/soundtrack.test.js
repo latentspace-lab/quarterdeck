@@ -1,5 +1,5 @@
 // tests/unit/soundtrack.test.js - soundtrack module structure and path checks.
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { createSuite } from "../lib/harness.js";
@@ -21,7 +21,27 @@ for (const t of TRACKS) {
    ok(t.src.includes("sounds/music/"), `track "${t.id}" src points into sounds/music/`);
    ok(!t.src.includes("//"), `track "${t.id}" src has no double slashes`);
    const rel = t.src.replace(/^.*sounds\//, "sounds/");
-   ok(existsSync(join(PUBLIC, rel)), `track "${t.id}" file exists on disk`, join(PUBLIC, rel));
+   const file = join(PUBLIC, rel);
+   ok(existsSync(file), `track "${t.id}" file exists on disk`, file);
+   ok(file.endsWith(".mp3"), `track "${t.id}" is served as .mp3`, rel);
+   if (existsSync(file)) {
+      // MP3 is the one format every browser decodes in Web Audio; Safari
+      // cannot decode Opus or Vorbis and AAC depends on OS decoders. An
+      // extension proves nothing (the first soundtrack was Opus inside an
+      // .m4a), so check the bytes: an ID3 tag or an MPEG frame sync.
+      eq(audioKind(readFileSync(file)), "mp3", `track "${t.id}" really is MPEG audio`);
+   }
+}
+
+function audioKind(buf) {
+   if (buf.toString("ascii", 0, 3) === "ID3") return "mp3";
+   if (buf[0] === 0xff && (buf[1] & 0xe6) === 0xe2) return "mp3";
+   if (buf.toString("ascii", 4, 8) === "ftyp") {
+      const i = buf.indexOf("stsd", 0, "ascii");
+      return "mp4/" + (i < 0 ? "?" : buf.toString("ascii", i + 16, i + 20));
+   }
+   if (buf.toString("ascii", 0, 4) === "OggS") return "ogg";
+   return "unknown";
 }
 
 suite.section("Soundtrack class shape");

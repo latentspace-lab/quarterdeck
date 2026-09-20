@@ -3,9 +3,18 @@ import { clamp } from "./utils.js";
 
 const BASE = (typeof import.meta !== "undefined" && import.meta.env && import.meta.env.BASE_URL) || "/";
 
+// MP3 only: it is the one format every browser decodes in Web Audio. Safari
+// cannot decode Opus or Vorbis here, and AAC depends on OS decoders.
 const TRACKS = [
-   { id: "the-royal-navy", src: BASE + "sounds/music/the-royal-navy.m4a", title: "The Royal Navy" },
+   { id: "the-royal-navy", src: BASE + "sounds/music/the-royal-navy.mp3", title: "The Royal Navy" },
 ];
+
+const warn = (msg, err) => console.warn("[soundtrack] " + msg, err !== undefined ? err : "");
+
+export function trackTitle(id) {
+   const t = TRACKS.find((x) => x.id === id);
+   return t ? t.title : id;
+}
 
 export class Soundtrack {
    constructor() {
@@ -25,13 +34,13 @@ export class Soundtrack {
       if (!this.enabled) return null;
       if (this._ctx) return this._ctx;
       const AC = typeof window !== "undefined" && (window.AudioContext || window.webkitAudioContext);
-      if (!AC) { this.enabled = false; return null; }
+      if (!AC) { warn("no AudioContext in this browser"); this.enabled = false; return null; }
       try {
          this._ctx = new AC();
          this._gain = this._ctx.createGain();
          this._gain.gain.value = this.volume;
          this._gain.connect(this._ctx.destination);
-      } catch { this.enabled = false; return null; }
+      } catch (e) { warn("AudioContext could not be created", e); this.enabled = false; return null; }
       return this._ctx;
    }
 
@@ -40,14 +49,30 @@ export class Soundtrack {
       return this._loading;
    }
 
+   // Must run synchronously inside a user-gesture handler. Safari only
+   // unlocks an AudioContext that is created or resumed within the gesture
+   // itself, and starting a silent buffer there primes it on WebKit.
+   unlock() {
+      const ctx = this._ensure();
+      if (!ctx) return null;
+      if (ctx.state === "suspended") ctx.resume().catch((e) => warn("resume failed", e));
+      try {
+         const s = ctx.createBufferSource();
+         s.buffer = ctx.createBuffer(1, 1, ctx.sampleRate);
+         s.connect(ctx.destination);
+         s.start(0);
+      } catch (e) { warn("priming buffer failed", e); }
+      return ctx;
+   }
+
    async _doPreload() {
       await Promise.all(TRACKS.map(async (t) => {
          if (this._raw[t.id]) return;
          try {
             const res = await fetch(t.src);
-            if (!res.ok) return;
+            if (!res.ok) { warn("HTTP " + res.status + " for " + t.src); return; }
             this._raw[t.id] = await res.arrayBuffer();
-         } catch { /* asset missing */ }
+         } catch (e) { warn("could not fetch " + t.src, e); }
       }));
       this._preloaded = true;
    }
@@ -56,10 +81,11 @@ export class Soundtrack {
       if (this._buffers[id]) return this._buffers[id];
       const ctx = this._ensure();
       const raw = this._raw[id];
-      if (!ctx || !raw) return null;
+      if (!ctx) return null;
+      if (!raw) { warn("track " + id + " was not fetched"); return null; }
       try {
          this._buffers[id] = await ctx.decodeAudioData(raw.slice(0));
-      } catch { return null; }
+      } catch (e) { warn("could not decode " + id + " (codec unsupported?)", e); return null; }
       return this._buffers[id];
    }
 
@@ -76,7 +102,10 @@ export class Soundtrack {
 
       this.stop();
 
-      if (ctx.state === "suspended") await ctx.resume().catch(() => {});
+      if (ctx.state === "suspended") await ctx.resume().catch((e) => warn("resume failed", e));
+      if (ctx.state !== "running") {
+         warn("AudioContext is " + ctx.state + " - the browser has not unlocked audio yet");
+      }
       const source = ctx.createBufferSource();
       source.buffer = buf;
       source.loop = false;
@@ -89,6 +118,7 @@ export class Soundtrack {
       };
       source.start(0);
       this._current = { id, source };
+      console.info("[soundtrack] playing " + id + " (" + buf.duration.toFixed(0) + " s, context " + ctx.state + ")");
       return true;
    }
 
@@ -128,14 +158,15 @@ export class Soundtrack {
    // Start the soundtrack: play a specific opening track, then continue
    // with shuffled playback of the remaining catalogue.
    async start(openingId) {
+      this.unlock();   // synchronously, before the first await
       await this.preload();
       if (openingId) {
          this._queue = this._buildQueue(openingId);
-         this.play(openingId);
-      } else {
-         this._queue = this._buildQueue(null);
-         this._playNext();
+         return this.play(openingId);
       }
+      this._queue = this._buildQueue(null);
+      await this._playNext();
+      return this.playing;
    }
 }
 

@@ -23,7 +23,7 @@ import { UI } from "./ui.js";
 // constructor - the ReferenceError aborted Simulator construction and
 // with it the whole game.
 import { voiceAnnounce, TRIGGER } from "./audio.js";
-import { soundtrack } from "./soundtrack.js";
+import { soundtrack, trackTitle } from "./soundtrack.js";
 import { DEG, clamp, lerp, normDeg, dirVec, diffDeg } from "./utils.js";
 import { MultiplayerSession } from "./net/MultiplayerSession.js";
 import { defaultServerUrl, listRooms } from "./net/NetClient.js";
@@ -196,16 +196,21 @@ export class Simulator {
 
       // Soundtrack. Browsers refuse to start audio before the page has been
       // interacted with, so the opening track waits for the first click or
-      // key press rather than for the game to leave the menu.
+      // key press rather than for the game to leave the menu. click, keydown
+      // and touchend are the events every browser accepts as that gesture;
+      // Safari does not accept pointerdown.
       this.soundtrack = soundtrack;
       soundtrack.preload();
+      const GESTURES = ["click", "keydown", "touchend"];
       const openMusic = () => {
-         window.removeEventListener("pointerdown", openMusic);
-         window.removeEventListener("keydown", openMusic);
-         soundtrack.start("the-royal-navy");
+         for (const ev of GESTURES) window.removeEventListener(ev, openMusic);
+         soundtrack.start("the-royal-navy").then((ok) => {
+            this.ui.showMessage(ok
+               ? "♪ " + trackTitle("the-royal-navy")
+               : "Music could not start — see the browser console");
+         });
       };
-      window.addEventListener("pointerdown", openMusic);
-      window.addEventListener("keydown", openMusic);
+      for (const ev of GESTURES) window.addEventListener(ev, openMusic);
 
       // Show menu first
       this.openMenu();
