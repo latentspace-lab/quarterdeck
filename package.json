@@ -3,7 +3,8 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "description": "Quarterdeck (browser-based) - Semi-realistic sailing physics with Freeride/Regatta/Training modes",
+  "description": "3D sailing simulator in the browser",
+  "license": "GPL-3.0-or-later",
   "workspaces": [
     "packages/shared",
     "packages/server",
