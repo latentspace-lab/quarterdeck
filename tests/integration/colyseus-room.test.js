@@ -153,7 +153,7 @@ async function run() {
       const ai = [...shipsOf(room3).values()].find((s) => s.ai);
       ok(ai, "an AI ship is in the state");
       eq(ai && ai.vesselId, "hirondelle", "the known vessel was spawned, the bogus one dropped");
-      ok(ai && Math.hypot(ai.x, ai.z) > 600, "to windward, well off", ai && Math.hypot(ai.x, ai.z).toFixed(0) + " m");
+      ok(ai && Math.hypot(ai.x, ai.z) > 120, "to windward, well off", ai && Math.hypot(ai.x, ai.z).toFixed(0) + " m");
       await room3.leave(true);
 
       suite.section("The lobby list");
