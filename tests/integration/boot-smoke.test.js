@@ -48,7 +48,11 @@ async function run() {
    const server = createServer(async (req, res) => {
       try {
          let p = decodeURIComponent(new URL(req.url, "http://x").pathname);
-         if (p.startsWith(BASE)) p = p.slice(BASE.length - 1);
+         // Serve only under BASE, exactly as the dev server and GitHub Pages
+         // do. A hard-coded root path like /sounds/x.ogg must 404 here, or the
+         // suite would pass on URLs that are broken in a real deployment.
+         if (!p.startsWith(BASE)) { res.writeHead(404).end("outside base"); return; }
+         p = p.slice(BASE.length - 1);
          const file = join(DIST, normalize(p).replace(/^(\.\.[/\\])+/, ""));
          const target = (await stat(file).catch(() => null))?.isDirectory()
             ? join(file, "index.html")
@@ -127,10 +131,13 @@ async function run() {
          const all = [...document.querySelectorAll("button")];
          const go = all.filter((b) => b.textContent.includes("·") && b.textContent.trim().length < 40).pop();
          if (!go) return null;
-         go.click();
+         go.id = "__start";
          return go.textContent.trim();
       });
       ok(started, "the start button can be pressed", started);
+      // A real click, not element.click(): only a trusted pointer event counts
+      // as the user activation that lets the browser start audio.
+      await page.click("#__start");
       await page.waitForTimeout(6000);
 
       const s = await page.evaluate(() => {
@@ -152,6 +159,45 @@ async function run() {
       ok(s.rendererCalls > 0, "something is actually being drawn", s.rendererCalls + " draw calls");
       eq(errors.length, 0, "no errors while sailing either",
          errors.length ? errors.slice(0, 3).join(" | ") : undefined);
+
+      // The soundtrack is fetched over HTTP like any other asset, so a wrong
+      // base path or a renamed file shows up here and nowhere else.
+      suite.section("The soundtrack plays");
+      const music = await page.evaluate(() => {
+         const st = window.__sim.soundtrack;
+         return {
+            preloaded: st._preloaded,
+            bytes: Object.values(st._raw).map((b) => b.byteLength),
+            playing: st.playing,
+            current: st.currentTrack,
+            looping: st._current ? st._current.source.loop : null,
+         };
+      });
+      ok(music.preloaded, "the track list preloaded");
+      ok(music.bytes.length > 0 && music.bytes.every((n) => n > 0),
+         "the audio file was actually fetched", music.bytes.join(", ") + " bytes");
+      ok(music.playing, "music is playing after the first interaction");
+      eq(music.current, "the-royal-navy", "and it is The Royal Navy");
+      eq(music.looping, false, "the opening track does not loop");
+
+      // A playing flag only proves start() was called. Tap the output and
+      // measure real signal, so a silent or empty buffer cannot pass.
+      const signal = await page.evaluate(async () => {
+         const st = window.__sim.soundtrack;
+         const an = st._ctx.createAnalyser();
+         an.fftSize = 2048;
+         st._gain.connect(an);
+         const buf = new Float32Array(an.fftSize);
+         let peak = 0;
+         for (let i = 0; i < 15; i++) {
+            await new Promise((r) => setTimeout(r, 60));
+            an.getFloatTimeDomainData(buf);
+            for (const v of buf) if (Math.abs(v) > peak) peak = Math.abs(v);
+         }
+         return { state: st._ctx.state, peak: +peak.toFixed(5) };
+      });
+      eq(signal.state, "running", "the audio context is running");
+      ok(signal.peak > 0.001, "and real audio samples are flowing", "peak " + signal.peak);
 
       suite.section("The rudder smoothing kicks in");
       // Real key presses instead of synthetic events - the test should take

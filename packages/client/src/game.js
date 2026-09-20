@@ -23,6 +23,7 @@ import { UI } from "./ui.js";
 // constructor - the ReferenceError aborted Simulator construction and
 // with it the whole game.
 import { voiceAnnounce, TRIGGER } from "./audio.js";
+import { soundtrack } from "./soundtrack.js";
 import { DEG, clamp, lerp, normDeg, dirVec, diffDeg } from "./utils.js";
 import { MultiplayerSession } from "./net/MultiplayerSession.js";
 import { defaultServerUrl, listRooms } from "./net/NetClient.js";
@@ -182,6 +183,19 @@ export class Simulator {
       this._bindMenu();
       this._onResize = () => this._resize();
       window.addEventListener("resize", this._onResize);
+
+      // Soundtrack. Browsers refuse to start audio before the page has been
+      // interacted with, so the opening track waits for the first click or
+      // key press rather than for the game to leave the menu.
+      this.soundtrack = soundtrack;
+      soundtrack.preload();
+      const openMusic = () => {
+         window.removeEventListener("pointerdown", openMusic);
+         window.removeEventListener("keydown", openMusic);
+         soundtrack.start("the-royal-navy");
+      };
+      window.addEventListener("pointerdown", openMusic);
+      window.addEventListener("keydown", openMusic);
 
       // Show menu first
       this.openMenu();
