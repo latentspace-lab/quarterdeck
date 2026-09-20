@@ -125,11 +125,35 @@ function display(hex) {
  * shader onto the canvas; `setSize()` follows the window; `dispose()` frees
  * the target. Tunables live on `uniforms`.
  */
+/**
+ * How many pixels the world is rendered at, at most. The scene is drawn into
+ * an off-screen target and then blitted through the aquatint shader, so the
+ * target can be smaller than the canvas: the HUD stays crisp at native
+ * resolution while the sea shader, by far the most expensive thing on
+ * screen, pays for fewer pixels. The frame time is almost exactly linear in
+ * this number. 3.2 Mpx is a 1440p-class budget: a 1080p or 1440p screen
+ * renders at full resolution, a 4K one at about 0.7 scale.
+ */
+export const DEFAULT_PIXEL_BUDGET = 3.2e6;
+
+/** The scale (0..1) that fits width x height into the pixel budget. */
+export function renderScaleFor(width, height, budget = DEFAULT_PIXEL_BUDGET) {
+   const px = Math.max(1, width * height);
+   return Math.min(1, Math.sqrt(budget / px));
+}
+
 export function createAquatint(renderer, scene, camera, opts = {}) {
-   const pr = renderer.getPixelRatio();
+   const budget = opts.pixelBudget ?? DEFAULT_PIXEL_BUDGET;
    const size = renderer.getSize(new THREE.Vector2());
-   let w = Math.max(1, Math.floor(size.width * pr));
-   let h = Math.max(1, Math.floor(size.height * pr));
+   let scale = 1, w = 1, h = 1;
+   const fit = (width, height) => {
+      const pr = renderer.getPixelRatio();
+      const cw = Math.max(1, Math.floor(width * pr)), ch = Math.max(1, Math.floor(height * pr));
+      scale = renderScaleFor(cw, ch, budget);
+      w = Math.max(1, Math.round(cw * scale));
+      h = Math.max(1, Math.round(ch * scale));
+   };
+   fit(size.width, size.height);
 
    const makeTarget = (samples) => {
       const depthTexture = new THREE.DepthTexture(w, h, THREE.UnsignedIntType);
@@ -142,8 +166,10 @@ export function createAquatint(renderer, scene, camera, opts = {}) {
       return rt;
    };
    // Multisampling keeps the rigging from sparkling; the depth attachment
-   // is resolved along with the colour (three r158+).
-   let target = makeTarget(opts.samples ?? 4);
+   // is resolved along with the colour (three r158+). Two samples are enough
+   // for a print that is blurred by its own ink lines; four cost as much
+   // again as the whole rest of the frame at 4K.
+   let target = makeTarget(opts.samples ?? 2);
 
    const uniforms = {
       tDiffuse: { value: target.texture },
@@ -172,6 +198,10 @@ export function createAquatint(renderer, scene, camera, opts = {}) {
    return {
       uniforms,
       get target() { return target; },
+      /** The current render scale of the world relative to the canvas. */
+      get scale() { return scale; },
+      get width() { return w; },
+      get height() { return h; },
       render() {
          renderer.setRenderTarget(target);
          renderer.render(scene, camera);
@@ -183,9 +213,7 @@ export function createAquatint(renderer, scene, camera, opts = {}) {
          quad.render(renderer);
       },
       setSize(width, height) {
-         const ratio = renderer.getPixelRatio();
-         w = Math.max(1, Math.floor(width * ratio));
-         h = Math.max(1, Math.floor(height * ratio));
+         fit(width, height);
          target.setSize(w, h);
          uniforms.uResolution.value.set(w, h);
       },

@@ -58,7 +58,7 @@ export class Simulator {
       this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
       this.renderer.setSize(window.innerWidth, window.innerHeight);
       this.renderer.shadowMap.enabled = true;
-      this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      this.renderer.shadowMap.type = THREE.PCFShadowMap;
       viewport.appendChild(this.renderer.domElement);
       this.renderer.domElement.style.cssText = "position:fixed;inset:0;width:100%;height:100%";
 
@@ -73,8 +73,11 @@ export class Simulator {
       this.camera.lookAt(0, 1, 0);
 
       // The aquatint pass draws the scene through its own target; the plain
-      // style bypasses it (see _draw).
-      this.aquatint = createAquatint(this.renderer, scene.scene, this.camera);
+      // style bypasses it (see _draw). ?px=<megapixels> overrides the pixel
+      // budget the world is rendered at (see aquatint.js), for tuning.
+      const pxParam = parseFloat(new URLSearchParams(typeof location !== "undefined" ? location.search : "").get("px"));
+      this.aquatint = createAquatint(this.renderer, scene.scene, this.camera,
+         Number.isFinite(pxParam) && pxParam > 0 ? { pixelBudget: pxParam * 1e6 } : {});
 
       // Ocean
       this.ocean = createOcean({ sunDir: new THREE.Vector3(0.4, 0.6, 0.7) });
@@ -851,6 +854,8 @@ export class Simulator {
             pos: this.boat.pos,
             heel: this.boat.heel,
          });
+         // The shadow box travels with the player's ship.
+         this.scene.followShadow(this.boat.pos.x, this.boat.pos.z);
 
          this._updateUI(this._uiMsg);
          this._uiMsg = "";
