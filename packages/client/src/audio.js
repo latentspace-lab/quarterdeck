@@ -4,49 +4,51 @@
 // The correct voice set is selected at play time based on the player's vessel nation.
 import { clamp } from "./utils.js";
 
+const BASE = (typeof import.meta !== "undefined" && import.meta.env && import.meta.env.BASE_URL) || "/";
+
 // ---------------------------------------------------------------------------
 // Sound catalogue — GB (English) and FR (French) voices
 // ---------------------------------------------------------------------------
 const VOICE_GB = {
-   ahoi:              { key: "ahoi",              src: "/sounds/ahoi.ogg",              cooldown: 0  },
-   battlestations:    { key: "battlestations",    src: "/sounds/battlestations.ogg",    cooldown: 8  },
-   braceforimpact:    { key: "braceforimpact",    src: "/sounds/braceforimpact.ogg",    cooldown: 6  },
-   ceasefire:         { key: "ceasefire",         src: "/sounds/ceasefire.ogg",         cooldown: 5  },
-   fireatwill:        { key: "fireatwill",        src: "/sounds/fireatwill.ogg",        cooldown: 2  },
-   makesail:          { key: "makesail",          src: "/sounds/makesail.ogg",          cooldown: 3  },
-   pumps:             { key: "pumps",             src: "/sounds/manthepumps_takingwater.ogg", cooldown: 15 },
-   pointouttheguns:   { key: "pointouttheguns",   src: "/sounds/pointouttheguns.ogg",   cooldown: 10 },
-   sunk:              { key: "sunk",              src: "/sounds/sunk.ogg",              cooldown: 8  },
-   takethatvessel:    { key: "takethatvessel",    src: "/sounds/takethatvessel.ogg",   cooldown: 5  },
-   victory:           { key: "victory",           src: "/sounds/victory.ogg",           cooldown: 15 },
+   ahoi:              { key: "ahoi",              src: BASE + "sounds/voice/ahoi.ogg",              cooldown: 0  },
+   battlestations:    { key: "battlestations",    src: BASE + "sounds/voice/battlestations.ogg",    cooldown: 8  },
+   braceforimpact:    { key: "braceforimpact",    src: BASE + "sounds/voice/braceforimpact.ogg",    cooldown: 6  },
+   ceasefire:         { key: "ceasefire",         src: BASE + "sounds/voice/ceasefire.ogg",         cooldown: 5  },
+   fireatwill:        { key: "fireatwill",        src: BASE + "sounds/voice/fireatwill.ogg",        cooldown: 2  },
+   makesail:          { key: "makesail",          src: BASE + "sounds/voice/makesail.ogg",          cooldown: 3  },
+   pumps:             { key: "pumps",             src: BASE + "sounds/voice/manthepumps_takingwater.ogg", cooldown: 15 },
+   pointouttheguns:   { key: "pointouttheguns",   src: BASE + "sounds/voice/pointouttheguns.ogg",   cooldown: 10 },
+   sunk:              { key: "sunk",              src: BASE + "sounds/voice/sunk.ogg",              cooldown: 8  },
+   takethatvessel:    { key: "takethatvessel",    src: BASE + "sounds/voice/takethatvessel.ogg",   cooldown: 5  },
+   victory:           { key: "victory",           src: BASE + "sounds/voice/victory.ogg",           cooldown: 15 },
 };
 
 const VOICE_ES = {
-   ahoi:              { key: "ahoi",              src: "/sounds/ahoi_es.ogg",           cooldown: 0  },
-   battlestations:    { key: "battlestations",    src: "/sounds/battlestations_es.ogg",cooldown: 8  },
-   braceforimpact:    { key: "braceforimpact",    src: "/sounds/braceforimpact_es.ogg",cooldown: 6  },
-   ceasefire:         { key: "ceasefire",         src: "/sounds/ceasefire_es.ogg",     cooldown: 5  },
-   fireatwill:        { key: "fireatwill",        src: "/sounds/fireatwill_es.ogg",    cooldown: 2  },
-   makesail:          { key: "makesail",          src: "/sounds/makesail_es.ogg",      cooldown: 3  },
-   pumps:             { key: "pumps",             src: "/sounds/pumps_es.ogg",         cooldown: 15 },
-   pointouttheguns:   { key: "pointouttheguns",   src: "/sounds/pointouttheguns_es.ogg",cooldown: 10 },
-   sunk:              { key: "sunk",              src: "/sounds/sunk_es.ogg",          cooldown: 8  },
-   takethatvessel:    { key: "takethatvessel",    src: "/sounds/takethatvessel_es.ogg",cooldown: 5  },
-   victory:           { key: "victory",           src: "/sounds/victory_es.ogg",       cooldown: 15 },
+   ahoi:              { key: "ahoi",              src: BASE + "sounds/voice/ahoi_es.ogg",           cooldown: 0  },
+   battlestations:    { key: "battlestations",    src: BASE + "sounds/voice/battlestations_es.ogg",cooldown: 8  },
+   braceforimpact:    { key: "braceforimpact",    src: BASE + "sounds/voice/braceforimpact_es.ogg",cooldown: 6  },
+   ceasefire:         { key: "ceasefire",         src: BASE + "sounds/voice/ceasefire_es.ogg",     cooldown: 5  },
+   fireatwill:        { key: "fireatwill",        src: BASE + "sounds/voice/fireatwill_es.ogg",    cooldown: 2  },
+   makesail:          { key: "makesail",          src: BASE + "sounds/voice/makesail_es.ogg",      cooldown: 3  },
+   pumps:             { key: "pumps",             src: BASE + "sounds/voice/pumps_es.ogg",         cooldown: 15 },
+   pointouttheguns:   { key: "pointouttheguns",   src: BASE + "sounds/voice/pointouttheguns_es.ogg",cooldown: 10 },
+   sunk:              { key: "sunk",              src: BASE + "sounds/voice/sunk_es.ogg",          cooldown: 8  },
+   takethatvessel:    { key: "takethatvessel",    src: BASE + "sounds/voice/takethatvessel_es.ogg",cooldown: 5  },
+   victory:           { key: "victory",           src: BASE + "sounds/voice/victory_es.ogg",       cooldown: 15 },
 };
 
 const VOICE_FR = {
-   ahoi:              { key: "ahoi",              src: "/sounds/ahoi_fr.ogg",           cooldown: 0  },
-   battlestations:    { key: "battlestations",    src: "/sounds/battlestations_fr.ogg",cooldown: 8  },
-   braceforimpact:    { key: "braceforimpact",    src: "/sounds/braceforimpact_fr.ogg",cooldown: 6  },
-   ceasefire:         { key: "ceasefire",         src: "/sounds/ceasefire_fr.ogg",     cooldown: 5  },
-   fireatwill:        { key: "fireatwill",        src: "/sounds/fireatwill_fr.ogg",    cooldown: 2  },
-   makesail:          { key: "makesail",          src: "/sounds/makesail_fr.ogg",      cooldown: 3  },
-   pumps:             { key: "pumps",             src: "/sounds/pumps_fr.ogg",         cooldown: 15 },
-   pointouttheguns:   { key: "pointouttheguns",   src: "/sounds/pointouttheguns_fr.ogg",cooldown: 10 },
-   sunk:              { key: "sunk",              src: "/sounds/sunk_fr.ogg",          cooldown: 8  },
-   takethatvessel:    { key: "takethatvessel",    src: "/sounds/takethatvessel_fr.ogg",cooldown: 5  },
-   victory:           { key: "victory",           src: "/sounds/victory_fr.ogg",       cooldown: 15 },
+   ahoi:              { key: "ahoi",              src: BASE + "sounds/voice/ahoi_fr.ogg",           cooldown: 0  },
+   battlestations:    { key: "battlestations",    src: BASE + "sounds/voice/battlestations_fr.ogg",cooldown: 8  },
+   braceforimpact:    { key: "braceforimpact",    src: BASE + "sounds/voice/braceforimpact_fr.ogg",cooldown: 6  },
+   ceasefire:         { key: "ceasefire",         src: BASE + "sounds/voice/ceasefire_fr.ogg",     cooldown: 5  },
+   fireatwill:        { key: "fireatwill",        src: BASE + "sounds/voice/fireatwill_fr.ogg",    cooldown: 2  },
+   makesail:          { key: "makesail",          src: BASE + "sounds/voice/makesail_fr.ogg",      cooldown: 3  },
+   pumps:             { key: "pumps",             src: BASE + "sounds/voice/pumps_fr.ogg",         cooldown: 15 },
+   pointouttheguns:   { key: "pointouttheguns",   src: BASE + "sounds/voice/pointouttheguns_fr.ogg",cooldown: 10 },
+   sunk:              { key: "sunk",              src: BASE + "sounds/voice/sunk_fr.ogg",          cooldown: 8  },
+   takethatvessel:    { key: "takethatvessel",    src: BASE + "sounds/voice/takethatvessel_fr.ogg",cooldown: 5  },
+   victory:           { key: "victory",           src: BASE + "sounds/voice/victory_fr.ogg",       cooldown: 15 },
 };
 
 export const NATIONS = { GB: "GB", FR: "FR", ES: "ES" };
