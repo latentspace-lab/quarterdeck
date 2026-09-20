@@ -35,7 +35,7 @@ suite.section("classic opening: a line abreast dead upwind");
 {
    const s = plan(1, false);
    eq(s.length, 2, "one spawn per enemy");
-   ok(s.every((e) => Math.abs(dist(e) - Math.hypot(UPWIND_M, STAGGER_M / 2)) < 1e-6), "900 m out, half a stagger to each side");
+   ok(s.every((e) => Math.abs(dist(e) - Math.hypot(UPWIND_M, STAGGER_M / 2)) < 1e-6), "UPWIND_M out, half a stagger to each side");
    near(Math.hypot(s[0].x - s[1].x, s[0].z - s[1].z), STAGGER_M, 1e-6, "spaced one stagger apart");
    ok(s.every((e) => e.z > 0), "upwind of the player (wind from 0 = +z)");
    const t = plan(2, false);
@@ -54,7 +54,7 @@ suite.section("random opening");
       if (Math.abs(((e.heading - bearingTo(e) + 540) % 360) - 180) > 1e-6) pointing = false;
       bearings.add(Math.round(bearingTo(e) / 30));
    }
-   ok(inBand, "700 to 1400 m out, 100 seeds");
+   ok(inBand, "SPAWN_M band, 100 seeds");
    ok(pointing, "and the enemy heads for the player");
    ok(bearings.size >= 10, "from all round the compass", bearings.size + " of 12 sectors");
    const a = plan(42, true), b = plan(42, true), c = plan(43, true);

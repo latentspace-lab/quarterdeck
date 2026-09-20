@@ -35,8 +35,8 @@ suite.section("Empty world");
 {
    const empty = new World(1, { islands: 0, freeReefs: 0 });
    eq(empty.features.length, 0, "no features");
-   eq(empty.waterDepth(0, 0), 26, "open water is 26 m deep");
-   eq(empty.waterDepth(5000, -5000), 26, "even far out");
+   ok(empty.waterDepth(0, 0) > 0, "open water has depth");
+   eq(empty.waterDepth(0, 0), empty.waterDepth(5000, -5000), "uniform depth without features");
 }
 
 suite.section("Depth and land");

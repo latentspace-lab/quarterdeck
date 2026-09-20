@@ -6,11 +6,11 @@ import { dirVec, normDeg } from "./utils.js";
 /** Random battle wind, knots. */
 export const WIND_KTS = [10, 24];
 /** Random spawn distance from the player, metres. */
-export const SPAWN_M = [700, 1400];
+export const SPAWN_M = [140, 280];
 /** Classic start: the enemy this far dead upwind. */
-export const UPWIND_M = 900;
+export const UPWIND_M = 180;
 /** Spacing between enemies abreast, metres. */
-export const STAGGER_M = 420;
+export const STAGGER_M = 84;
 
 /** A fresh wind for the battle: any direction in the menu's 5° steps, a working breeze. */
 export function battleWind(rng) {
@@ -22,8 +22,8 @@ export function battleWind(rng) {
 /**
  * Where the enemy ships start and how they are led.
  *
- * random = false is the classic opening: a line abreast 900 m dead upwind.
- * random = true puts the line on a random bearing 700 to 1400 m out, with a
+ * random = false is the classic opening: a line abreast 180 m dead upwind.
+ * random = true puts the line on a random bearing 140 to 280 m out, with a
  * little variation in the spacing, so the tactical situation differs every
  * battle. Either way the enemies point at the player.
  */
