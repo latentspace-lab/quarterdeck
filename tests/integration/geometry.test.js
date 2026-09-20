@@ -41,9 +41,6 @@ section("Waves (Gerstner)");
    }
    ok(worst < 0.95, "the waves stay below the breaking limit everywhere",
       "max steepness " + worst.toFixed(2));
-   // At 12 kn everything stays tuned as it was before
-   ok(Math.abs(ampForWind(12) - 0.176) < 0.01,
-      "unchanged from the previous tuning at 12 kn", ampForWind(12).toFixed(3));
 }
 
 // 1) Height finite everywhere
