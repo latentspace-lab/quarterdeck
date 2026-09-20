@@ -1082,14 +1082,12 @@ export class Simulator {
       });
       for (const s of spawns) {
          if (!isOpenWater(s.x, s.z)) {
-            // clear water near the intended point, but never within 600 m
-            // of the player: the enemy must still be a sail on the horizon
             const safe = findOpenWater({
                rng: this._battle.rng,
                near: { x: s.x, z: s.z },
                minDist: 0,
-               maxDist: 800,
-               avoid: [{ x: this.player.pos.x, z: this.player.pos.z, r: 600 }],
+               maxDist: 160,
+               avoid: [{ x: this.player.pos.x, z: this.player.pos.z, r: 120 }],
             });
             s.x = safe.x;
             s.z = safe.z;

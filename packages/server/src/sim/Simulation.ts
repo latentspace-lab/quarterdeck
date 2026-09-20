@@ -126,7 +126,7 @@ export class Simulation {
    }
 
    /**
-    * Enemies line up to windward, a good 900 m off and staggered across the
+    * Enemies line up to windward, ~180 m off and staggered across the
     * wind, heading for the players' spawn line. Mirrors the client's
     * _startBattle; skill and range vary per captain from the room seed.
     */
@@ -136,19 +136,17 @@ export class Simulation {
       const across = dirVec(windDir + 90);
       const out: ServerShip[] = [];
       vesselIds.forEach((vesselId, i) => {
-         const spread = (i - (vesselIds.length - 1) / 2) * 420;
-         let x = up.x * 900 + across.x * spread;
-         let z = up.z * 900 + across.z * spread;
+         const spread = (i - (vesselIds.length - 1) / 2) * 84;
+         let x = up.x * 180 + across.x * spread;
+         let z = up.z * 180 + across.z * spread;
          if (!this.world.isOpenWater(x, z)) {
             // Look for clear water around the intended point, but never
-            // closer than 600 m to the players' spawn line: the enemy must
-            // still be "in sight", not alongside.
             const safe = this.world.findOpenWater({
                rng: this.spawnRng,
                near: { x, z },
                minDist: 0,
-               maxDist: 800,
-               avoid: [{ x: 0, z: 0, r: 600 }],
+               maxDist: 160,
+               avoid: [{ x: 0, z: 0, r: 120 }],
             });
             x = safe.x;
             z = safe.z;
