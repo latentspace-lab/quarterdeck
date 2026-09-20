@@ -75,6 +75,9 @@ export function createScene() {
    sunLight.shadow.camera.right = 100;
    sunLight.shadow.camera.top = 100;
    sunLight.shadow.camera.bottom = -100;
+   // The light's target is part of the scene so that followShadow() can
+   // move the 200 m shadow box along with the player's ship.
+   scene.add(sunLight.target);
    scene.add(sunLight);
    const hemi = new THREE.HemisphereLight(0x99bbff, 0x0a1a2a, 0.55);
    scene.add(hemi);
@@ -88,7 +91,6 @@ export function createScene() {
       opacity: 0.85,
       depthWrite: false,
       fog: false,
-      fogExp2: false,
      });
    const cloudTex = makeCloudTexture();
    cloudMat.map = cloudTex;
@@ -125,6 +127,16 @@ export function createScene() {
         skyMat.uniforms.sunDir.value.copy(d);
         this.sun.position.copy(d).multiplyScalar(6200);
         this.sunLight.position.copy(d).multiplyScalar(500);
+      },
+      /**
+       * Centre the shadow box on a world position. The directional light
+       * only shadows a 200 m square around its target; without this the
+       * square stays at the origin and the ships sail out of it.
+       */
+      followShadow(x, z) {
+         const d = skyMat.uniforms.sunDir.value;
+         sunLight.target.position.set(x, 0, z);
+         sunLight.position.set(x + d.x * 500, d.y * 500, z + d.z * 500);
       },
       /** Re-tint sky, fog, lights and clouds from a style's world palette. */
       setPalette(w) {

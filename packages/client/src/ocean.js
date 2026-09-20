@@ -141,10 +141,22 @@ varying vec3 vNormal;
 varying float vFoam;
 varying float vHeight;
 
+// Value noise with a variable number of octaves. Beyond a few hundred metres
+// the two finest octaves of the ripple, grain and streak noise are smaller
+// than a pixel, so the far water gets two octaves and the near water four.
+// (Only the high-frequency calls use this; the low-frequency band and hatch
+// noise keep four octaves, their detail is still visible on the horizon.)
+float fbmN(vec2 p, int n) {
+   float a = 0.5, s = 0.0;
+   for (int i = 0; i < 4; i++) { if (i >= n) break; s += a * vnoise(p); p = p * 2.03 + 17.1; a *= 0.5; }
+   return s;
+}
+const float LOD_DIST = 300.0;
+
 // Long streaks that run with the wind: squeezed across, stretched along.
-float streaks(vec2 p, vec2 wd, float t) {
+float streaks(vec2 p, vec2 wd, float t, int oct) {
    float along = dot(p, wd), across = dot(p, vec2(wd.y, -wd.x));
-   return fbm(vec2(along * 0.045 - t * 0.12, across * 0.55));
+   return fbmN(vec2(along * 0.045 - t * 0.12, across * 0.55), oct);
 }
 
 // The painted sea: ranks of rollers with an inky trough and a lit crest,
@@ -154,8 +166,9 @@ vec3 painted(vec3 V, float dist, vec3 L) {
   vec2 wd = vec2(sin(uWindDir), cos(uWindDir));
   vec3 N = normalize(vNormal);
   float near = 1.0 / (1.0 + dist * 0.045);
-  float rip = fbm(vWorld.xz * 0.9 + vec2(uTime * 0.6, -uTime * 0.4)) - 0.5;
-  float rip2 = fbm(vWorld.xz * 1.53 + vec2(-uTime * 0.5, uTime * 0.7)) - 0.5;
+  int oct = dist < LOD_DIST ? 4 : 2;
+  float rip = fbmN(vWorld.xz * 0.9 + vec2(uTime * 0.6, -uTime * 0.4), oct) - 0.5;
+  float rip2 = fbmN(vWorld.xz * 1.53 + vec2(-uTime * 0.5, uTime * 0.7), oct) - 0.5;
   float rippleAmp = near * (0.04 + min(uAmp, 0.9) * 0.45);
   N = normalize(N + vec3(rip * rippleAmp, 0.0, rip2 * rippleAmp));
 
@@ -185,8 +198,8 @@ vec3 painted(vec3 V, float dist, vec3 L) {
   col += uSunCol * spec * 0.25;
 
   // --- foam -----------------------------------------------------------
-  float st = streaks(vWorld.xz, wd, uTime);
-  float grain = fbm(vWorld.xz * 1.6 + 3.0);
+  float st = streaks(vWorld.xz, wd, uTime, oct);
+  float grain = fbmN(vWorld.xz * 1.6 + 3.0, oct);
   float capZone = smoothstep(0.35, 0.95, hSigned) * (0.55 + 0.45 * clamp((1.0 - N.y) * 3.0, 0.0, 1.0));
   float capField = capZone * (0.45 + 0.55 * st) + (grain - 0.5) * 0.35;
   float caps = smoothstep(0.47 - uWhite * 0.18, 0.55 - uWhite * 0.18, capField) * step(0.02, uWhite);
@@ -200,6 +213,10 @@ vec3 painted(vec3 V, float dist, vec3 L) {
      if (i >= uShipN) break;
      vec4 sh = uShips[i]; vec2 dim = uShipDim[i];
      vec2 d = vWorld.xz - sh.xy;
+     // The bow wave and the wake (TRAIL_N points, a fifth of a length
+     // apart) all lie within three lengths of the ship; the rest of the
+     // sea skips the trail loop and its noise.
+     if (dot(d, d) > dim.x * dim.x * 9.0) continue;
      vec2 fwd = vec2(sin(sh.z), cos(sh.z));
      float s = dot(d, fwd), r = dot(d, vec2(fwd.y, -fwd.x));
      float loa = dim.x, beam = dim.y, spd = clamp(sh.w / 8.0, 0.0, 1.0);
@@ -207,7 +224,7 @@ vec3 painted(vec3 V, float dist, vec3 L) {
      float halfW = 0.5 * beam * sqrt(clamp(1.0 - sn * sn, 0.0, 1.0));
      float rb = abs(r) - halfW;
      float bow = smoothstep(-0.05, 0.35, sn) * smoothstep(1.02, 0.7, sn) * smoothstep(-0.3, 0.2, rb) * (1.0 - smoothstep(0.3, 1.2 + 3.5 * spd, rb));
-     bow *= (0.5 + 0.7 * fbm(vec2(s * 0.5, r * 0.9) + uTime * 0.7)) * (0.35 + spd);
+     bow *= (0.5 + 0.7 * fbmN(vec2(s * 0.5, r * 0.9) + uTime * 0.7, oct)) * (0.35 + spd);
      // wake: churned water along the trail astern, widening a little and
      // fading with the distance run. The lane is a soft profile across the
      // nearest point of the trail; the texture is world-space noise so it
@@ -225,7 +242,7 @@ vec3 painted(vec3 V, float dist, vec3 L) {
         float x = dq / hw;
         lane = max(lane, exp(-x * x * 2.2) * exp(-len / (loa * 1.2)));
      }
-     float churn = fbm(vWorld.xz * 0.45 + vec2(uTime * 0.15, -uTime * 0.1));
+     float churn = fbmN(vWorld.xz * 0.45 + vec2(uTime * 0.15, -uTime * 0.1), oct);
      float wake = lane * spd * smoothstep(0.30, 0.75, churn + lane * 0.35);
      shipFoam = max(shipFoam, max(bow, wake));
   }
@@ -376,6 +393,10 @@ export function createOcean({ sunDir = new THREE.Vector3(0.4, 0.6, 0.7) } = {}) 
 
    const mesh = new THREE.Mesh(geo, mat);
    mesh.frustumCulled = false;
+   // Drawn before everything else: the sea covers most of the screen and
+   // its shader is the most expensive, so it should be the one that wins
+   // the depth test outright rather than the one that overwrites the land.
+   mesh.renderOrder = -1;
 
    const cell = SIZE / SEG;
    // Last-read sea state - for display only, never for simulation.
