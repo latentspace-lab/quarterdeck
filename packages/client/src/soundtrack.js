@@ -8,6 +8,8 @@ const BASE = (typeof import.meta !== "undefined" && import.meta.env && import.me
 // cannot decode Opus or Vorbis here, and AAC depends on OS decoders.
 const TRACKS = [
    { id: "the-royal-navy", src: BASE + "sounds/music/the-royal-navy.mp3", title: "The Royal Navy" },
+   { id: "spanish-navy-theme", src: BASE + "sounds/music/spanish-navy-theme.mp3", title: "Spanish Navy Theme" },
+   { id: "blue-waters-silent-threat", src: BASE + "sounds/music/blue-waters-silent-threat.mp3", title: "Blue Waters, Silent Threat" },
 ];
 
 const warn = (msg, err) => console.warn("[soundtrack] " + msg, err !== undefined ? err : "");
