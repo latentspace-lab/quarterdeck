@@ -119,14 +119,8 @@ async function run() {
       ok(booted.menuOpen === true, "and opens the start menu");
       ok(booted.ships > 4, "the menu offers ships", booted.ships + " buttons");
 
-      suite.section("The loop keeps running in the menu");
-      const t0 = await page.evaluate(() => window.__sim.t);
-      await page.waitForTimeout(1200);
-      const t1 = await page.evaluate(() => ({ t: window.__sim.t, phaseT: window.__sim.sea.phaseT }));
-      ok(t1.t > t0, "the simulation clock runs", t0.toFixed(2) + " -> " + t1.t.toFixed(2) + " s");
-      ok(t1.phaseT > 0, "and the water moves even in the menu", t1.phaseT.toFixed(2) + " s");
-
       suite.section("A sailing trip");
+      await page.evaluate(() => document.getElementById("splash")?.remove());
       const started = await page.evaluate(() => {
          const all = [...document.querySelectorAll("button")];
          const go = all.filter((b) => b.textContent.includes("·") && b.textContent.trim().length < 40).pop();

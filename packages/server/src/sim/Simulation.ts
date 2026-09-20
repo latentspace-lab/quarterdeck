@@ -137,8 +137,22 @@ export class Simulation {
       const out: ServerShip[] = [];
       vesselIds.forEach((vesselId, i) => {
          const spread = (i - (vesselIds.length - 1) / 2) * 420;
-         const x = up.x * 900 + across.x * spread;
-         const z = up.z * 900 + across.z * spread;
+         let x = up.x * 900 + across.x * spread;
+         let z = up.z * 900 + across.z * spread;
+         if (!this.world.isOpenWater(x, z)) {
+            // Look for clear water around the intended point, but never
+            // closer than 600 m to the players' spawn line: the enemy must
+            // still be "in sight", not alongside.
+            const safe = this.world.findOpenWater({
+               rng: this.spawnRng,
+               near: { x, z },
+               minDist: 0,
+               maxDist: 800,
+               avoid: [{ x: 0, z: 0, r: 600 }],
+            });
+            x = safe.x;
+            z = safe.z;
+         }
          const heading = normDeg((Math.atan2(-x, -z) * 180) / Math.PI);
          const id = "ai-" + (this.captains.size + 1);
          out.push(
