@@ -29,7 +29,9 @@ suite.section("keys reach the ship from the canvas");
    press(dom, "KeyH", { tagName: "CANVAS" });
    press(dom, "KeyQ", { tagName: "BODY" });
    press(dom, "KeyT", null);
-   eq(c.drain().join(","), "toggleHud,firePort,toggleTopdown", "H, Q and T queue their orders");
+   // V used to cycle the ship mid-game; the ship is chosen in the menu now.
+   press(dom, "KeyV", { tagName: "CANVAS" });
+   eq(c.drain().join(","), "toggleHud,firePort,toggleTopdown", "H, Q and T queue their orders; V is no order");
    c.unbind();
 }
 

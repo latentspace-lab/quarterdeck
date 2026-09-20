@@ -3,7 +3,7 @@ import * as THREE from "three";
 import { createOcean, seaHeight, ampForWind, waveHeightForWind, seaStateName, TRAIL_N } from "./ocean.js";
 import { SeaState, SIM_DT, makeRng } from "@quarterdeck/shared";
 import { createScene } from "./scene.js";
-import { getVessel, VESSELS, vesselLabel } from "./vessels.js";
+import { getVessel, vesselLabel } from "./vessels.js";
 import { Ship } from "./ship.js";
 import { Fleet, SCENARIOS, scenarioFor } from "./fleet.js";
 import { battleWind, battleSpawns } from "./battleStart.js";
@@ -28,15 +28,9 @@ import {
    readStyleFromParams, storeStyle, nextStyle, setCurrentStyle, applyStyleToDocument, palette,
 } from "./style.js";
 import { createAquatint } from "./aquatint.js";
+import { safeStorage } from "./storage.js";
 import { PuffField, setPuffField, cloudBank, KIND } from "./puffs.js";
 import { applySailPalette } from "./warship.js";
-
-const CAM_LABEL = {
-   CHASE: "Chase",
-   COCKPIT: "Cockpit",
-   TOP: "Top-Down",
-   ORBIT: "Orbit",
-};
 
 export class Simulator {
    constructor(opts = {}) {
@@ -123,7 +117,7 @@ export class Simulator {
 
       // UI
       this.ui = new UI(this.dom, compassC, menuEl, document.body);
-      // The orders panel in the HUD speaks the same language as the keyboard.
+      // The HUD buttons speak the same language as the keyboard.
       this.ui.onCommand = (cmd) => this.controls.queue.push(cmd);
       this.ui.onHold = (code, down) => { this.controls.keys[code] = !!down; };
       this.ui.compass.width = 160;
@@ -271,6 +265,7 @@ export class Simulator {
          throw e;
       }
       this.mode = "Multiplayer";
+      this.ui.resetAttention();
       this.gusts = this.wind.variability > 0;
       // A regatta room: show its course where the server has it.
       const race = this.session.mode === "regatta";
@@ -456,12 +451,12 @@ export class Simulator {
              <li><b>C</b> / <b>1–4</b> : Camera (Follow, Cockpit, Top-Down, Orbit)</li>
              <li><b>M</b> / <b>Esc</b> : Menu · <b>H</b> : Hide / show the HUD ·
              <b>R</b> : Restart course/training · <b>G</b> : Gusts · <b>P</b> : Aquatint / plain rendering</li>
-             <li><b>Q / E / F</b> : Port / Starboard / Both broadsides</li>
+             <li><b>Q / E</b> : Port / Starboard broadside</li>
              <li><b>Z</b> : Change load &nbsp;·&nbsp; <b>X</b> : Cut away wreck</li>
-             <li><b>V</b> : Change ship &nbsp;·&nbsp; <b>W / S</b> : set / reef sails on square-riggers</li>
+             <li><b>W / S</b> : set / reef sails on square-riggers</li>
              <li><b>Space</b> : Right the boat after capsize</li>
              <li><b>Mouse wheel</b> : Zoom · <b>Drag</b> : Rotate view</li>
-             <li><b>Orders panel</b> (bottom right) : every command as a button — hold the helm and sail buttons.</li>
+             <li><b>Mouse</b> : the battery rows fire and the load chips load; hold the helm and sail buttons under the point of sail; Menu and View sit under the compass. Click a panel title to fold it.</li>
            </ul>
            <p style="margin-top:12px"><b class="prim">Tip:</b> Watch the compass.
            The red arrow = ship, the blue = wind (from where), the turquoise = apparent wind.</p>
@@ -477,6 +472,7 @@ export class Simulator {
    }
 
    startMode(mode, dir, speed, gusts, vesselId) {
+      this.ui.resetAttention();
       if (vesselId) this.setVessel(vesselId);
       this.mode = mode;
       this.wind.baseDir = dir;
@@ -968,6 +964,7 @@ export class Simulator {
             case "toggleGusts":
                this.gusts = !this.gusts;
                this.wind.variability = this.gusts ? 1 : 0;
+               this.ui.showMessage(this.gusts ? "Gusts and shifts: on" : "Gusts and shifts: off");
                break;
             case "toggleHud":
                this.hudVisible = !this.hudVisible;
@@ -992,10 +989,6 @@ export class Simulator {
             case "fireStbd":
                this._fire("STBD");
                break;
-            case "fireBoth":
-               this._fire("PORT");
-               this._fire("STBD");
-               break;
             case "cycleAmmo": {
                if (!this.vessel.guns) break;
                const a = this.battery.cycleAmmo();
@@ -1012,30 +1005,13 @@ export class Simulator {
                else this.ui.showMessage("No wreck in tow.");
                break;
             }
-            case "cycleVessel": {
-               if (this.session) {
-                  this.ui.showMessage("The ship cannot be changed in a multiplayer battle.");
-                  break;
-               }
-               const i = VESSELS.findIndex((v) => v.id === this.vesselId);
-               const nxt = VESSELS[(i + 1) % VESSELS.length];
-               this.setVessel(nxt.id);
-               if (this.mode === "Training") {
-                  this.trainer.setIndex(0);
-                  const c = this.trainer.current;
-                  this._updateTrainTarget(c);
-                  this.ui.setTraining({ title: c.title, desc: c.desc, hint: c.hint, progress: 0, done: false });
-               }
-               this.ui.showMessage("Now aboard: " + vesselLabel(nxt) + " · " + nxt.rate);
-               break;
-            }
             default:
                break;
          }
       }
    }
 
-   /** Load a specific ammunition (orders panel); Z still cycles. */
+   /** Load a specific ammunition (the chips in the battery panel); Z still cycles. */
    _setAmmo(id) {
       if (!this.vessel.guns || !AMMO[id]) return;
       if (this.battery.ammo === id) return;
@@ -1339,7 +1315,6 @@ export class Simulator {
          crew: this.player.crew.status(),
          wreck: this.debris.hasWreckage(this.player.id),
          wreckDrag: this.player.wreckDrag,
-         multiplayer: !!this.session,
          depth: this.terrain.visible ? this.terrain.depthAt(b.pos.x, b.pos.z) : null,
          enemies: this.session ? this.session.others(b.pos)
          : this.mode === "Battle" ? this.fleet.ships.map((sh) => {
@@ -1355,8 +1330,6 @@ export class Simulator {
                rate: sh.vessel.rate,
             };
          }) : null,
-         camera: CAM_LABEL[this.cam.mode],
-         gusts: this.gusts,
          message: msg || (this._courseUI && this._courseUI.message) || "",
          course: this.mode === "Regatta" || (this.session && this.session.mode === "regatta") ? this._courseUI : null,
       };
@@ -1379,15 +1352,6 @@ function disposeTree(root) {
       if (Array.isArray(m)) m.forEach((x) => x && x.dispose && x.dispose());
       else if (m && m.dispose) m.dispose();
    });
-}
-
-// localStorage can be missing or throw (private mode, blocked storage).
-function safeStorage() {
-   try {
-      return typeof window !== "undefined" ? window.localStorage : null;
-   } catch {
-      return null;
-   }
 }
 
 // ---------- Water target marker (ring + buoy) ----------

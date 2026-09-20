@@ -47,10 +47,9 @@ npm test                 # all tests (~700 checks)
 |-----|--------|
 | **A/D** or **←/→** | Rudder |
 | **W/S** | Trim sails (yacht) · Set/reef sails (square-rigger) |
-| **Q/E/F** | Broadside port / starboard / both |
+| **Q/E** | Broadside port / starboard |
 | **Z** | Ammo: round shot · chain · grape |
 | **X** | Cut away wreck |
-| **V** | Switch ship |
 | **C** or **1–4** | Camera mode |
 | **P** | Rendering style: aquatint / plain |
 | **Space** | Right the boat after capsize |

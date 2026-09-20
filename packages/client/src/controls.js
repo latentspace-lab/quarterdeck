@@ -73,8 +73,6 @@ export class Controls {
             case "NumpadEnter": this.queue.push("capsizeRight"); break;
             case "KeyQ": this.queue.push("firePort"); break;
             case "KeyE": this.queue.push("fireStbd"); break;
-            case "KeyF": this.queue.push("fireBoth"); break;
-            case "KeyV": this.queue.push("cycleVessel"); break;
             case "KeyZ": this.queue.push("cycleAmmo"); break;
             case "KeyX": this.queue.push("cutWreck"); break;
             default:

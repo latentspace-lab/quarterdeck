@@ -2,6 +2,73 @@
 import { normDeg } from "./utils.js";
 import { VESSELS, vesselLabel, broadsideWeight, gunCount } from "./vessels.js";
 import { palette } from "./style.js";
+import { safeStorage, readJSON, writeJSON } from "./storage.js";
+
+// Folding panels. A panel that is not pinned open shows only its head with
+// a one-line summary; it unfolds by itself for a few seconds when what it
+// reports changes for the worse (a hit, a casualty, a wind shift), the way
+// a good first lieutenant reports only what the captain must hear now.
+const HUD_KEY = "quarterdeck.hud";
+const FOLD_DEFAULTS = { dmg: true, crew: false, wind: false, foes: false }; // true = pinned open
+const NUDGE_MS = 6000;
+// After a start the wind ramps up and the ship settles; none of that is news.
+const QUIET_MS = 4000;
+// What counts as "worth a look": drops in condition, a shift of fifteen
+// degrees, the wind freshening or dying by four knots or a third. (Not a
+// Beaufort step: with gusts on, a wind sitting on a Beaufort boundary would
+// cross it every few seconds.)
+const NUDGE = { hull: 0.05, rig: 0.05, rudder: 0.10, leak: 0.05, morale: 0.05, windDeg: 20, windKn: 5, windFrac: 0.35 };
+// The wind is judged on a running mean, so a gust or a momentary shift does
+// not count; only a change that holds for several seconds does.
+const WIND_TAU_MS = 6000;
+
+class Fold {
+   constructor(panel, id, pinned, onChange) {
+      this.el = panel;
+      this.id = id;
+      this.pinned = pinned;
+      this.onChange = onChange;
+      this.head = panel.querySelector(".panel-head");
+      this.sum = panel.querySelector(".panel-sum");
+      // Why the panel opened by itself, shown in the head while it is open.
+      this.whyEl = document.createElement("span");
+      this.whyEl.className = "panel-why";
+      this.head.insertBefore(this.whyEl, this.sum);
+      this.why = "";
+      this._until = 0;
+      this.head.addEventListener("click", () => this.toggle());
+      this.apply(0);
+   }
+   get expanded() { return !this.el.classList.contains("is-collapsed"); }
+   toggle() {
+      if (this.el.classList.contains("no-fold")) return;
+      this.pinned = !this.pinned;
+      this._until = 0;
+      this.onChange(this);
+      this.apply(performance.now());
+   }
+   setSummary(text) {
+      if (this.sum.textContent !== text) this.sum.textContent = text;
+   }
+   /**
+    * Unfold for a while and say why; a pinned panel is open anyway. A sticky
+    * reason (renewed every frame while it lasts) does not overwrite a fresh
+    * one such as "hull hit".
+    */
+   nudge(now, why, sticky = false) {
+      if (this.pinned) return;
+      const fresh = now >= this._until;
+      this._until = Math.max(this._until, now + NUDGE_MS);
+      if (why && (fresh || !sticky)) this.why = why;
+   }
+   apply(now) {
+      const nudged = !this.pinned && now < this._until;
+      this.el.classList.toggle("is-collapsed", !(this.pinned || nudged));
+      this.el.classList.toggle("is-nudged", nudged);
+      const text = nudged ? this.why : "";
+      if (this.whyEl.textContent !== text) this.whyEl.textContent = text;
+   }
+}
 
 export class UI {
    constructor(rootHud, compassCanvas, menuEl, bodyEl) {
@@ -13,159 +80,154 @@ export class UI {
       this.hudVisible = true;
       this.training = null;
       this._last = {};
+      this._prev = {};
+      this._quietUntil = 0;
+      this._pips = {};
       this.build();
    }
 
    build() {
       this.root.innerHTML =
           `
-           <div class="panel tl">
-              <div class="mode" id="hudMode">FREERIDE</div>
-              <div class="ship-name" id="hudShip">Nordwind</div>
-              <div class="small" id="hudShipRate">Bermuda Sloop</div>
-              <div class="small" id="hudLap">Lap 0</div>
-              <div class="small" id="hudTime">0.0s · Best: --</div>
-              <div class="small" id="hudCourse">Course: Start</div>
-              <div class="small" id="hudProgress">0%</div>
+           <div class="hud-col" id="hud-left">
+              <div class="panel ship" id="shipPanel">
+                 <div class="panel-head" data-fold="dmg">
+                    <span class="ship-id">
+                       <span class="ship-name" id="hudShip">Nordwind</span>
+                       <span class="ship-sub"><span class="mode" id="hudMode">FREERIDE</span> · <span id="hudShipRate">Bermuda Sloop</span></span>
+                    </span>
+                    <span class="panel-sum" id="dmgSum"></span>
+                    <span class="chev"></span>
+                 </div>
+                 <div class="race small" id="hudRace" hidden>
+                    <div id="hudLap"></div>
+                    <div id="hudTime"></div>
+                    <div id="hudCourse"></div>
+                    <div id="hudProgress"></div>
+                 </div>
+                 <div class="panel-body" id="dmgBody">
+                    <div class="dmg-body">
+                       <svg class="plan" id="dPlan" viewBox="0 0 92 132" aria-hidden="true">
+                          <polygon id="pl_PORT_BOW"      points="46,4 46,44 14,44 20,22"/>
+                          <polygon id="pl_STBD_BOW"      points="46,4 46,44 78,44 72,22"/>
+                          <polygon id="pl_PORT_MID"      points="46,44 46,88 11,88 14,44"/>
+                          <polygon id="pl_STBD_MID"      points="46,44 46,88 81,88 78,44"/>
+                          <polygon id="pl_PORT_QUARTER"  points="46,88 46,120 18,117 11,88"/>
+                          <polygon id="pl_STBD_QUARTER"  points="46,88 46,120 74,117 81,88"/>
+                          <path class="plan-line" d="M46,4 L20,22 L14,44 L11,88 L18,117 L46,120
+                             L74,117 L81,88 L78,44 L72,22 Z"/>
+                          <line class="plan-line thin" x1="46" y1="6" x2="46" y2="119"/>
+                          <line class="plan-line thin" x1="14" y1="44" x2="78" y2="44"/>
+                          <line class="plan-line thin" x1="11" y1="88" x2="81" y2="88"/>
+                          <circle id="pl_mast_fore"   cx="46" cy="30" r="5.5"/>
+                          <circle id="pl_mast_main"   cx="46" cy="66" r="6"/>
+                          <circle id="pl_mast_mizzen" cx="46" cy="100" r="5"/>
+                          <text id="pl_x_fore"   class="plan-x" x="46" y="33.5">✕</text>
+                          <text id="pl_x_main"   class="plan-x" x="46" y="69.5">✕</text>
+                          <text id="pl_x_mizzen" class="plan-x" x="46" y="103.5">✕</text>
+                          <polygon id="pl_rudder" points="42,121 50,121 48,130 44,130"/>
+                       </svg>
+                       <div class="dmg-bars">
+                          <div class="dmg-row"><span class="dl">Hull</span>
+                             <div class="dmg-track"><div class="dmg-fill" id="dHull"></div></div>
+                             <span class="dv" id="dHullV">100%</span></div>
+                          <div class="dmg-row"><span class="dl">Rigging</span>
+                             <div class="dmg-track"><div class="dmg-fill" id="dRig"></div></div>
+                             <span class="dv" id="dRigV">100%</span></div>
+                          <div class="dmg-row"><span class="dl">Rudder</span>
+                             <div class="dmg-track"><div class="dmg-fill" id="dRud"></div></div>
+                             <span class="dv" id="dRudV">100%</span></div>
+                          <div class="dmg-row"><span class="dl">Leak</span>
+                             <div class="dmg-track"><div class="dmg-fill flood" id="dFlood"></div></div>
+                             <span class="dv" id="dFloodV">0%</span></div>
+                       </div>
+                    </div>
+                    <div class="dmg-foot">
+                       <span class="small warn" id="dWarn"></span>
+                       <button type="button" class="cmd act" data-cmd="cutWreck" id="cmdCut" hidden><span class="l">Cut away wreck</span><kbd>X</kbd></button>
+                    </div>
+                 </div>
+              </div>
+              <div class="panel crew" id="crewPanel" style="display:none">
+                 <div class="panel-head" data-fold="crew">
+                    <span class="crew-title">CREW <span id="crewHead"></span></span>
+                    <span class="panel-sum" id="crewSum"></span>
+                    <span class="chev"></span>
+                 </div>
+                 <div class="panel-body">
+                    <div id="crewList"></div>
+                    <div class="crew-foot"><span>Morale</span>
+                       <div class="dmg-track"><div class="dmg-fill" id="crewMoral"></div></div>
+                       <span class="dv" id="crewMoralV">100%</span></div>
+                 </div>
+              </div>
+              <div class="panel gun" id="gunPanel" style="display:none">
+                 <div class="gun-title">BATTERY · <span id="gunCal">—</span></div>
+                 <div class="ammo-row" id="ammoRow">
+                    <button type="button" class="ammo" data-cmd="ammo:ball">Shot</button>
+                    <button type="button" class="ammo" data-cmd="ammo:chain">Chain</button>
+                    <button type="button" class="ammo" data-cmd="ammo:grape">Grape</button>
+                    <kbd class="ammo-key">Z</kbd>
+                 </div>
+                 <button type="button" class="gun-row" data-cmd="firePort" id="cmdFireP">
+                    <span class="gun-side">Port</span><kbd>Q</kbd>
+                    <span class="gun-pips" id="gunPipsP"></span>
+                    <span class="gun-track"><span class="gun-fill" id="gunFillP"></span></span>
+                    <span class="gun-state" id="gunStateP">READY</span>
+                 </button>
+                 <button type="button" class="gun-row" data-cmd="fireStbd" id="cmdFireS">
+                    <span class="gun-side">Stbd</span><kbd>E</kbd>
+                    <span class="gun-pips" id="gunPipsS"></span>
+                    <span class="gun-track"><span class="gun-fill" id="gunFillS"></span></span>
+                    <span class="gun-state" id="gunStateS">READY</span>
+                 </button>
+              </div>
+              <div class="panel foes" id="foePanel" style="display:none">
+                 <div class="panel-head" data-fold="foes">
+                    <span class="foe-title">ENEMIES</span>
+                    <span class="panel-sum" id="foeSum"></span>
+                    <span class="chev"></span>
+                 </div>
+                 <div class="panel-body" id="foeList"></div>
+              </div>
            </div>
-           <div class="panel tr windbox">
-              <div class="wind-title">WIND</div>
-              <div class="wind-dir"><span id="windDir">0</span>° · <span id="windName">Calm</span></div>
-              <div class="wind-speed"><span id="windSpeed">0.0</span> kn · <span id="beaufort">Bft 0</span></div>
-              <div class="awa">AwA <span id="awaFrom">--</span>° · <span id="awaSpeed">--</span> kn</div>
-              <div class="small" id="seaState">Sea: --</div>
-              <div class="small" id="hudGust">Gusts: on</div>
-           </div>
-           <div class="panel bl">
-              <div class="readbig"><span id="hSpeed">0.0</span><span class="u">kn</span></div>
-              <div class="small" id="vmg">VMG ↑ 0.0 · ↓ 0.0</div>
-              <div class="small" id="twa">TWA -- · <span id="tack">Port</span></div>
-           </div>
-           <div class="panel bc">
-              <div class="pos" id="pos"><span class="dot"></span><span id="posText">Luffing</span></div>
-              <div class="rudder">
-                 <span class="rr" style="opacity:.8">PORT ←</span>
+           <div class="hud-col" id="hud-right">
+              <div class="panel windbox" id="windPanel">
+                 <div class="panel-head" data-fold="wind">
+                    <span class="wind-title">WIND</span>
+                    <span class="panel-sum" id="windSum"></span>
+                    <span class="chev"></span>
+                 </div>
+                 <div class="panel-body">
+                    <div class="wind-dir"><span id="windDir">0</span>° · <span id="windName">Calm</span></div>
+                    <div class="wind-speed"><span id="windSpeed">0.0</span> kn · <span id="beaufort">Bft 0</span></div>
+                    <div class="awa">AwA <span id="awaFrom">--</span>° · <span id="awaSpeed">--</span> kn</div>
+                    <div class="small" id="seaState">Sea: --</div>
+                 </div>
+              </div>
+              <div class="panel speed">
+                 <div class="readbig"><span id="hSpeed">0.0</span><span class="u">kn</span></div>
+                 <div class="small" id="vmg">VMG ↑ 0.0 · ↓ 0.0</div>
+                 <div class="small" id="twa">TWA -- · <span id="tack">Port</span></div>
+              </div>
+              <div class="panel conn" id="conn">
+                 <div class="pos" id="pos"><span class="dot"></span><span id="posText">Luffing</span></div>
                  <div class="rudder-track"><div class="rudder-ind" id="rudderInd"></div></div>
-                 <span class="rr" style="opacity:.8">→ STBD</span>
-              </div>
-              <div class="camera" id="camera">CAM: Follow</div>
-              <div class="hint">Space: Right the boat after capsize · C: Camera</div>
-           </div>
-           <div class="panel cmd" id="cmdPanel">
-              <div class="cmd-title">CAPTAIN'S ORDERS</div>
-              <div class="cmd-group">
-                 <div class="cmd-label">Helm</div>
-                 <div class="cmd-row">
-                    <button type="button" class="cmd" data-hold="KeyA"><span class="l">◄ Port</span><kbd>A</kbd></button>
-                    <button type="button" class="cmd" data-hold="KeyD"><span class="l">Starboard ►</span><kbd>D</kbd></button>
+                 <div class="helm">
+                    <button type="button" class="cmd hold" data-hold="KeyA"><span class="l">◄ Port</span><kbd>A</kbd></button>
+                    <button type="button" class="cmd hold" data-hold="KeyD"><span class="l">Stbd ►</span><kbd>D</kbd></button>
                  </div>
-              </div>
-              <div class="cmd-group">
-                 <div class="cmd-label">Sails</div>
-                 <div class="cmd-row">
-                    <button type="button" class="cmd" data-hold="KeyW" id="cmdSailIn"><span class="l">Set sail</span><kbd>W</kbd></button>
-                    <button type="button" class="cmd" data-hold="KeyS" id="cmdSailOut"><span class="l">Reef</span><kbd>S</kbd></button>
+                 <div class="sails">
+                    <button type="button" class="cmd hold" data-hold="KeyW" id="cmdSailIn"><span class="l">Set sail</span><kbd>W</kbd></button>
                     <span class="cmd-state" id="cmdSailState"></span>
+                    <button type="button" class="cmd hold" data-hold="KeyS" id="cmdSailOut"><span class="l">Reef</span><kbd>S</kbd></button>
                  </div>
+                 <button type="button" class="cmd act" data-cmd="capsizeRight" id="cmdRight" hidden><span class="l">Right the ship</span><kbd>Space</kbd></button>
               </div>
-              <div class="cmd-group" id="cmdGuns">
-                 <div class="cmd-label">Gunnery</div>
-                 <div class="cmd-row">
-                    <button type="button" class="cmd" data-cmd="firePort" id="cmdFireP"><span class="l">Fire port</span><kbd>Q</kbd></button>
-                    <button type="button" class="cmd" data-cmd="fireStbd" id="cmdFireS"><span class="l">Fire stbd</span><kbd>E</kbd></button>
-                    <button type="button" class="cmd" data-cmd="fireBoth" id="cmdFireB"><span class="l">Both</span><kbd>F</kbd></button>
-                 </div>
-                 <div class="cmd-row">
-                    <span class="cmd-state" style="margin:0">Load</span>
-                    <button type="button" class="cmd small ammo-btn" data-cmd="ammo:ball"><span class="l">Shot</span></button>
-                    <button type="button" class="cmd small ammo-btn" data-cmd="ammo:chain"><span class="l">Chain</span></button>
-                    <button type="button" class="cmd small ammo-btn" data-cmd="ammo:grape"><span class="l">Grape</span></button>
-                    <kbd>Z</kbd>
-                 </div>
-              </div>
-              <div class="cmd-group">
-                 <div class="cmd-label">Damage control</div>
-                 <div class="cmd-row">
-                    <button type="button" class="cmd" data-cmd="cutWreck" id="cmdCut"><span class="l">Cut away wreck</span><kbd>X</kbd></button>
-                    <button type="button" class="cmd" data-cmd="capsizeRight" id="cmdRight"><span class="l">Right the ship</span><kbd>Space</kbd></button>
-                 </div>
-              </div>
-              <div class="cmd-group">
-                 <div class="cmd-label">Ship &amp; view</div>
-                 <div class="cmd-row">
-                    <button type="button" class="cmd small" data-cmd="cycleVessel" id="cmdVessel"><span class="l">Change ship</span><kbd>V</kbd></button>
-                    <button type="button" class="cmd small" data-cmd="cycleCamera"><span class="l">Camera</span><kbd>C</kbd></button>
-                    <button type="button" class="cmd small" data-cmd="toggleMenu"><span class="l">Menu</span><kbd>M</kbd></button>
-                 </div>
-              </div>
-              <div class="hint">H hides the HUD · T top-down · G gusts · R restart course</div>
            </div>
-           <div class="panel crew" id="crewPanel" style="display:none">
-              <div class="crew-title">CREW <span id="crewHead"></span></div>
-              <div id="crewList"></div>
-              <div class="crew-foot"><span>Moral</span>
-                 <div class="dmg-track"><div class="dmg-fill" id="crewMoral"></div></div>
-                 <span class="dv" id="crewMoralV">100%</span></div>
-           </div>
-           <div class="panel dmg" id="dmgPanel" style="display:none">
-              <div class="dmg-title">HULL CONDITION</div>
-              <div class="dmg-body">
-                 <svg class="plan" id="dPlan" viewBox="0 0 92 132" aria-hidden="true">
-                    <polygon id="pl_PORT_BOW"      points="46,4 46,44 14,44 20,22"/>
-                    <polygon id="pl_STBD_BOW"      points="46,4 46,44 78,44 72,22"/>
-                    <polygon id="pl_PORT_MID"      points="46,44 46,88 11,88 14,44"/>
-                    <polygon id="pl_STBD_MID"      points="46,44 46,88 81,88 78,44"/>
-                    <polygon id="pl_PORT_QUARTER"  points="46,88 46,120 18,117 11,88"/>
-                    <polygon id="pl_STBD_QUARTER"  points="46,88 46,120 74,117 81,88"/>
-                    <path class="plan-line" d="M46,4 L20,22 L14,44 L11,88 L18,117 L46,120
-                       L74,117 L81,88 L78,44 L72,22 Z"/>
-                    <line class="plan-line thin" x1="46" y1="6" x2="46" y2="119"/>
-                    <line class="plan-line thin" x1="14" y1="44" x2="78" y2="44"/>
-                    <line class="plan-line thin" x1="11" y1="88" x2="81" y2="88"/>
-                    <circle id="pl_mast_fore"   cx="46" cy="30" r="5.5"/>
-                    <circle id="pl_mast_main"   cx="46" cy="66" r="6"/>
-                    <circle id="pl_mast_mizzen" cx="46" cy="100" r="5"/>
-                    <text id="pl_x_fore"   class="plan-x" x="46" y="33.5">✕</text>
-                    <text id="pl_x_main"   class="plan-x" x="46" y="69.5">✕</text>
-                    <text id="pl_x_mizzen" class="plan-x" x="46" y="103.5">✕</text>
-                    <polygon id="pl_rudder" points="42,121 50,121 48,130 44,130"/>
-                 </svg>
-                 <div class="dmg-bars">
-                    <div class="dmg-row"><span class="dl">Hull</span>
-                       <div class="dmg-track"><div class="dmg-fill" id="dHull"></div></div>
-                       <span class="dv" id="dHullV">100%</span></div>
-                    <div class="dmg-row"><span class="dl">Rigging</span>
-                       <div class="dmg-track"><div class="dmg-fill" id="dRig"></div></div>
-                       <span class="dv" id="dRigV">100%</span></div>
-                    <div class="dmg-row"><span class="dl">Rudder</span>
-                       <div class="dmg-track"><div class="dmg-fill" id="dRud"></div></div>
-                       <span class="dv" id="dRudV">100%</span></div>
-                    <div class="dmg-row"><span class="dl">Leak</span>
-                       <div class="dmg-track"><div class="dmg-fill flood" id="dFlood"></div></div>
-                       <span class="dv" id="dFloodV">0%</span></div>
-                    <div class="masts" id="dMasts"></div>
-                 </div>
-              </div>
-              <div class="small warn" id="dWarn"></div>
-           </div>
-           <div class="panel foes" id="foePanel" style="display:none">
-              <div class="foe-title">ENEMIES</div>
-              <div id="foeList"></div>
-           </div>
-           <div class="panel gun" id="gunPanel" style="display:none">
-              <div class="gun-title">BATTERY · <span id="gunCal">—</span></div>
-              <div class="ammo-row" id="ammoRow"></div>
-              <div class="gun-row">
-                 <span class="gun-side">Q ◄ PORT</span>
-                 <div class="gun-track"><div class="gun-fill" id="gunFillP"></div></div>
-                 <span class="gun-state" id="gunStateP">READY</span>
-              </div>
-              <div class="gun-row">
-                 <span class="gun-side">E ► STBD</span>
-                 <div class="gun-track"><div class="gun-fill" id="gunFillS"></div></div>
-                 <span class="gun-state" id="gunStateS">READY</span>
-              </div>
-              <div class="small" id="gunInfo">— guns per side · F = both sides</div>
+           <div class="hud-tabs" id="hud-tabs">
+              <button type="button" class="cmd tab" data-cmd="toggleMenu" id="cmdMenu"><span class="l">Menu</span><kbd>M</kbd></button>
+              <button type="button" class="cmd tab" data-cmd="cycleCamera" id="cmdView"><span class="l">View</span><kbd>C</kbd></button>
            </div>
            <div class="msgwrap" id="msgwrap"></div>
            <div class="train panel" id="train" style="display:none">
@@ -175,106 +237,115 @@ export class UI {
               <div class="train-bar"><div class="train-fill" id="trainFill"></div></div>
            </div>
            `;
+      const q = (sel) => this.root.querySelector(sel);
       this._refs = {
-         mode: this.root.querySelector("#hudMode"),
-         ship: this.root.querySelector("#hudShip"),
-         shipRate: this.root.querySelector("#hudShipRate"),
-         gunPanel: this.root.querySelector("#gunPanel"),
-         gunCal: this.root.querySelector("#gunCal"),
-         gunFillP: this.root.querySelector("#gunFillP"),
-         gunFillS: this.root.querySelector("#gunFillS"),
-         gunStateP: this.root.querySelector("#gunStateP"),
-         gunStateS: this.root.querySelector("#gunStateS"),
-         gunInfo: this.root.querySelector("#gunInfo"),
-         ammoRow: this.root.querySelector("#ammoRow"),
-         crewPanel: this.root.querySelector("#crewPanel"),
-         crewHead: this.root.querySelector("#crewHead"),
-         crewList: this.root.querySelector("#crewList"),
-         crewMoral: this.root.querySelector("#crewMoral"),
-         crewMoralV: this.root.querySelector("#crewMoralV"),
-         dmgPanel: this.root.querySelector("#dmgPanel"),
-         dHull: this.root.querySelector("#dHull"), dHullV: this.root.querySelector("#dHullV"),
-         dRig: this.root.querySelector("#dRig"), dRigV: this.root.querySelector("#dRigV"),
-         dRud: this.root.querySelector("#dRud"), dRudV: this.root.querySelector("#dRudV"),
-         dFlood: this.root.querySelector("#dFlood"), dFloodV: this.root.querySelector("#dFloodV"),
-         dMasts: this.root.querySelector("#dMasts"),
+         mode: q("#hudMode"),
+         ship: q("#hudShip"),
+         shipRate: q("#hudShipRate"),
+         gunPanel: q("#gunPanel"),
+         gunCal: q("#gunCal"),
+         gunFillP: q("#gunFillP"),
+         gunFillS: q("#gunFillS"),
+         gunStateP: q("#gunStateP"),
+         gunStateS: q("#gunStateS"),
+         gunPipsP: q("#gunPipsP"),
+         gunPipsS: q("#gunPipsS"),
+         ammo: Array.from(this.root.querySelectorAll("#ammoRow button[data-cmd]")),
+         cmdFireP: q("#cmdFireP"),
+         cmdFireS: q("#cmdFireS"),
+         crewPanel: q("#crewPanel"),
+         crewHead: q("#crewHead"),
+         crewList: q("#crewList"),
+         crewMoral: q("#crewMoral"),
+         crewMoralV: q("#crewMoralV"),
+         shipPanel: q("#shipPanel"),
+         dmgBody: q("#dmgBody"),
+         race: q("#hudRace"),
+         dHull: q("#dHull"), dHullV: q("#dHullV"),
+         dRig: q("#dRig"), dRigV: q("#dRigV"),
+         dRud: q("#dRud"), dRudV: q("#dRudV"),
+         dFlood: q("#dFlood"), dFloodV: q("#dFloodV"),
          plan: {
             sections: {},
             masts: {},
             xs: {},
-            rudder: this.root.querySelector("#pl_rudder"),
+            rudder: q("#pl_rudder"),
          },
-         dWarn: this.root.querySelector("#dWarn"),
-         foePanel: this.root.querySelector("#foePanel"),
-         foeList: this.root.querySelector("#foeList"),
-         lap: this.root.querySelector("#hudLap"),
-         time: this.root.querySelector("#hudTime"),
-         course: this.root.querySelector("#hudCourse"),
-         progress: this.root.querySelector("#hudProgress"),
-         windDir: this.root.querySelector("#windDir"),
-         windName: this.root.querySelector("#windName"),
-         windSpeed: this.root.querySelector("#windSpeed"),
-         beaufort: this.root.querySelector("#beaufort"),
-         awaFrom: this.root.querySelector("#awaFrom"),
-         awaSpeed: this.root.querySelector("#awaSpeed"),
-         gust: this.root.querySelector("#hudGust"),
-         seaState: this.root.querySelector("#seaState"),
-         hSpeed: this.root.querySelector("#hSpeed"),
-         vmg: this.root.querySelector("#vmg"),
-         twa: this.root.querySelector("#twa"),
-         tack: this.root.querySelector("#tack"),
-         rudderInd: this.root.querySelector("#rudderInd"),
-         camera: this.root.querySelector("#camera"),
-         posText: this.root.querySelector("#posText"),
-         posDot: this.root.querySelector("#pos .dot"),
-         msgwrap: this.root.querySelector("#msgwrap"),
-         train: this.root.querySelector("#train"),
-         trainTitle: this.root.querySelector("#trainTitle"),
-         trainDesc: this.root.querySelector("#trainDesc"),
-         trainHint: this.root.querySelector("#trainHint"),
-         trainFill: this.root.querySelector("#trainFill"),
-         cmdPanel: this.root.querySelector("#cmdPanel"),
-         cmdGuns: this.root.querySelector("#cmdGuns"),
-         cmdFireP: this.root.querySelector("#cmdFireP"),
-         cmdFireS: this.root.querySelector("#cmdFireS"),
-         cmdFireB: this.root.querySelector("#cmdFireB"),
-         cmdAmmo: Array.from(this.root.querySelectorAll(".ammo-btn")),
-         cmdSailIn: this.root.querySelector("#cmdSailIn .l"),
-         cmdSailOut: this.root.querySelector("#cmdSailOut .l"),
-         cmdSailState: this.root.querySelector("#cmdSailState"),
-         cmdCut: this.root.querySelector("#cmdCut"),
-         cmdRight: this.root.querySelector("#cmdRight"),
-         cmdVessel: this.root.querySelector("#cmdVessel"),
+         dWarn: q("#dWarn"),
+         cmdCut: q("#cmdCut"),
+         foePanel: q("#foePanel"),
+         foeList: q("#foeList"),
+         lap: q("#hudLap"),
+         time: q("#hudTime"),
+         course: q("#hudCourse"),
+         progress: q("#hudProgress"),
+         windDir: q("#windDir"),
+         windName: q("#windName"),
+         windSpeed: q("#windSpeed"),
+         beaufort: q("#beaufort"),
+         awaFrom: q("#awaFrom"),
+         awaSpeed: q("#awaSpeed"),
+         seaState: q("#seaState"),
+         hSpeed: q("#hSpeed"),
+         vmg: q("#vmg"),
+         twa: q("#twa"),
+         tack: q("#tack"),
+         rudderInd: q("#rudderInd"),
+         posText: q("#posText"),
+         posDot: q("#pos .dot"),
+         cmdSailIn: q("#cmdSailIn .l"),
+         cmdSailOut: q("#cmdSailOut .l"),
+         cmdSailState: q("#cmdSailState"),
+         cmdRight: q("#cmdRight"),
+         msgwrap: q("#msgwrap"),
+         train: q("#train"),
+         trainTitle: q("#trainTitle"),
+         trainDesc: q("#trainDesc"),
+         trainHint: q("#trainHint"),
+         trainFill: q("#trainFill"),
       };
       this._bindCommands();
       for (const side of ["PORT", "STBD"]) {
          for (const sec of ["BOW", "MID", "QUARTER"]) {
             const k = side + "_" + sec;
-            this._refs.plan.sections[k] = this.root.querySelector("#pl_" + k);
+            this._refs.plan.sections[k] = q("#pl_" + k);
          }
       }
       for (const m of ["fore", "main", "mizzen"]) {
-         this._refs.plan.masts[m] = this.root.querySelector("#pl_mast_" + m);
-         this._refs.plan.xs[m] = this.root.querySelector("#pl_x_" + m);
+         this._refs.plan.masts[m] = q("#pl_mast_" + m);
+         this._refs.plan.xs[m] = q("#pl_x_" + m);
+      }
+
+      // Folding panels; what the player pinned open or shut is remembered.
+      this._prefs = readJSON(safeStorage(), HUD_KEY, FOLD_DEFAULTS);
+      this.folds = {};
+      for (const id of Object.keys(FOLD_DEFAULTS)) {
+         const panel = q(`[data-fold="${id}"]`).closest(".panel");
+         this.folds[id] = new Fold(panel, id, !!this._prefs[id], (f) => {
+            this._prefs[f.id] = f.pinned;
+            writeJSON(safeStorage(), HUD_KEY, this._prefs);
+         });
       }
    }
 
    /**
-    * The orders panel: every command the captain can give, as a button.
-    * Buttons with data-cmd push the same queue event the key would; buttons
-    * with data-hold act like holding the key down (helm, sails). The game
-    * plugs in onCommand(name) and onHold(code, down).
+    * Every command the captain can give by mouse lives inside the readout it
+    * concerns: the battery rows fire, the load chips load, the helm and sail
+    * buttons under the point of sail are held. Buttons with data-cmd push
+    * the same queue event the key would; buttons with data-hold act like
+    * holding the key down. The game plugs in onCommand(name) and
+    * onHold(code, down).
     */
    _bindCommands() {
       this.onCommand = null;
       this.onHold = null;
-      for (const b of this.root.querySelectorAll("button.cmd[data-cmd]")) {
+      for (const b of this.root.querySelectorAll("button[data-cmd]")) {
          b.addEventListener("click", () => {
             b.blur();
             if (this.onCommand) this.onCommand(b.dataset.cmd);
          });
       }
-      for (const b of this.root.querySelectorAll("button.cmd[data-hold]")) {
+      for (const b of this.root.querySelectorAll("button[data-hold]")) {
          const code = b.dataset.hold;
          const set = (down) => {
             b.classList.toggle("held", down);
@@ -286,35 +357,6 @@ export class UI {
       }
    }
 
-   _updateCommands(s) {
-      const R = this._refs;
-      if (!R.cmdPanel) return;
-      const armed = !!(s.vessel && s.vessel.guns);
-      R.cmdGuns.style.display = armed ? "" : "none";
-      if (armed && s.guns) {
-         const ready = s.guns.gunsReady || { PORT: s.guns.guns, STBD: s.guns.guns };
-         const st = (btn, g, n) => {
-            const ok = !!(g && g.ready && n > 0);
-            btn.classList.toggle("ready", ok);
-            btn.disabled = !ok;
-         };
-         st(R.cmdFireP, s.guns.PORT, ready.PORT);
-         st(R.cmdFireS, s.guns.STBD, ready.STBD);
-         R.cmdFireB.disabled = R.cmdFireP.disabled && R.cmdFireS.disabled;
-         R.cmdFireB.classList.toggle("ready", !R.cmdFireB.disabled);
-         const cur = s.guns.ammo ? s.guns.ammo.id : "ball";
-         for (const b of R.cmdAmmo) b.classList.toggle("on", b.dataset.cmd === "ammo:" + cur);
-      }
-      const square = !!(s.vessel && s.vessel.rig === "square");
-      R.cmdSailIn.textContent = square ? "Set sail" : "Trim in";
-      R.cmdSailOut.textContent = square ? "Reef" : "Trim out";
-      R.cmdSailState.textContent = square && typeof s.sailSet === "number"
-         ? Math.round(s.sailSet * 100) + "% set" : "";
-      R.cmdCut.disabled = !s.wreck;
-      R.cmdRight.disabled = !(s.boat && s.boat.capsize);
-      R.cmdVessel.style.display = s.multiplayer ? "none" : "";
-   }
-
    update(s) {
       if (!this.hudVisible) {
          this.root.style.display = "none";
@@ -323,6 +365,7 @@ export class UI {
       }
       this.root.style.display = "block";
       this.compass.style.display = "block";
+      const now = performance.now();
       const R = this._refs;
       R.mode.textContent = s.mode.toUpperCase();
 
@@ -330,11 +373,13 @@ export class UI {
          R.ship.textContent = vesselLabel(s.vessel);
          R.shipRate.textContent = s.vessel.rate;
       }
+      this._attention(s, now);
       this._updateGuns(s);
       this._updateDamage(s);
       this._updateCrew(s);
       this._updateFoes(s);
 
+      R.race.hidden = !s.course;
       if (s.course) {
          R.lap.textContent = "Lap " + s.course.lap;
          R.time.textContent =
@@ -350,42 +395,19 @@ export class UI {
             " m · Brg " +
             Math.round(s.course.bearing) +
             "°";
-         R.progress.style.visibility = "visible";
          R.progress.textContent = Math.round(s.course.progress * 100) + "%";
-      } else {
-         R.lap.textContent = "";
-         R.time.textContent = "";
-         R.course.textContent = s.mode === "Training" ? "" : "Open Sea";
-         R.progress.style.visibility = "hidden";
       }
 
-      R.windDir.textContent = Math.round(s.wind.dir % 360);
-      R.windName.textContent = s.wind.name;
-      R.windSpeed.textContent = s.wind.speed.toFixed(1);
-      R.beaufort.textContent = "Bft " + s.wind.bft;
-      R.awaFrom.textContent = s.awa.from ? Math.round(s.awa.from) : "--";
-      R.awaSpeed.textContent = s.awa.speed ? s.awa.speed.toFixed(1) : "--";
-      R.gust.textContent = "Gusts: " + (s.gusts ? "on" : "off");
-      if (s.sea) R.seaState.textContent = "Sea: " + s.sea.name + " · " + s.sea.hs.toFixed(1) + " m";
+      this._updateWind(s);
 
       const sp = s.boat.speed.toFixed(1);
       R.hSpeed.textContent = sp;
       R.hSpeed.parentElement.classList.toggle("luff", !!s.boat.luffing);
       R.vmg.textContent =
          "VMG ↑ " + s.boat.vmgUp.toFixed(1) + "  ↓ " + s.boat.vmgDown.toFixed(1);
-      R.twa.textContent =
-         "TWA " +
-         Math.round(s.boat.twa) +
-         "° · " +
-         (s.boat.tack === "STBD" ? "Stbd" : "Port") +
-         (s.boat.capsize ? "  CAPSIZED!" : "");
-      R.tack.textContent = s.boat.tack === "STBD" ? "Stbd" : "Port";
+      R.twa.textContent = "TWA " + Math.round(s.boat.twa) + "° · " + (s.boat.tack === "STBD" ? "Stbd" : "Port");
 
-      const rr = Math.max(-1, Math.min(1, s.boat.rudder || 0));
-      R.rudderInd.style.left = ((rr + 1) / 2 * 100).toFixed(0) + "%";
-      R.camera.textContent = "CAM: " + s.camera;
-      R.posText.textContent = s.pos;
-      R.posDot.style.background = pointColor(s.boat.twa, s.boat.luffing, s.noGo || 32);
+      this._updateConn(s);
 
       if (this.training) {
          R.train.style.display = "block";
@@ -403,8 +425,125 @@ export class UI {
          this._showMessage(s.message);
       }
       this._last.message = s.message;
-      this._updateCommands(s);
+      for (const f of Object.values(this.folds)) f.apply(now);
       this.drawCompass(s);
+   }
+
+   /** Forget the last frame: a new mode or ship starts with a clean slate, not a "change". */
+   resetAttention() {
+      this._prev = {};
+      this._windEma = null;
+      this._prevNow = 0;
+      this._quietUntil = performance.now() + QUIET_MS;
+      for (const f of Object.values(this.folds)) f._until = 0;
+   }
+
+   /**
+    * Decide which folded panels deserve a look this frame, by comparing the
+    * state against a compact snapshot of the last one. Only changes for the
+    * worse unfold a panel: nobody needs to be told that nothing happened.
+    */
+   _attention(s, now) {
+      const P = this._prev, d = s.damage, c = s.crew;
+      const next = {};
+      // The snapshot is kept up to date even while quiet, so the first real
+      // change after a start is measured against the settled state.
+      const quiet = now < this._quietUntil;
+      const F = {};
+      for (const k in this.folds) F[k] = { nudge: (t, why, sticky) => { if (!quiet) this.folds[k].nudge(t, why, sticky); } };
+      if (d && d.masts) {
+         const rig = (d.rigging + d.sails) / 2;
+         const gone = ["fore", "main", "mizzen"].filter((m) => d.masts[m] && d.masts[m].state === "gone").length;
+         const afire = d.afire > 0.05;
+         next.hull = { hull: d.hull, rig, rudder: d.rudder, leak: d.flooding, gone, afire };
+         const p = P.hull;
+         if (p) {
+            const why = [];
+            if (p.hull - d.hull >= NUDGE.hull) why.push("hull hit");
+            if (p.rig - rig >= NUDGE.rig) why.push("rigging hit");
+            if (p.rudder - d.rudder >= NUDGE.rudder) why.push("rudder hit");
+            if (d.flooding - p.leak >= NUDGE.leak) why.push("taking water");
+            if (gone > p.gone) why.push("mast gone");
+            if (afire && !p.afire) why.push("fire");
+            if (why.length) F.dmg.nudge(now, why.join(" · "));
+         }
+         // A wreck alongside or a shoaling bottom stays worth a look as long as it lasts.
+         if (s.wreck) F.dmg.nudge(now, "wreck alongside", true);
+         else if (s.depth !== null && s.depth !== undefined && s.depth < 12) F.dmg.nudge(now, "shallow water", true);
+      }
+      if (c) {
+         next.crew = { fit: c.fit, morale: c.morale };
+         if (P.crew) {
+            if (c.fit < P.crew.fit) F.crew.nudge(now, "casualties");
+            else if (P.crew.morale - c.morale >= NUDGE.morale) F.crew.nudge(now, "morale falling");
+         }
+      }
+      if (s.wind) {
+         // Running mean of the wind (as a vector, so north does not wrap),
+         // compared against a reference that moves only when a nudge fires:
+         // gusts cancel out, a slow veer still adds up to a shift.
+         const dt = this._prevNow ? now - this._prevNow : 0;
+         const a = dt > 0 ? 1 - Math.exp(-dt / WIND_TAU_MS) : 1;
+         const rad = s.wind.dir * Math.PI / 180;
+         const e = this._windEma || (this._windEma = { x: Math.sin(rad), y: Math.cos(rad), speed: s.wind.speed });
+         e.x += (Math.sin(rad) - e.x) * a;
+         e.y += (Math.cos(rad) - e.y) * a;
+         e.speed += (s.wind.speed - e.speed) * a;
+         const dir = normDeg(Math.atan2(e.x, e.y) * 180 / Math.PI);
+         const ref = P.wind || { dir, speed: e.speed };
+         const dd = ((dir - ref.dir) % 360 + 540) % 360 - 180;
+         const dv = e.speed - ref.speed;
+         let why = null;
+         if (Math.abs(dd) >= NUDGE.windDeg) why = (dd > 0 ? "veered " : "backed ") + Math.round(Math.abs(dd)) + "°";
+         else if (Math.abs(dv) >= Math.max(NUDGE.windKn, NUDGE.windFrac * ref.speed)) {
+            why = (dv > 0 ? "freshening " : "dying ") + Math.round(ref.speed) + " → " + Math.round(e.speed) + " kn";
+         }
+         if (why) {
+            if (P.wind) F.wind.nudge(now, why);
+            next.wind = { dir, speed: e.speed };
+         } else next.wind = ref;
+      }
+      this._prevNow = now;
+      if (s.enemies) {
+         const seen = {};
+         for (const e of s.enemies) seen[e.name] = e.sunk ? 2 : e.struck ? 1 : 0;
+         if (P.foes) {
+            for (const k in seen) {
+               if (!(k in P.foes)) F.foes.nudge(now, "new sail: " + k);
+               else if (seen[k] > P.foes[k]) F.foes.nudge(now, k + (seen[k] === 2 ? " sunk" : " struck"));
+            }
+         }
+         next.foes = seen;
+      }
+      this._prev = next;
+   }
+
+   _updateWind(s) {
+      const R = this._refs;
+      const dir = Math.round(s.wind.dir % 360);
+      R.windDir.textContent = dir;
+      R.windName.textContent = s.wind.name;
+      R.windSpeed.textContent = s.wind.speed.toFixed(1);
+      R.beaufort.textContent = "Bft " + s.wind.bft;
+      R.awaFrom.textContent = s.awa.from ? Math.round(s.awa.from) : "--";
+      R.awaSpeed.textContent = s.awa.speed ? s.awa.speed.toFixed(1) : "--";
+      if (s.sea) R.seaState.textContent = "Sea: " + s.sea.name + " · " + s.sea.hs.toFixed(1) + " m";
+      this.folds.wind.setSummary(dir + "° " + s.wind.name + " · " + Math.round(s.wind.speed) + " kn");
+   }
+
+   /** The conn: point of sail, helm and canvas, and the one order a capsize allows. */
+   _updateConn(s) {
+      const R = this._refs;
+      const rr = Math.max(-1, Math.min(1, s.boat.rudder || 0));
+      R.rudderInd.style.left = ((rr + 1) / 2 * 100).toFixed(0) + "%";
+      R.posText.textContent = s.pos;
+      R.posDot.style.background = pointColor(s.boat.twa, s.boat.luffing, s.noGo || 32);
+      const square = !!(s.vessel && s.vessel.rig === "square");
+      R.cmdSailIn.textContent = square ? "Set sail" : "Trim in";
+      R.cmdSailOut.textContent = square ? "Reef" : "Trim out";
+      R.cmdSailState.textContent = square && typeof s.sailSet === "number"
+         ? Math.round(s.sailSet * 100) + "% set" : "";
+      R.cmdRight.hidden = !(s.boat && s.boat.capsize);
    }
 
    _updateGuns(s) {
@@ -414,17 +553,39 @@ export class UI {
          return;
       }
       R.gunPanel.style.display = "block";
+      // "18-pounder / 9-pounder" is a mouthful for a panel title: 18-pdr / 9-pdr.
       const cal = (s.vessel && s.vessel.guns && s.vessel.guns.decks
-         .map((d) => d.calibre).join(" / ")) || "";
+         .map((d) => String(d.calibre).replace(/-pounders?/i, "-pdr")).join(" / ")) || "";
       R.gunCal.textContent = cal;
       const ready = s.guns.gunsReady || { PORT: s.guns.guns, STBD: s.guns.guns };
-      const set = (fill, state, g, nReady) => {
+      // One pip per gun of the side, one row per deck; a knocked-out gun is
+      // a hollow pip, taken from the lower deck first. The rows are rebuilt
+      // only when the numbers change.
+      let decks = (s.vessel && s.vessel.guns && s.vessel.guns.decks || []).map((d) => d.count | 0);
+      if (decks.reduce((a, b) => a + b, 0) !== s.guns.guns) decks = [s.guns.guns];
+      const pips = (el, key, k) => {
+         const sig = decks.join(",") + "/" + k;
+         if (this._pips[key] === sig) return;
+         this._pips[key] = sig;
+         let left = k;
+         el.innerHTML = decks.map((n) => {
+            const on = Math.min(n, left);
+            left -= on;
+            return `<span class="deck">` + Array.from({ length: n }, (_, i) => `<span class="pip${i < on ? "" : " out"}"></span>`).join("") + `</span>`;
+         }).join("");
+      };
+      pips(R.gunPipsP, "P", ready.PORT);
+      pips(R.gunPipsS, "S", ready.STBD);
+      const set = (btn, fill, state, g, nReady) => {
          const pct = Math.round(g.progress * 100);
          // A side without manned guns is not "ready", it is finished. The
          // colours live in the stylesheet (is-out / is-ready / loading).
          const out = nReady <= 0;
          fill.className = "gun-fill" + (out ? " is-out" : g.ready ? " is-ready" : "");
          state.className = "gun-state" + (out ? " is-out" : g.ready ? " is-ready" : "");
+         const ok = !out && !!g.ready;
+         btn.disabled = !ok;
+         btn.classList.toggle("ready", ok);
          if (out) {
             fill.style.width = "100%";
             state.textContent = "KNOCKED OUT";
@@ -433,18 +594,10 @@ export class UI {
          fill.style.width = pct + "%";
          state.textContent = g.ready ? "READY" : "LOADING " + pct + "%";
       };
-      set(R.gunFillP, R.gunStateP, s.guns.PORT, ready.PORT);
-      set(R.gunFillS, R.gunStateS, s.guns.STBD, ready.STBD);
-      R.gunInfo.textContent =
-         ready.PORT + "/" + ready.STBD + " of " + s.guns.guns + " guns · "
-         + s.guns.broadsides + " broadsides · " + s.guns.shots + " shots";
-      if (s.guns.ammo && R.ammoRow) {
-         const cur = s.guns.ammo.id;
-         const names = [["ball", "Shot"], ["chain", "Chain"], ["grape", "Grape"]];
-         R.ammoRow.innerHTML = names.map(([id, n]) =>
-            `<span class="ammo${id === cur ? " on" : ""}">${n}</span>`).join("")
-            + `<span class="ammo-key">Z</span>`;
-      }
+      set(R.cmdFireP, R.gunFillP, R.gunStateP, s.guns.PORT, ready.PORT);
+      set(R.cmdFireS, R.gunFillS, R.gunStateS, s.guns.STBD, ready.STBD);
+      const cur = s.guns.ammo ? s.guns.ammo.id : "ball";
+      for (const b of R.ammo) b.classList.toggle("on", b.dataset.cmd === "ammo:" + cur);
    }
 
    showMessage(text) {
@@ -454,11 +607,13 @@ export class UI {
    _updateDamage(s) {
       const R = this._refs;
       const d = s.damage;
-      if (!d || (s.vessel && s.vessel.rig !== "square")) {
-         R.dmgPanel.style.display = "none";
+      const has = !!(d && d.masts && !(s.vessel && s.vessel.rig !== "square"));
+      R.shipPanel.classList.toggle("no-fold", !has);
+      R.dmgBody.hidden = !has;
+      if (!has) {
+         this.folds.dmg.setSummary("");
          return;
       }
-      R.dmgPanel.style.display = "block";
       const bar = (fill, val, v, invert = false) => {
          const pct = Math.round(val * 100);
          fill.style.width = pct + "%";
@@ -493,23 +648,19 @@ export class UI {
       }
       if (R.plan.rudder) R.plan.rudder.style.fill = damageColor(d.rudder);
 
-      const M = [['fore', 'Fore'], ['main', 'Main'], ['mizzen', 'Mizzen']];
-      R.dMasts.innerHTML = M.map(([k, n]) => {
-         const st = d.masts[k];
-         const cls = st.state === "gone" ? "gone" : st.state === "wounded" ? "hurt" : "ok";
-         const val = st.state === "gone" ? "gone" : Math.round(st.integrity * 100) + "%";
-         return `<span class="mast ${cls}" title="${n}mast">${n}<b>${val}</b></span>`;
-      }).join("");
-
       const warn = [];
       if (d.afire > 0.05) warn.push("FIRE ON BOARD");
-      if (s.wreck) warn.push("Wreck in tow — X to cut");
+      if (s.wreck) warn.push("Wreck in tow");
       if (d.flooding > 0.25) warn.push("Water in the ship");
       if (s.depth !== null && s.depth !== undefined && s.depth < 12) {
          warn.push("SHALLOW WATER " + s.depth.toFixed(1) + " m");
       }
       R.dWarn.textContent = warn.join(" · ");
-      R.dWarn.style.display = warn.length ? "block" : "none";
+      R.dWarn.style.display = warn.length ? "" : "none";
+      R.cmdCut.hidden = !s.wreck;
+
+      this.folds.dmg.setSummary((d.afire > 0.05 ? "FIRE · " : "")
+         + "Hull " + Math.round(d.hull * 100) + "% · Leak " + Math.round(d.flooding * 100) + "%");
    }
 
    _updateCrew(s) {
@@ -532,6 +683,7 @@ export class UI {
       R.crewMoral.style.width = Math.round(m * 100) + "%";
       setLevel(R.crewMoral, m);
       R.crewMoralV.textContent = Math.round(m * 100) + "%";
+      this.folds.crew.setSummary("Morale " + Math.round(m * 100) + "%");
    }
 
    _updateFoes(s) {
@@ -552,6 +704,14 @@ export class UI {
             <div class="foe-sub">Brg ${Math.round(e.bearing)}° · Masts ${e.masts}/3</div>
          </div>`;
       }).join("");
+      const afloat = s.enemies.filter((e) => !e.sunk && !e.struck);
+      let sum;
+      if (!afloat.length) sum = s.enemies.every((e) => e.sunk) ? "all sunk" : "all struck";
+      else {
+         const nearest = Math.min(...afloat.map((e) => e.dist));
+         sum = afloat.length + (afloat.length === 1 ? " ship" : " ships") + " · nearest " + Math.round(nearest) + " m";
+      }
+      this.folds.foes.setSummary(sum);
    }
 
    _showMessage(text) {
