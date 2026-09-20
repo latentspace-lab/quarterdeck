@@ -1,119 +1,95 @@
-// audio.js - Voice announcements + UI sounds
+// audio.js - Voice announcements
 //
-// Voices are nation-specific: British (GB) or French (FR).
-// The correct voice set is selected at play time based on the player's vessel nation.
-import { clamp } from "./utils.js";
+// Voices are nation-specific: British (GB), French (FR) or Spanish (ES).
+// The set is chosen at play time from the player's faction.
+import { audioContext } from "./audioContext.js";
 
 const BASE = (typeof import.meta !== "undefined" && import.meta.env && import.meta.env.BASE_URL) || "/";
 
-// ---------------------------------------------------------------------------
-// Sound catalogue — GB (English) and FR (French) voices
-// ---------------------------------------------------------------------------
-const VOICE_GB = {
-   ahoi:              { key: "ahoi",              src: BASE + "sounds/voice/ahoi.ogg",              cooldown: 0  },
-   battlestations:    { key: "battlestations",    src: BASE + "sounds/voice/battlestations.ogg",    cooldown: 8  },
-   braceforimpact:    { key: "braceforimpact",    src: BASE + "sounds/voice/braceforimpact.ogg",    cooldown: 6  },
-   ceasefire:         { key: "ceasefire",         src: BASE + "sounds/voice/ceasefire.ogg",         cooldown: 5  },
-   fireatwill:        { key: "fireatwill",        src: BASE + "sounds/voice/fireatwill.ogg",        cooldown: 2  },
-   makesail:          { key: "makesail",          src: BASE + "sounds/voice/makesail.ogg",          cooldown: 3  },
-   pumps:             { key: "pumps",             src: BASE + "sounds/voice/manthepumps_takingwater.ogg", cooldown: 15 },
-   pointouttheguns:   { key: "pointouttheguns",   src: BASE + "sounds/voice/pointouttheguns.ogg",   cooldown: 10 },
-   sunk:              { key: "sunk",              src: BASE + "sounds/voice/sunk.ogg",              cooldown: 8  },
-   takethatvessel:    { key: "takethatvessel",    src: BASE + "sounds/voice/takethatvessel.ogg",   cooldown: 5  },
-   victory:           { key: "victory",           src: BASE + "sounds/voice/victory.ogg",           cooldown: 15 },
-};
+// MP3 only - see soundtrack.js.
+const VOICE_DIR = BASE + "sounds/voice/";
 
-const VOICE_ES = {
-   ahoi:              { key: "ahoi",              src: BASE + "sounds/voice/ahoi_es.ogg",           cooldown: 0  },
-   battlestations:    { key: "battlestations",    src: BASE + "sounds/voice/battlestations_es.ogg",cooldown: 8  },
-   braceforimpact:    { key: "braceforimpact",    src: BASE + "sounds/voice/braceforimpact_es.ogg",cooldown: 6  },
-   ceasefire:         { key: "ceasefire",         src: BASE + "sounds/voice/ceasefire_es.ogg",     cooldown: 5  },
-   fireatwill:        { key: "fireatwill",        src: BASE + "sounds/voice/fireatwill_es.ogg",    cooldown: 2  },
-   makesail:          { key: "makesail",          src: BASE + "sounds/voice/makesail_es.ogg",      cooldown: 3  },
-   pumps:             { key: "pumps",             src: BASE + "sounds/voice/pumps_es.ogg",         cooldown: 15 },
-   pointouttheguns:   { key: "pointouttheguns",   src: BASE + "sounds/voice/pointouttheguns_es.ogg",cooldown: 10 },
-   sunk:              { key: "sunk",              src: BASE + "sounds/voice/sunk_es.ogg",          cooldown: 8  },
-   takethatvessel:    { key: "takethatvessel",    src: BASE + "sounds/voice/takethatvessel_es.ogg",cooldown: 5  },
-   victory:           { key: "victory",           src: BASE + "sounds/voice/victory_es.ogg",       cooldown: 15 },
-};
-
-const VOICE_FR = {
-   ahoi:              { key: "ahoi",              src: BASE + "sounds/voice/ahoi_fr.ogg",           cooldown: 0  },
-   battlestations:    { key: "battlestations",    src: BASE + "sounds/voice/battlestations_fr.ogg",cooldown: 8  },
-   braceforimpact:    { key: "braceforimpact",    src: BASE + "sounds/voice/braceforimpact_fr.ogg",cooldown: 6  },
-   ceasefire:         { key: "ceasefire",         src: BASE + "sounds/voice/ceasefire_fr.ogg",     cooldown: 5  },
-   fireatwill:        { key: "fireatwill",        src: BASE + "sounds/voice/fireatwill_fr.ogg",    cooldown: 2  },
-   makesail:          { key: "makesail",          src: BASE + "sounds/voice/makesail_fr.ogg",      cooldown: 3  },
-   pumps:             { key: "pumps",             src: BASE + "sounds/voice/pumps_fr.ogg",         cooldown: 15 },
-   pointouttheguns:   { key: "pointouttheguns",   src: BASE + "sounds/voice/pointouttheguns_fr.ogg",cooldown: 10 },
-   sunk:              { key: "sunk",              src: BASE + "sounds/voice/sunk_fr.ogg",          cooldown: 8  },
-   takethatvessel:    { key: "takethatvessel",    src: BASE + "sounds/voice/takethatvessel_fr.ogg",cooldown: 5  },
-   victory:           { key: "victory",           src: BASE + "sounds/voice/victory_fr.ogg",       cooldown: 15 },
+// key -> { file stem per nation, cooldown in seconds }
+const LINES = {
+   ahoi:            { gb: "ahoi",                    es: "ahoi_es",            fr: "ahoi_fr",            cooldown: 0  },
+   battlestations:  { gb: "battlestations",          es: "battlestations_es",  fr: "battlestations_fr",  cooldown: 8  },
+   braceforimpact:  { gb: "braceforimpact",          es: "braceforimpact_es",  fr: "braceforimpact_fr",  cooldown: 6  },
+   ceasefire:       { gb: "ceasefire",               es: "ceasefire_es",       fr: "ceasefire_fr",       cooldown: 5  },
+   fireatwill:      { gb: "fireatwill",              es: "fireatwill_es",      fr: "fireatwill_fr",      cooldown: 2  },
+   makesail:        { gb: "makesail",                es: "makesail_es",        fr: "makesail_fr",        cooldown: 3  },
+   pumps:           { gb: "manthepumps_takingwater", es: "pumps_es",           fr: "pumps_fr",           cooldown: 15 },
+   pointouttheguns: { gb: "pointouttheguns",         es: "pointouttheguns_es", fr: "pointouttheguns_fr", cooldown: 10 },
+   sunk:            { gb: "sunk",                    es: "sunk_es",            fr: "sunk_fr",            cooldown: 8  },
+   takethatvessel:  { gb: "takethatvessel",          es: "takethatvessel_es",  fr: "takethatvessel_fr",  cooldown: 5  },
+   victory:         { gb: "victory",                 es: "victory_es",         fr: "victory_fr",         cooldown: 15 },
 };
 
 export const NATIONS = { GB: "GB", FR: "FR", ES: "ES" };
+
+// Off until the lines are less intrusive; ?voice=1 turns them on.
+export const VOICE_ENABLED = typeof location !== "undefined"
+   && new URLSearchParams(location.search).get("voice") === "1";
+
+export function voiceSrc(key, nation = "GB") {
+   const line = LINES[key];
+   if (!line) return null;
+   const stem = line[nation.toLowerCase()] || line.gb;
+   return VOICE_DIR + stem + ".mp3";
+}
+
+export const VOICE_KEYS = Object.keys(LINES);
+
+const warn = (msg, err) => console.warn("[voice] " + msg, err !== undefined ? err : "");
 
 // ---------------------------------------------------------------------------
 // Audio player
 // ---------------------------------------------------------------------------
 export class VoiceAudio {
    constructor() {
-      this.enabled = true;
+      this.enabled = VOICE_ENABLED;
       this.gain = 0.9;
       this._buffers = {};      // `${nation}:${key}` -> AudioBuffer
-      this._ctx = null;
       this._lastPlayed = {};   // `${nation}:${key}` -> timestamp
-      this._preloaded = {};    // nation -> Set of loaded keys
+      this._loading = {};      // nation -> Promise
    }
 
    _ensure() {
       if (!this.enabled) return null;
-      if (this._ctx) return this._ctx;
-      const AC = typeof window !== "undefined" && (window.AudioContext || window.webkitAudioContext);
-      if (!AC) { this.enabled = false; return null; }
-      try { this._ctx = new AC(); } catch { this.enabled = false; return null; }
-      return this._ctx;
+      const ctx = audioContext();
+      if (!ctx) this.enabled = false;
+      return ctx;
    }
 
-   _voiceFor(nation) {
-      if (nation === "FR") return VOICE_FR;
-      if (nation === "ES") return VOICE_ES;
-      return VOICE_GB;
-   }
-
-   // Pre-load a single sound file
    async _fetch(nation, key) {
       const ctx = this._ensure();
       if (!ctx) return;
       const bkey = `${nation}:${key}`;
       if (this._buffers[bkey]) return;
-      const voice = this._voiceFor(nation);
-      const entry = voice[key];
-      if (!entry) return;
+      const src = voiceSrc(key, nation);
       try {
-         const res = await fetch(entry.src);
-         if (!res.ok) return;
+         const res = await fetch(src);
+         if (!res.ok) { warn("HTTP " + res.status + " for " + src); return; }
          const buf = await res.arrayBuffer();
          this._buffers[bkey] = await ctx.decodeAudioData(buf);
-      } catch { /* asset missing or decode failed */ }
+      } catch (e) { warn("could not load " + src, e); }
    }
 
-   // Pre-load all voices for a given nation
-   async preloadNation(nation = "GB") {
-      const voice = this._voiceFor(nation);
-      await Promise.all(Object.keys(voice).map((k) => this._fetch(nation, k)));
-      this._preloaded[nation] = true;
+   preloadNation(nation = "GB") {
+      if (!this._loading[nation]) {
+         this._loading[nation] = Promise.all(VOICE_KEYS.map((k) => this._fetch(nation, k)));
+      }
+      return this._loading[nation];
    }
 
-   // Pre-load both nations (call at init)
-   async preload() {
-      await Promise.all([
-         this.preloadNation("GB"),
-         this.preloadNation("FR"),
-      ]);
+   preload() {
+      return Promise.all(Object.values(NATIONS).map((n) => this.preloadNation(n)));
    }
 
-   // Play a voice line for the given nation
+   loaded(nation = "GB") {
+      return VOICE_KEYS.every((k) => !!this._buffers[`${nation}:${k}`]);
+   }
+
+   // Play a voice line; false if unknown, not loaded, or still in cooldown.
    play(key, nation = "GB") {
       const ctx = this._ensure();
       if (!ctx) return false;
@@ -122,9 +98,7 @@ export class VoiceAudio {
       if (!buf) return false;
 
       const now = performance.now() / 1000;
-      const voice = this._voiceFor(nation);
-      const entry = voice[key];
-      const cooldown = entry ? entry.cooldown : 0;
+      const cooldown = LINES[key] ? LINES[key].cooldown : 0;
       if (cooldown > 0 && now - (this._lastPlayed[bkey] || 0) < cooldown) return false;
 
       const src = ctx.createBufferSource();
@@ -133,29 +107,23 @@ export class VoiceAudio {
       g.gain.value = this.gain;
       src.connect(g);
       g.connect(ctx.destination);
-      if (ctx.state === "suspended") ctx.resume().catch(() => {});
       src.start(0);
       this._lastPlayed[bkey] = now;
       return true;
    }
 
-   // Play using the current nation's voice
    announce(key, nation = "GB") { return this.play(key, nation); }
 }
 
-// Singleton instance
 export const voiceAudio = new VoiceAudio();
 
-// ---------------------------------------------------------------------------
-// Trigger helpers
-// ---------------------------------------------------------------------------
 export function voiceAnnounce(key, nation = "GB") {
-   voiceAudio.announce(key, nation);
+   return voiceAudio.announce(key, nation);
 }
 
 // Triggers (mapped to game events):
 export const TRIGGER = {
-   MENU_OPEN:        "ahoi",           // menu opens
+   MENU_OPEN:       "ahoi",           // menu opens
    BATTLE_STATIONS: "battlestations", // Q/E/F pressed (broadside fire)
    COLLISION:       "braceforimpact", // collision detected
    CEASE_FIRE:      "ceasefire",      // guns finished reloading

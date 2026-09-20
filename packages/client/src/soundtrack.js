@@ -1,5 +1,6 @@
 // soundtrack.js - Background music playback (non-looping, with shuffle queue)
 import { clamp } from "./utils.js";
+import { audioContext, unlockAudio } from "./audioContext.js";
 
 const BASE = (typeof import.meta !== "undefined" && import.meta.env && import.meta.env.BASE_URL) || "/";
 
@@ -33,36 +34,18 @@ export class Soundtrack {
    _ensure() {
       if (!this.enabled) return null;
       if (this._ctx) return this._ctx;
-      const AC = typeof window !== "undefined" && (window.AudioContext || window.webkitAudioContext);
-      if (!AC) { warn("no AudioContext in this browser"); this.enabled = false; return null; }
-      try {
-         this._ctx = new AC();
-         this._gain = this._ctx.createGain();
-         this._gain.gain.value = this.volume;
-         this._gain.connect(this._ctx.destination);
-      } catch (e) { warn("AudioContext could not be created", e); this.enabled = false; return null; }
-      return this._ctx;
+      const ctx = audioContext();
+      if (!ctx) { this.enabled = false; return null; }
+      this._ctx = ctx;
+      this._gain = ctx.createGain();
+      this._gain.gain.value = this.volume;
+      this._gain.connect(ctx.destination);
+      return ctx;
    }
 
    preload() {
       if (!this._loading) this._loading = this._doPreload();
       return this._loading;
-   }
-
-   // Must run synchronously inside a user-gesture handler. Safari only
-   // unlocks an AudioContext that is created or resumed within the gesture
-   // itself, and starting a silent buffer there primes it on WebKit.
-   unlock() {
-      const ctx = this._ensure();
-      if (!ctx) return null;
-      if (ctx.state === "suspended") ctx.resume().catch((e) => warn("resume failed", e));
-      try {
-         const s = ctx.createBufferSource();
-         s.buffer = ctx.createBuffer(1, 1, ctx.sampleRate);
-         s.connect(ctx.destination);
-         s.start(0);
-      } catch (e) { warn("priming buffer failed", e); }
-      return ctx;
    }
 
    async _doPreload() {
@@ -158,7 +141,7 @@ export class Soundtrack {
    // Start the soundtrack: play a specific opening track, then continue
    // with shuffled playback of the remaining catalogue.
    async start(openingId) {
-      this.unlock();   // synchronously, before the first await
+      unlockAudio();   // synchronously, before the first await
       await this.preload();
       if (openingId) {
          this._queue = this._buildQueue(openingId);

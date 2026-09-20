@@ -65,7 +65,9 @@ async function run() {
       }
    });
    await new Promise((r) => server.listen(0, "127.0.0.1", r));
-   const url = `http://127.0.0.1:${server.address().port}${BASE}`;
+   // ?voice=1: the voice lines are off by default, but their wiring is
+   // checked here so they still work when switched back on.
+   const url = `http://127.0.0.1:${server.address().port}${BASE}?voice=1`;
 
    // Playwright ships its own Chromium build; if the installed one is
    // different (as in the pre-installed container), name it directly.
@@ -121,6 +123,10 @@ async function run() {
 
       suite.section("A sailing trip");
       await page.evaluate(() => document.getElementById("splash")?.remove());
+      // A player's first touch is the splash or a ship card, not Start: that
+      // is the gesture that unlocks audio while the menu is still open.
+      await page.mouse.click(20, 20);
+      await page.waitForTimeout(1500);
       const started = await page.evaluate(() => {
          const all = [...document.querySelectorAll("button")];
          const go = all.filter((b) => b.textContent.includes("·") && b.textContent.trim().length < 40).pop();
@@ -192,6 +198,18 @@ async function run() {
       });
       eq(signal.state, "running", "the audio context is running");
       ok(signal.peak > 0.001, "and real audio samples are flowing", "peak " + signal.peak);
+
+      suite.section("The voice lines");
+      const voice = await page.evaluate(() => {
+         const v = window.__sim.voice;
+         return {
+            loaded: v.loaded("GB"),
+            count: Object.keys(v._buffers).filter((k) => k.startsWith("GB:")).length,
+            ahoy: !!v._lastPlayed["GB:ahoi"],
+         };
+      });
+      ok(voice.loaded, "the Royal Navy set is decoded", voice.count + " lines");
+      ok(voice.ahoy, "\"Ahoy\" was spoken for the open menu on the first interaction");
 
       suite.section("The rudder smoothing kicks in");
       // Real key presses instead of synthetic events - the test should take
