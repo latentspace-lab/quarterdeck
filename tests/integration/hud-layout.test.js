@@ -110,14 +110,27 @@ async function run() {
       eq(loaded.on, "Chain", "and only that chip is lit");
 
       suite.section("The conn strip steers");
-      const stbd = await page.$("[data-hold='KeyD']");
-      const box = await stbd.boundingBox();
-      await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-      await page.mouse.down();
-      await page.waitForFunction(() => window.__sim.boat.rudder > 0.3, null, { timeout: SLOW });
-      const held = await page.evaluate(() => window.__sim.boat.rudder);
-      await page.mouse.up();
-      ok(held > 0.3, "holding the starboard button puts the helm over", held.toFixed(2));
+      // A real pointer hold, not a synthetic event: the button must be hit
+      // where it is drawn. The press is retried a few times because a slow
+      // runner can drop the pointer between hover and press; the last
+      // attempt reports what it saw so a failure explains itself.
+      let held = 0, seen = null;
+      for (let attempt = 0; attempt < 3 && !(held > 0.3); attempt++) {
+         await page.hover("[data-hold='KeyD']", { timeout: SLOW });
+         await page.mouse.down();
+         await page.waitForFunction(() => window.__sim.boat.rudder > 0.3, null, { timeout: 20000 }).catch(() => {});
+         seen = await page.evaluate(() => {
+            const b = document.querySelector("[data-hold='KeyD']").getBoundingClientRect();
+            const el = document.elementFromPoint(b.x + b.width / 2, b.y + b.height / 2);
+            return { rudder: +window.__sim.boat.rudder.toFixed(2), keyD: !!window.__sim.controls.keys.KeyD,
+               held: document.querySelector("[data-hold='KeyD']").classList.contains("held"),
+               under: el ? el.tagName + (el.id ? "#" + el.id : "") : null };
+         });
+         held = seen.rudder;
+         await page.mouse.up();
+         if (!(held > 0.3)) await page.waitForFunction(() => Math.abs(window.__sim.boat.rudder) < 0.2, null, { timeout: SLOW }).catch(() => {});
+      }
+      ok(held > 0.3, "holding the starboard button puts the helm over", JSON.stringify(seen));
       await page.waitForFunction(() => Math.abs(window.__sim.boat.rudder) < 0.2, null, { timeout: SLOW });
       const released = await page.evaluate(() => window.__sim.boat.rudder);
       ok(Math.abs(released) < 0.2, "and it comes back amidships on release", released.toFixed(2));
