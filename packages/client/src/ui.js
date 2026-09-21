@@ -161,27 +161,6 @@ export class UI {
                        <span class="dv" id="crewMoralV">100%</span></div>
                  </div>
               </div>
-              <div class="panel gun" id="gunPanel" style="display:none">
-                 <div class="gun-title">BATTERY · <span id="gunCal">—</span></div>
-                 <div class="ammo-row" id="ammoRow">
-                    <button type="button" class="ammo" data-cmd="ammo:ball">Shot</button>
-                    <button type="button" class="ammo" data-cmd="ammo:chain">Chain</button>
-                    <button type="button" class="ammo" data-cmd="ammo:grape">Grape</button>
-                    <kbd class="ammo-key">Z</kbd>
-                 </div>
-                 <button type="button" class="gun-row" data-cmd="firePort" id="cmdFireP">
-                    <span class="gun-side">Port</span><kbd>Q</kbd>
-                    <span class="gun-pips" id="gunPipsP"></span>
-                    <span class="gun-track"><span class="gun-fill" id="gunFillP"></span></span>
-                    <span class="gun-state" id="gunStateP">READY</span>
-                 </button>
-                 <button type="button" class="gun-row" data-cmd="fireStbd" id="cmdFireS">
-                    <span class="gun-side">Stbd</span><kbd>E</kbd>
-                    <span class="gun-pips" id="gunPipsS"></span>
-                    <span class="gun-track"><span class="gun-fill" id="gunFillS"></span></span>
-                    <span class="gun-state" id="gunStateS">READY</span>
-                 </button>
-              </div>
               <div class="panel foes" id="foePanel" style="display:none">
                  <div class="panel-head" data-fold="foes">
                     <span class="foe-title">ENEMIES</span>
@@ -210,6 +189,31 @@ export class UI {
                  <div class="small" id="vmg">VMG ↑ 0.0 · ↓ 0.0</div>
                  <div class="small" id="twa">TWA -- · <span id="tack">Port</span></div>
               </div>
+           </div>
+           <div class="hud-col" id="hud-bl">
+              <div class="panel gun" id="gunPanel" style="display:none">
+                 <div class="gun-title">BATTERY · <span id="gunCal">—</span></div>
+                 <div class="ammo-row" id="ammoRow">
+                    <button type="button" class="ammo" data-cmd="ammo:ball">Shot</button>
+                    <button type="button" class="ammo" data-cmd="ammo:chain">Chain</button>
+                    <button type="button" class="ammo" data-cmd="ammo:grape">Grape</button>
+                    <kbd class="ammo-key">Z</kbd>
+                 </div>
+                 <button type="button" class="gun-row" data-cmd="firePort" id="cmdFireP">
+                    <span class="gun-side">Port</span><kbd>Q</kbd>
+                    <span class="gun-pips" id="gunPipsP"></span>
+                    <span class="gun-track"><span class="gun-fill" id="gunFillP"></span></span>
+                    <span class="gun-state" id="gunStateP">READY</span>
+                 </button>
+                 <button type="button" class="gun-row" data-cmd="fireStbd" id="cmdFireS">
+                    <span class="gun-side">Stbd</span><kbd>E</kbd>
+                    <span class="gun-pips" id="gunPipsS"></span>
+                    <span class="gun-track"><span class="gun-fill" id="gunFillS"></span></span>
+                    <span class="gun-state" id="gunStateS">READY</span>
+                 </button>
+              </div>
+           </div>
+           <div class="hud-col" id="hud-br">
               <div class="panel conn" id="conn">
                  <div class="pos" id="pos"><span class="dot"></span><span id="posText">Luffing</span></div>
                  <div class="rudder-track"><div class="rudder-ind" id="rudderInd"></div></div>
@@ -224,10 +228,10 @@ export class UI {
                  </div>
                  <button type="button" class="cmd act" data-cmd="capsizeRight" id="cmdRight" hidden><span class="l">Right the ship</span><kbd>Space</kbd></button>
               </div>
-           </div>
-           <div class="hud-tabs" id="hud-tabs">
-              <button type="button" class="cmd tab" data-cmd="toggleMenu" id="cmdMenu"><span class="l">Menu</span><kbd>M</kbd></button>
-              <button type="button" class="cmd tab" data-cmd="cycleCamera" id="cmdView"><span class="l">View</span><kbd>C</kbd></button>
+              <div class="hud-tabs" id="hud-tabs">
+                 <button type="button" class="cmd tab" data-cmd="toggleMenu" id="cmdMenu"><span class="l">Menu</span><kbd>M</kbd></button>
+                 <button type="button" class="cmd tab" data-cmd="cycleCamera" id="cmdView"><span class="l">View</span><kbd>C</kbd></button>
+              </div>
            </div>
            <div class="msgwrap" id="msgwrap"></div>
            <div class="train panel" id="train" style="display:none">

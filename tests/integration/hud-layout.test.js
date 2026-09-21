@@ -68,7 +68,13 @@ async function run() {
       eq(gone.vessel, false, "no 'Change ship' button");
       eq(gone.hints, 0, "no key-hint lines in the HUD");
       ok(gone.left && gone.right, "the panels sit in a left and a right column");
-      eq(gone.tabs, "toggleMenu,cycleCamera", "Menu and View are the tabs under the compass");
+      eq(gone.tabs, "toggleMenu,cycleCamera", "Menu and View are the tabs in the bottom-right corner");
+      const anchored = await page.evaluate(() => {
+         const r = (s) => document.querySelector(s).getBoundingClientRect();
+         return { gun: r("#gunPanel").bottom, conn: r("#conn").bottom, h: innerHeight, foe: r("#foePanel").bottom, wind: r("#windPanel").bottom };
+      });
+      ok(anchored.h - anchored.gun < 40 && anchored.foe < anchored.gun, "the battery is anchored at the bottom left, below the readouts");
+      ok(anchored.h - anchored.conn < 80 && anchored.wind < anchored.conn, "the conn is anchored at the bottom right, below the readouts");
       for (const id of ["#gunPanel", "#shipPanel", "#crewPanel", "#foePanel", "#windPanel", "#conn"]) {
          ok(await shown(id), id + " is shown in a battle");
       }

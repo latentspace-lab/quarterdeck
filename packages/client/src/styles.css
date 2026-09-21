@@ -252,15 +252,19 @@ html, body {
 
 .panel.train { position: absolute; }
 
-/* The two columns: the ship and the fight down the left (condition, crew,
- * battery, enemies), the sea and the sailing under the compass on the right
- * (wind, speed, the conn). Panels stack and reflow as they fold, so nothing
- * is pinned to a pixel any more. */
+/* Two sides: the ship and the fight on the left (ship and hull, crew,
+ * enemies, and the battery), the sea and the sailing on the right (wind,
+ * speed under the compass, and the conn). Readouts stack from the top and
+ * reflow as they fold; the panels that take the mouse (battery, conn) are
+ * anchored to the bottom corners so a panel opening by itself never moves
+ * a button from under the hand. */
 .hud-col { position: absolute; display: flex; flex-direction: column; gap: 6px; align-items: stretch; }
 #hud-left { top: 12px; left: 12px; width: 268px; }
 #hud-right { top: 184px; right: 12px; width: 248px; }   /* under the 160px compass at top:14px */
-:root:not([data-style="plain"]) #hud-left { width: 296px; }
-:root:not([data-style="plain"]) #hud-right { width: 272px; }
+#hud-bl { bottom: 16px; left: 12px; width: 268px; }
+#hud-br { bottom: 16px; right: 12px; width: 248px; }
+:root:not([data-style="plain"]) #hud-left, :root:not([data-style="plain"]) #hud-bl { width: 296px; }
+:root:not([data-style="plain"]) #hud-right, :root:not([data-style="plain"]) #hud-br { width: 272px; }
 .panel.conn { text-align: center; }
 
 /* Only what can be pressed takes the mouse; the rest of #hud lets the
@@ -290,8 +294,8 @@ html, body {
 .panel.is-collapsed .panel-sum { display: inline; }
 .panel.is-collapsed .panel-head { margin-bottom: 0; }
 
-/* Menu and view: two small tabs in the bottom right corner, out of the way. */
-.hud-tabs { position: absolute; right: 12px; bottom: 16px; display: flex; gap: 4px; }
+/* Menu and view: two small tabs under the conn, out of the way. */
+.hud-tabs { display: flex; justify-content: flex-end; gap: 4px; }
 button.cmd.tab { flex: 0 0 auto; font-size: 10px; padding: 2px 6px; opacity: 0.8; }
 button.cmd.tab:hover { opacity: 1; }
 
