@@ -7,6 +7,10 @@
 // helm buttons steer), the panels fold and unfold, a hit unfolds the hull
 // panel by itself, and a fold survives a reload. Skips without a build or
 // a browser, like the other browser suites.
+//
+// Every wait here is on a condition, never a fixed sleep, and the timeouts
+// are generous: under software GL on the CI runner a frame can take a
+// second or more, and the game only acts on a click at the next frame.
 import { serveDist, launchChromium, watchErrors } from "../lib/browser.js";
 import { createSuite } from "../lib/harness.js";
 
@@ -14,17 +18,20 @@ const suite = createSuite("HUD layout (browser)");
 const { ok, eq } = suite;
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const SLOW = 60000;
 
 /** Start a battle in a frigate the way a player does: mode card, ship card, Start. */
 async function boot(page, url) {
    await page.goto(url + "?random=0", { waitUntil: "load", timeout: 30000 });
-   await page.waitForFunction(() => window.__sim && window.__sim.menuOpen, null, { timeout: 15000 });
+   await page.waitForFunction(() => window.__sim && window.__sim.menuOpen, null, { timeout: SLOW });
    await page.evaluate(() => document.getElementById("splash")?.remove());
    await page.click(".mode-btn[data-mode='Battle']");
    await page.click(".ship-btn[data-vessel='lydia']");
    await page.click("#menuStart");
-   await page.waitForFunction(() => window.__sim.menuOpen === false, null, { timeout: 5000 });
-   await sleep(1500);
+   await page.waitForFunction(() => window.__sim.menuOpen === false, null, { timeout: SLOW });
+   // The HUD is filled on the first frame after the start; wait for it.
+   await page.waitForFunction(() => document.querySelector("#gunStateP").textContent === "READY"
+      && document.querySelector("#gunPipsP .pip"), null, { timeout: SLOW });
 }
 
 async function run() {
@@ -39,7 +46,7 @@ async function run() {
       site.close();
       return suite.done();
    }
-   const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+   const page = await browser.newPage({ viewport: { width: 1280, height: 760 } });
    const errors = watchErrors(page);
    const shown = (sel) => page.evaluate((s) => {
       const el = document.querySelector(s);
@@ -68,8 +75,9 @@ async function run() {
       eq(errors.length, 0, "no errors while starting", errors.slice(0, 3).join(" | "));
 
       suite.section("The battery is the gunnery control");
-      await page.click("#cmdFireP");
-      await page.waitForFunction(() => window.__sim.player.battery.broadsides >= 1, null, { timeout: 4000 });
+      await page.click("#cmdFireP", { timeout: SLOW });
+      await page.waitForFunction(() => window.__sim.player.battery.broadsides >= 1, null, { timeout: SLOW });
+      await page.waitForFunction(() => /LOADING/.test(document.querySelector("#gunStateP").textContent), null, { timeout: SLOW });
       const fired = await page.evaluate(() => ({
          disabled: document.querySelector("#cmdFireP").disabled,
          state: document.querySelector("#gunStateP").textContent,
@@ -85,8 +93,9 @@ async function run() {
       }));
       eq(pips.port, pips.guns, "one pip per gun of the port battery", pips.guns + " guns");
       eq(pips.out, 0, "and none of them knocked out yet");
-      await page.click("#ammoRow button[data-cmd='ammo:chain']");
-      await sleep(300);
+      await page.click("#ammoRow button[data-cmd='ammo:chain']", { timeout: SLOW });
+      await page.waitForFunction(() => window.__sim.battery.status().ammo.id === "chain"
+         && document.querySelector("#ammoRow button[data-cmd='ammo:chain']").classList.contains("on"), null, { timeout: SLOW });
       const loaded = await page.evaluate(() => ({
          ammo: window.__sim.battery.status().ammo.id,
          on: [...document.querySelectorAll("#ammoRow button")].filter((b) => b.classList.contains("on")).map((b) => b.textContent).join(","),
@@ -99,11 +108,11 @@ async function run() {
       const box = await stbd.boundingBox();
       await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
       await page.mouse.down();
-      await sleep(1000);
+      await page.waitForFunction(() => window.__sim.boat.rudder > 0.3, null, { timeout: SLOW });
       const held = await page.evaluate(() => window.__sim.boat.rudder);
       await page.mouse.up();
       ok(held > 0.3, "holding the starboard button puts the helm over", held.toFixed(2));
-      await sleep(1500);
+      await page.waitForFunction(() => Math.abs(window.__sim.boat.rudder) < 0.2, null, { timeout: SLOW });
       const released = await page.evaluate(() => window.__sim.boat.rudder);
       ok(Math.abs(released) < 0.2, "and it comes back amidships on release", released.toFixed(2));
       const right = await page.evaluate(() => ({
@@ -119,7 +128,8 @@ async function run() {
       suite.section("The hull panel folds and remembers it");
       ok(!(await page.evaluate(() => document.querySelector("#shipPanel").classList.contains("is-collapsed"))),
          "the ship's panel starts open");
-      await page.click("#shipPanel .panel-head");
+      await page.click("#shipPanel .panel-head", { timeout: SLOW });
+      await page.waitForFunction(() => document.querySelector("#shipPanel").classList.contains("is-collapsed"), null, { timeout: SLOW });
       const folded = await page.evaluate(() => ({
          collapsed: document.querySelector("#shipPanel").classList.contains("is-collapsed"),
          sum: document.querySelector("#dmgSum").textContent,
@@ -130,19 +140,19 @@ async function run() {
       ok(/Hull \d+% · Leak \d+%/.test(folded.sum), "the head sums it up", folded.sum);
       eq(folded.body, "none", "the body is hidden");
       eq(folded.stored.dmg, false, "the choice is stored");
-      await page.click("#shipPanel .panel-head");
-      ok(!(await page.evaluate(() => document.querySelector("#shipPanel").classList.contains("is-collapsed"))),
-         "a second click opens it again");
+      await page.click("#shipPanel .panel-head", { timeout: SLOW });
+      await page.waitForFunction(() => !document.querySelector("#shipPanel").classList.contains("is-collapsed"), null, { timeout: SLOW });
+      ok(true, "a second click opens it again");
 
       suite.section("A leak unfolds the hull panel by itself");
-      await page.click("#shipPanel .panel-head");
-      await sleep(200);
+      await page.click("#shipPanel .panel-head", { timeout: SLOW });
+      await page.waitForFunction(() => document.querySelector("#shipPanel").classList.contains("is-collapsed"), null, { timeout: SLOW });
       await page.evaluate(() => { window.__sim.player.dmg.flooding = 0.3; });
-      await page.waitForFunction(() => !document.querySelector("#shipPanel").classList.contains("is-collapsed"), null, { timeout: 2000 });
-      ok(true, "water in the ship opens the folded panel");
-      await sleep(7000);
-      eq(await page.evaluate(() => document.querySelector("#shipPanel").classList.contains("is-collapsed")), true,
-         "and it folds again once the news is old");
+      await page.waitForFunction(() => !document.querySelector("#shipPanel").classList.contains("is-collapsed"), null, { timeout: SLOW });
+      const why = await page.evaluate(() => document.querySelector("#shipPanel .panel-why").textContent);
+      ok(/taking water/.test(why), "water in the ship opens the folded panel and says so", why);
+      await page.waitForFunction(() => document.querySelector("#shipPanel").classList.contains("is-collapsed"), null, { timeout: SLOW });
+      ok(true, "and it folds again once the news is old");
 
       suite.section("The fold survives a reload");
       await boot(page, site.url);
