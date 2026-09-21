@@ -235,13 +235,13 @@ html, body {
  * the tint is warm cream and the backdrop filter washes what shows through,
  * like a sheet of oiled paper laid over the print. */
 .panel {
-   position: absolute;
+   position: relative;
    background: var(--glass);
    border: var(--frame);
    outline: var(--frame-2);
    outline-offset: var(--frame-2-offset);
    border-radius: var(--r);
-   padding: 10px 12px;
+   padding: 8px 11px;
    backdrop-filter: var(--glass-filter);
    -webkit-backdrop-filter: var(--glass-filter);
    box-shadow: var(--shadow);
@@ -250,16 +250,60 @@ html, body {
    color: var(--text);
 }
 
-.panel.tl { top: 12px; left: 12px; min-width: 168px; }
-.panel.tr { top: 310px; right: 12px; min-width: 150px; z-index: 3; }
-.panel.bl { bottom: 16px; left: 12px; min-width: 150px; text-align: left; }
-.panel.bc { bottom: 16px; left: 50%; transform: translateX(-50%); text-align: center; min-width: 280px; }
+.panel.train { position: absolute; }
+
+/* Two sides: the ship and the fight on the left (ship and hull, crew,
+ * enemies, and the battery), the sea and the sailing on the right (wind,
+ * speed under the compass, and the conn). Readouts stack from the top and
+ * reflow as they fold; the panels that take the mouse (battery, conn) are
+ * anchored to the bottom corners so a panel opening by itself never moves
+ * a button from under the hand. */
+.hud-col { position: absolute; display: flex; flex-direction: column; gap: 6px; align-items: stretch; }
+#hud-left { top: 12px; left: 12px; width: 268px; }
+#hud-right { top: 184px; right: 12px; width: 248px; }   /* under the 160px compass at top:14px */
+#hud-bl { bottom: 16px; left: 12px; width: 268px; }
+#hud-br { bottom: 16px; right: 12px; width: 248px; }
+:root:not([data-style="plain"]) #hud-left, :root:not([data-style="plain"]) #hud-bl { width: 296px; }
+:root:not([data-style="plain"]) #hud-right, :root:not([data-style="plain"]) #hud-br { width: 272px; }
+.panel.conn { text-align: center; }
+
+/* Only what can be pressed takes the mouse; the rest of #hud lets the
+ * camera drag through. */
+#hud button, .panel-head { pointer-events: auto; }
+/* Contextual orders (cut away, right the ship) exist only while they apply;
+ * the display rules on button.cmd must not resurrect a hidden one. */
+#hud [hidden] { display: none !important; }
+
+/* A folding panel: head with title, one-line summary and a chevron. */
+.panel-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 6px;
+   cursor: pointer; user-select: none; -webkit-user-select: none; }
+.panel-head > :first-child { flex: 0 0 auto; }
+.panel-sum { margin-left: auto; min-width: 0; font-size: 11px; opacity: 0.85; display: none;
+   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.chev { flex: 0 0 auto; margin-left: auto; font-size: 10px; opacity: 0.6; }
+.panel-sum + .chev { margin-left: 0; }
+/* Why a panel opened by itself: "veered 22°", "hull hit", "casualties". */
+.panel-why { margin-left: auto; font-size: 11px; font-style: italic; color: var(--t-foe); display: none;
+   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.panel.is-nudged .panel-why { display: inline; }
+.panel.is-nudged .panel-why + .panel-sum { display: none; }
+.panel.is-nudged .chev { margin-left: 0; }
+.chev::after { content: "▾"; }
+.panel.is-collapsed .chev::after { content: "▸"; }
+.panel.is-collapsed .panel-body { display: none; }
+.panel.is-collapsed .panel-sum { display: inline; }
+.panel.is-collapsed .panel-head { margin-bottom: 0; }
+
+/* Menu and view: two small tabs under the conn, out of the way. */
+.hud-tabs { display: flex; justify-content: flex-end; gap: 4px; }
+button.cmd.tab { flex: 0 0 auto; font-size: 10px; padding: 2px 6px; opacity: 0.8; }
+button.cmd.tab:hover { opacity: 1; }
 
 small, .small { font-size: 11px; opacity: 0.92; }
 
 /* Panel titles: small capitals with letter-spacing, the way a chart or a
  * ship's log heads its columns. */
-.title, .mode, .wind-title, .cmd-title, .gun-title, .dmg-title, .crew-title, .foe-title, .train-title {
+.title, .mode, .wind-title, .gun-title, .crew-title, .foe-title, .train-title {
    font-family: var(--font-sc);
    font-weight: var(--wb);
    letter-spacing: var(--title-ls);
@@ -267,7 +311,7 @@ small, .small { font-size: 11px; opacity: 0.92; }
    font-variant-caps: var(--title-caps);
 }
 
-.mode { font-size: 18px; letter-spacing: max(1px, var(--title-ls)); color: var(--t-mode); }
+.mode { font-size: 11px; letter-spacing: max(1px, var(--title-ls)); color: var(--t-mode); opacity: 0.9; }
 
 .readbig {
    font-size: 46px;
@@ -294,15 +338,9 @@ small, .small { font-size: 11px; opacity: 0.92; }
    box-shadow: 0 0 10px currentColor; }
 :root:not([data-style="plain"]) .pos .dot { box-shadow: inset 0 0 0 1px var(--rule); }
 
-.rudder {
-   display: flex; align-items: center; gap: 8px; justify-content: center;
-   margin: 6px 0 2px;
-}
-.rt { font-size: 10px; opacity: 0.7; }
-.rl, .rr { font-weight: var(--wb); }
 .rudder-track {
    position: relative;
-   width: 150px; height: 8px;
+   width: auto; height: 8px; margin: 8px 0 6px;
    background: var(--track);
    border-radius: 4px;
 }
@@ -315,16 +353,15 @@ small, .small { font-size: 11px; opacity: 0.92; }
 }
 :root:not([data-style="plain"]) .rudder-ind { box-shadow: none; }
 
-.hint { font-size: 10px; opacity: 0.8; }
+.helm, .sails { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 6px; }
+.helm button.cmd.hold { flex: 1 1 0; }
+.sails button.cmd.hold { flex: 0 0 auto; }
+.sails .cmd-state { margin: 0; }
+button.cmd.act { margin-top: 6px; border-color: var(--t-foe); color: var(--t-foe); }
 .readbig.luff, .readbig.luff span { color: var(--bad) !important; text-shadow: 0 0 10px var(--bad); }
 :root:not([data-style="plain"]) .readbig.luff, :root:not([data-style="plain"]) .readbig.luff span { text-shadow: none; }
 
-/* Captain's orders: the one HUD panel that takes the mouse */
-.panel.cmd { right: 12px; bottom: 16px; width: 262px; pointer-events: auto; padding: 8px 10px; }
-.cmd-title { font-size: 11px; color: var(--t-panel); margin-bottom: 2px; }
-.cmd-label { font-size: 9px; letter-spacing: var(--label-ls); text-transform: uppercase;
-   color: var(--label); margin: 6px 0 3px; }
-.cmd-row { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+/* Buttons: every order the mouse can give shares one look. */
 button.cmd {
    flex: 1 1 auto; display: inline-flex; justify-content: space-between; align-items: center; gap: 6px;
    font: inherit; font-size: 11px; color: var(--text); background: var(--btn-bg);
@@ -376,7 +413,7 @@ button.cmd.on { background: var(--btn-on-bg); color: var(--btn-on-fg); border-co
    pointer-events: none;
 }
 
-/* Training panel: top centre, clear of the orders panel and the wind box.
+/* Training panel: top centre, clear of the compass and the wind box.
  * (It used to be styled through a bare `.tr` rule that in fact hit the wind
  * box, which is why the wind box once stretched to the bottom edge.) */
 .panel.train {
@@ -571,30 +608,42 @@ button.help-close {
 }
 :root:not([data-style="plain"]) .ship-name { font-style: italic; font-size: 16px; }
 
-.panel.gun {
-   left: 12px; bottom: 152px; width: 236px;
+.gun-title { display: block; font-size: 11px; color: var(--t-gun); margin-bottom: 6px; }
+/* Each side of the battery is a button: the bar shows the reload, a press
+ * fires. A side that is loading is disabled but stays fully legible. */
+button.gun-row {
+   display: grid; width: 100%; align-items: center; column-gap: 7px; row-gap: 3px; margin: 3px 0;
+   grid-template-columns: auto auto 1fr auto;
+   grid-template-areas: "side key pips pips" "bar bar bar state";
+   font: inherit; font-size: 10px; color: var(--text); text-align: left;
+   background: var(--btn-bg); border: 1px solid var(--btn-border); border-radius: var(--r);
+   padding: 3px 6px; cursor: pointer; user-select: none; -webkit-user-select: none;
 }
-.gun-title {
-   font-size: 11px; color: var(--t-gun);
-   margin-bottom: 6px;
-}
-.gun-row {
-   display: flex; align-items: center; gap: 7px; margin: 4px 0;
-   font-size: 10px;
-}
-.gun-side { width: 58px; font-weight: var(--wb); color: var(--text-2); }
+button.gun-row:hover:not(:disabled) { background: var(--btn-hover); }
+button.gun-row:active:not(:disabled) { background: var(--btn-active); }
+button.gun-row:disabled { cursor: default; }
+button.gun-row.ready { border-color: var(--btn-on-border); }
+button.gun-row kbd { font: inherit; font-size: 9px; opacity: 0.55; border: 1px solid var(--rule);
+   border-radius: 3px; padding: 0 4px; }
+.gun-side { grid-area: side; font-weight: var(--wb); color: var(--text-2); }
+button.gun-row kbd { grid-area: key; }
+/* One pip per gun; a hollow pip is a gun knocked out or unmanned. */
+.gun-pips { grid-area: pips; display: flex; flex-direction: column; gap: 2px; align-items: flex-start; }
+.gun-pips .deck { display: flex; flex-wrap: wrap; gap: 2px; }
+.pip { width: 6px; height: 6px; border-radius: 50%; background: var(--t-gun); box-sizing: border-box; }
+.pip.out { background: transparent; border: 1px solid var(--text-2); opacity: 0.55; }
 .gun-track {
-   position: relative; flex: 1; height: 7px;
-   background: var(--track); border-radius: 4px; overflow: hidden;
+   grid-area: bar; display: block; position: relative; height: 4px;
+   background: var(--track); border-radius: 2px; overflow: hidden;
 }
 .gun-fill {
-   position: absolute; left: 0; top: 0; height: 100%; width: 0%;
+   display: block; position: absolute; left: 0; top: 0; height: 100%; width: 0%;
    border-radius: 4px; transition: width 0.12s linear;
    background: var(--fill-loading);
 }
 .gun-fill.is-ready { background: var(--fill-ready); }
 .gun-fill.is-out { background: var(--fill-out); }
-.gun-state { width: 62px; text-align: right; font-weight: var(--wb); color: var(--text-2); opacity: 0.85; }
+.gun-state { grid-area: state; min-width: 62px; text-align: right; font-weight: var(--wb); color: var(--text-2); opacity: 0.85; }
 .gun-state.is-ready { color: var(--btn-on-fg); opacity: 1; }
 .gun-state.is-out { color: var(--bad); opacity: 1; }
 :root[data-style="plain"] .gun-state { color: rgba(210, 230, 250, 0.6); opacity: 1; }
@@ -655,8 +704,16 @@ button.help-close {
 
 /* ================= Damage, enemies, ammunition ================= */
 
-.panel.dmg { left: 12px; bottom: 306px; width: 236px; }
-.dmg-title { font-size: 11px; color: var(--t-panel); margin-bottom: 6px; }
+/* The ship's own panel: name and rate in the head, the hull plan below. */
+.ship-id { display: flex; flex-direction: column; line-height: 1.25; min-width: 0; }
+.ship-id .ship-name { margin: 0; }
+.ship-sub { font-size: 11px; color: var(--text-2); opacity: 0.9; white-space: nowrap; }
+.ship-sub .mode { font-size: 10px; }
+.race { margin-top: 6px; }
+.panel.no-fold .chev, .panel.no-fold .panel-sum { display: none; }
+.panel.no-fold .panel-head { cursor: default; margin-bottom: 0; }
+.dmg-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.dmg-foot .warn { margin-top: 0; }
 .dmg-row { display: flex; align-items: center; gap: 7px; margin: 3px 0; font-size: 10px; }
 .dl { width: 54px; color: var(--text-2); }
 .dv { width: 34px; text-align: right; opacity: 0.9; }
@@ -666,30 +723,19 @@ button.help-close {
    border-radius: 3px; transition: width 0.25s linear; background: var(--fill-ok); }
 .dmg-fill.is-warn { background: var(--fill-warn); }
 .dmg-fill.is-bad { background: var(--fill-bad); }
-.masts { display: flex; gap: 5px; margin-top: 7px; }
-.mast { flex: 1; text-align: center; font-size: 10px; font-weight: var(--wb);
-   padding: 3px 0; border-radius: var(--r); }
-.mast.ok   { background: rgba(79, 122, 90, 0.16); color: #2f4f39; border: 1px solid rgba(79, 122, 90, 0.5); }
-.mast.hurt { background: rgba(184, 134, 43, 0.18); color: #6e4f14; border: 1px solid rgba(184, 134, 43, 0.6); }
-.mast.gone { background: rgba(138, 47, 36, 0.12); color: var(--bad); border: 1px solid rgba(138, 47, 36, 0.5);
-   text-decoration: line-through; opacity: 0.75; }
-:root[data-style="plain"] .mast { border: 0; }
-:root[data-style="plain"] .mast.ok   { background: rgba(59, 214, 113, 0.22); color: #8ee06a; }
-:root[data-style="plain"] .mast.hurt { background: rgba(255, 176, 61, 0.22); color: #ffcf5d; }
-:root[data-style="plain"] .mast.gone { background: rgba(255, 93, 93, 0.2); color: #ff7b7b; }
 .warn { color: var(--t-foe); font-weight: var(--wb); margin-top: 6px; font-size: 10px;
    letter-spacing: 0.4px; }
 
 .ammo-row { display: flex; gap: 4px; margin-bottom: 6px; align-items: center; }
-.ammo { font-size: 9px; padding: 2px 6px; border-radius: var(--r);
+.ammo { font: inherit; font-size: 9px; line-height: 1.35; padding: 2px 6px; border-radius: var(--r); cursor: pointer;
    background: var(--btn-bg); color: var(--text-2); opacity: 0.75; border: 1px solid var(--rule-2); }
+.ammo:hover { opacity: 1; }
 :root[data-style="plain"] .ammo { background: rgba(255, 255, 255, 0.07); color: rgba(215, 232, 246, 0.6); border: 0; opacity: 1; }
 .ammo.on { background: var(--btn-on-bg); color: var(--btn-on-fg); font-weight: var(--wb); opacity: 1; border-color: var(--btn-on-border); }
 .ammo-key { margin-left: auto; font-size: 9px; opacity: 0.45; border: 1px solid var(--rule);
    border-radius: 3px; padding: 1px 5px; }
 
-.panel.foes { right: 12px; top: 196px; width: 210px; }
-.foe-title { font-size: 11px; color: var(--t-foe); margin-bottom: 6px; }
+.foe-title { font-size: 11px; color: var(--t-foe); }
 .foe { margin-bottom: 8px; }
 .foe.struck { opacity: 0.55; }
 .foe.out { opacity: 0.35; }
@@ -726,9 +772,7 @@ button.help-close {
 :root:not([data-style="plain"]) .sc-hint { font-style: italic; }
 
 /* ================= Crew ================= */
-.panel.crew { left: 12px; top: 140px; width: 236px; }
-.crew-title { font-size: 11px; color: var(--t-panel);
-   margin-bottom: 6px; display: flex; justify-content: space-between; gap: 6px; }
+.crew-title { font-size: 11px; color: var(--t-panel); display: inline-flex; gap: 8px; }
 .crew-title span { letter-spacing: 0; font-weight: 400; color: var(--text); opacity: 0.85;
    font-family: var(--font); text-transform: none; font-variant-caps: normal; }
 .crew-row { display: flex; align-items: center; gap: 7px; margin: 3px 0; font-size: 10px; }
@@ -748,7 +792,6 @@ button.help-close {
 .crew-foot > span:first-child { width: 76px; color: var(--text-2); }
 
 /* ---- Hull plan in the damage panel ---- */
-.panel.dmg { width: 268px; }
 .dmg-body { display: flex; gap: 9px; align-items: flex-start; }
 .dmg-bars { flex: 1; min-width: 0; }
 .plan { width: 62px; height: 90px; flex: none; margin-top: 1px; }
@@ -764,9 +807,6 @@ button.help-close {
 .plan-x { display: none; fill: var(--bad); font-size: 9px; font-weight: var(--wb);
    text-anchor: middle; font-family: system-ui, sans-serif; }
 :root[data-style="plain"] .plan-x { fill: #ff7b7b; }
-.masts { margin-top: 7px; }
-.mast { font-size: 9px; padding: 2px 0; }
-.mast b { display: block; font-size: 9px; font-weight: var(--wb); opacity: 0.95; }
 
 /* ---- Type scale for the aquatint skin ----
  * The Fell face has a small x-height, so every size steps up by about an
@@ -776,32 +816,31 @@ button.help-close {
 :root:not([data-style="plain"]) .small,
 :root:not([data-style="plain"]) .train-hint,
 :root:not([data-style="plain"]) .awa { font-size: 12.5px; }
-:root:not([data-style="plain"]) .mode { font-size: 20px; }
+:root:not([data-style="plain"]) .mode { font-size: 12px; }
 :root:not([data-style="plain"]) .ship-name { font-size: 18px; }
 :root:not([data-style="plain"]) .readbig { font-size: 50px; }
 :root:not([data-style="plain"]) .readbig .u { font-size: 18px; }
 :root:not([data-style="plain"]) .wind-title,
-:root:not([data-style="plain"]) .cmd-title,
 :root:not([data-style="plain"]) .gun-title,
-:root:not([data-style="plain"]) .dmg-title,
 :root:not([data-style="plain"]) .crew-title,
 :root:not([data-style="plain"]) .foe-title,
 :root:not([data-style="plain"]) .train-title { font-size: 13px; }
 :root:not([data-style="plain"]) .wind-dir { font-size: 24px; }
 :root:not([data-style="plain"]) .wind-speed { font-size: 18px; }
 :root:not([data-style="plain"]) .pos { font-size: 18px; }
-:root:not([data-style="plain"]) .rt,
-:root:not([data-style="plain"]) .hint,
+:root:not([data-style="plain"]) .panel-why,
+:root:not([data-style="plain"]) .panel-sum,
 :root:not([data-style="plain"]) .cmd-state,
 :root:not([data-style="plain"]) .sb-era { font-size: 12px; }
 :root:not([data-style="plain"]) .cmd-label,
 :root:not([data-style="plain"]) .cmd kbd,
 :root:not([data-style="plain"]) .ammo,
 :root:not([data-style="plain"]) .ammo-key,
-:root:not([data-style="plain"]) .mast,
-:root:not([data-style="plain"]) .mast b,
+:root:not([data-style="plain"]) button.gun-row kbd,
 :root:not([data-style="plain"]) .plan-x { font-size: 11px; }
 :root:not([data-style="plain"]) button.cmd { font-size: 12.5px; }
+:root:not([data-style="plain"]) button.cmd.tab { font-size: 11px; }
+:root:not([data-style="plain"]) button.gun-row { font-size: 12px; }
 :root:not([data-style="plain"]) .gun-row,
 :root:not([data-style="plain"]) .dmg-row,
 :root:not([data-style="plain"]) .crew-row,
@@ -836,13 +875,6 @@ button.help-close {
 :root:not([data-style="plain"]) .dl { width: 58px; }
 :root:not([data-style="plain"]) .cl { width: 84px; }
 :root:not([data-style="plain"]) .crew-foot > span:first-child { width: 84px; }
-:root:not([data-style="plain"]) .gun-side { width: 66px; }
-:root:not([data-style="plain"]) .gun-state { width: 70px; }
-:root:not([data-style="plain"]) .panel.crew,
-:root:not([data-style="plain"]) .panel.gun { width: 262px; }
-:root:not([data-style="plain"]) .panel.dmg { width: 296px; bottom: 318px; }
-:root:not([data-style="plain"]) .panel.cmd { width: 292px; }
-:root:not([data-style="plain"]) .panel.foes { width: 236px; top: 336px; }
-/* wind box directly under the compass, so the larger type stays clear of the
- * orders panel; the enemies list follows below it */
-:root:not([data-style="plain"]) .panel.tr { top: 190px; }
+:root:not([data-style="plain"]) .gun-state { min-width: 70px; }
+:root:not([data-style="plain"]) .ship-sub { font-size: 12px; }
+:root:not([data-style="plain"]) .ship-sub .mode { font-size: 11px; }
